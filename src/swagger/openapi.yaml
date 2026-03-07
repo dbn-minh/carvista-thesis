@@ -1,0 +1,462 @@
+openapi: 3.0.3
+info:
+  title: CarVista API
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000/api
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        message: { type: string }
+        details: { type: object }
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name: { type: string }
+        email: { type: string }
+        phone: { type: string }
+        password: { type: string }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+
+  /auth/register:
+    post:
+      summary: Register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterRequest" }
+      responses:
+        "201": { description: Created }
+        "409": { description: Email exists }
+
+  /auth/login:
+    post:
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200": { description: OK }
+
+  /auth/me:
+    get:
+      summary: Current user
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+        "401": { description: Unauthorized }
+
+  /catalog/makes:
+    get:
+      summary: List makes
+      responses:
+        "200": { description: OK }
+
+  /catalog/models:
+    get:
+      summary: List models
+      parameters:
+        - in: query
+          name: makeId
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+
+  /catalog/variants:
+    get:
+      summary: Search variants
+      parameters:
+        - in: query
+          name: make
+          schema: { type: string }
+        - in: query
+          name: model
+          schema: { type: string }
+        - in: query
+          name: year
+          schema: { type: integer }
+        - in: query
+          name: fuel
+          schema: { type: string }
+        - in: query
+          name: bodyType
+          schema: { type: string }
+        - in: query
+          name: q
+          schema: { type: string }
+      responses:
+        "200": { description: OK }
+
+  /catalog/variants/{id}:
+    get:
+      summary: Variant detail (specs + kv + images)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+
+  /catalog/variants/{id}/price-history:
+    get:
+      summary: Variant price history
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: marketId
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
+      responses:
+        "200": { description: OK }
+
+  /listings:
+    get:
+      summary: List listings
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, default: active }
+        - in: query
+          name: ownerId
+          schema: { type: integer }
+        - in: query
+          name: variantId
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+    post:
+      summary: Create listing (Sell your car)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [variant_id, asking_price]
+              properties:
+                variant_id: { type: integer }
+                asking_price: { type: number }
+                mileage_km: { type: integer }
+                location_city: { type: string }
+                location_country_code: { type: string }
+                description: { type: string }
+      responses:
+        "201": { description: Created }
+        "401": { description: Unauthorized }
+
+  /listings/{id}:
+    get:
+      summary: Listing detail
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+    put:
+      summary: Update listing (owner)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+
+  /listings/{id}/requests:
+    post:
+      summary: Create viewing request (buyer -> seller)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "201": { description: Created }
+
+  /requests/outbox:
+    get:
+      summary: Buyer requests
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+
+  /requests/inbox:
+    get:
+      summary: Seller requests
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+
+  /requests/{id}/status:
+    patch:
+      summary: Update request status
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [accepted, rejected, cancelled]
+      responses:
+        "200": { description: OK }
+
+  /watchlist/variants/{id}:
+    post:
+      summary: Watch variant
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+    delete:
+      summary: Unwatch variant
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+
+  /watchlist/listings/{id}:
+    post:
+      summary: Save listing
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+    delete:
+      summary: Unsave listing
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+
+  /notifications:
+    get:
+      summary: List notifications
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+
+  /notifications/{id}/read:
+    patch:
+      summary: Mark notification read
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+
+  /reports:
+    post:
+      summary: Create report
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entity_type, entity_id, reason]
+              properties:
+                entity_type:
+                  type: string
+                  enum: [listing, car_review, seller_review, user]
+                entity_id: { type: integer }
+                reason: { type: string }
+      responses:
+        "201": { description: Created }
+
+  /admin/users:
+    get:
+      summary: Admin list users
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+
+  /admin/users/{id}/role:
+    patch:
+      summary: Admin update user role
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+
+  /admin/reports:
+    get:
+      summary: Admin list reports
+      security: [{ BearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+
+  /admin/reports/{id}:
+    patch:
+      summary: Admin update report status
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+
+  /admin/variants/{id}/price:
+    post:
+      summary: Admin add variant price point (trigger price drop notifications)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "201": { description: Created }
+
+  /ai/compare:
+    post:
+      summary: AI compare variants
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [variant_ids]
+              properties:
+                variant_ids:
+                  type: array
+                  items: { type: integer }
+                market_id: { type: integer }
+      responses:
+        "200": { description: OK }
+
+  /ai/predict-price:
+    post:
+      summary: AI price prediction (simple trend)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [variant_id, market_id]
+              properties:
+                variant_id: { type: integer }
+                market_id: { type: integer }
+                horizon_months: { type: integer, default: 6 }
+      responses:
+        "200": { description: OK }
+
+  /ai/tco:
+    post:
+      summary: AI TCO calculator (rule-based)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [profile_id, base_price]
+              properties:
+                profile_id: { type: integer }
+                base_price: { type: number }
+                years: { type: integer, default: 5 }
+      responses:
+        "200": { description: OK }
+
+  /ai/chat/sessions:
+    post:
+      summary: Create chat session
+      security: [{ BearerAuth: [] }]
+      responses:
+        "201": { description: Created }
+
+  /ai/chat/sessions/{id}/messages:
+    post:
+      summary: Send chat message (stored in DB)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string }
+      responses:
+        "200": { description: OK }
