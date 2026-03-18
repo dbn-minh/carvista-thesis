@@ -1,14 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import Header from "@/components/layout/Header";
 import StatusBanner from "@/components/common/StatusBanner";
 import EmptyState from "@/components/common/EmptyState";
 import { authApi, listingsApi } from "@/lib/carvista-api";
 import { toCurrency } from "@/lib/api-client";
+import { useRequireLogin } from "@/lib/auth-guard";
 import type { Listing, User } from "@/lib/types";
 
 export default function MyListingsPage() {
+  const ready = useRequireLogin("/my-listings");
   const [user, setUser] = useState<User | null>(null);
   const [items, setItems] = useState<Listing[]>([]);
   const [message, setMessage] = useState("");
@@ -22,6 +25,8 @@ export default function MyListingsPage() {
   const [countryCode, setCountryCode] = useState("VN");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState("active");
+
+  if (!ready) return null;
 
   async function load() {
     setLoading(true);
@@ -79,41 +84,87 @@ export default function MyListingsPage() {
     <>
       <Header />
       <main className="container-cars py-8">
-        <h1 className="mb-2 text-3xl font-bold">My listings</h1>
-        <p className="mb-6 text-sm text-slate-600">
-          Use page này để sửa price / mileage / description / status cho listing của chính bạn.
-        </p>
-        <div className="mb-6">
+        <section className="section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(233,241,255,0.9))] p-6 md:p-8">
+          <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr] xl:items-end">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
+                Seller control
+              </p>
+              <h1 className="mt-2 text-4xl font-apercu-bold text-cars-primary">My listings</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
+                Update your price, mileage, location, description, and listing status without
+                touching the underlying marketplace logic.
+              </p>
+            </div>
+
+            <div className="rounded-[28px] bg-cars-primary p-5 text-white shadow-[0_18px_44px_rgba(15,45,98,0.18)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/70">
+                Account owner
+              </p>
+              <p className="mt-2 text-2xl font-apercu-bold">{user?.name || "Loading..."}</p>
+              <p className="mt-1 text-sm text-white/80">User ID: {user?.user_id || "-"}</p>
+            </div>
+          </div>
+        </section>
+
+        <div className="mt-6">
           <StatusBanner tone={tone}>{message}</StatusBanner>
         </div>
 
-        <section className="mb-8 rounded-2xl border p-4 text-sm">
-          <p><span className="font-medium">Current user:</span> {user?.name || "-"}</p>
-          <p><span className="font-medium">user_id:</span> {user?.user_id || "-"}</p>
-        </section>
-
-        {loading ? <p>Loading your listings...</p> : null}
+        <div className="mt-6 flex items-center justify-between gap-4">
+          <p className="text-sm text-cars-gray">
+            {loading ? "Loading your listings..." : `${items.length} listing(s) owned by your account`}
+          </p>
+          <Link
+            href="/sell"
+            className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary"
+          >
+            Create another listing
+          </Link>
+        </div>
 
         {!loading && items.length === 0 ? (
-          <EmptyState
-            title="No listings created by this user"
-            description="Tạo listing ở trang Sell trước rồi quay lại đây để edit."
-          />
+          <div className="mt-6">
+            <EmptyState
+              title="No listings created by this user"
+              description="Create your first marketplace listing from the Sell page."
+            />
+          </div>
         ) : null}
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
           {items.map((item) => (
-            <article key={item.listing_id} className="rounded-2xl border p-4 text-sm">
-              <p className="text-slate-500">listing_id: {item.listing_id}</p>
-              <p className="mt-2 font-medium">Price: {toCurrency(item.asking_price)}</p>
-              <p className="mt-1">Status: {item.status}</p>
-              <p className="mt-1">Mileage: {item.mileage_km ?? "-"}</p>
-              <p className="mt-1">Location: {item.location_city || "-"} / {item.location_country_code || "-"}</p>
-              <p className="mt-2">{item.description || "No description"}</p>
+            <article key={item.listing_id} className="section-shell p-5 text-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
+                    Listing #{item.listing_id}
+                  </p>
+                  <p className="mt-3 text-2xl font-apercu-bold text-cars-primary">
+                    {toCurrency(item.asking_price)}
+                  </p>
+                </div>
+                <span className="rounded-full bg-cars-off-white px-3 py-1 font-semibold capitalize text-cars-primary">
+                  {item.status}
+                </span>
+              </div>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                <p className="rounded-[20px] bg-cars-off-white px-4 py-3">
+                  Mileage: {item.mileage_km ?? "-"}
+                </p>
+                <p className="rounded-[20px] bg-cars-off-white px-4 py-3">
+                  Location: {item.location_city || "-"} / {item.location_country_code || "-"}
+                </p>
+              </div>
+
+              <p className="mt-5 leading-6 text-cars-gray">
+                {item.description || "No seller description yet."}
+              </p>
               <button
                 type="button"
                 onClick={() => startEdit(item)}
-                className="mt-4 rounded border px-3 py-2"
+                className="mt-5 rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white"
               >
                 Edit this listing
               </button>
@@ -122,35 +173,35 @@ export default function MyListingsPage() {
         </div>
 
         {editingId ? (
-          <section className="mt-8 rounded-2xl border p-6">
-            <h2 className="mb-4 text-xl font-semibold">Edit listing #{editingId}</h2>
-            <form onSubmit={saveEdit} className="grid gap-3 md:grid-cols-2">
+          <section className="section-shell mt-8 p-6">
+            <h2 className="text-2xl font-apercu-bold text-cars-primary">Edit listing #{editingId}</h2>
+            <form onSubmit={saveEdit} className="mt-5 grid gap-4 md:grid-cols-2">
               <input
-                className="rounded border px-3 py-2"
+                className="h-11 rounded-full border border-cars-gray-light px-4 text-sm"
                 value={askingPrice}
                 onChange={(e) => setAskingPrice(e.target.value)}
                 placeholder="asking_price"
               />
               <input
-                className="rounded border px-3 py-2"
+                className="h-11 rounded-full border border-cars-gray-light px-4 text-sm"
                 value={mileageKm}
                 onChange={(e) => setMileageKm(e.target.value)}
                 placeholder="mileage_km"
               />
               <input
-                className="rounded border px-3 py-2"
+                className="h-11 rounded-full border border-cars-gray-light px-4 text-sm"
                 value={locationCity}
                 onChange={(e) => setLocationCity(e.target.value)}
                 placeholder="location_city"
               />
               <input
-                className="rounded border px-3 py-2"
+                className="h-11 rounded-full border border-cars-gray-light px-4 text-sm"
                 value={countryCode}
                 onChange={(e) => setCountryCode(e.target.value)}
                 placeholder="location_country_code"
               />
               <select
-                className="rounded border px-3 py-2"
+                className="h-11 rounded-full border border-cars-gray-light px-4 text-sm"
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
               >
@@ -161,19 +212,22 @@ export default function MyListingsPage() {
               </select>
               <div />
               <textarea
-                className="min-h-[120px] rounded border px-3 py-2 md:col-span-2"
+                className="min-h-[140px] rounded-[24px] border border-cars-gray-light px-4 py-3 text-sm md:col-span-2"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="description"
               />
               <div className="flex gap-2 md:col-span-2">
-                <button className="rounded bg-purple-800 px-4 py-2 text-white" type="submit">
+                <button
+                  className="rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white"
+                  type="submit"
+                >
                   Save update
                 </button>
                 <button
                   type="button"
                   onClick={() => setEditingId(null)}
-                  className="rounded border px-4 py-2"
+                  className="rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary"
                 >
                   Cancel
                 </button>

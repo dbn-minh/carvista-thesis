@@ -51,11 +51,23 @@ export async function apiFetch<T>(
     headers.set("Authorization", `Bearer ${authToken}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-    cache: "no-store",
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+      cache: "no-store",
+    });
+  } catch (error) {
+    const message =
+      "Cannot reach the CarVista backend right now. Please make sure the backend server is running on http://localhost:4000.";
+    throw new ApiError(
+      message,
+      undefined,
+      error instanceof Error ? { cause: error.message, path } : { path }
+    );
+  }
 
   const text = await response.text();
   let data: unknown = null;

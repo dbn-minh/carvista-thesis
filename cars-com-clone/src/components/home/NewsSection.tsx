@@ -1,158 +1,185 @@
-import type React from "react";
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
+import { useRouter } from "next/navigation";
+import { useAuthModal } from "@/components/auth/AuthModalProvider";
+import { hasToken } from "@/lib/api-client";
 
-const newsArticles = [
+const workflows = [
   {
     id: 1,
-    title: "Why Is the Battery Light On?",
+    title: "Catalog research",
+    description: "Browse real makes, models, trims, specs, and pricing history from the CarVista catalog.",
     image: "https://ext.same-assets.com/569242764/2708255373.webp",
-    link: "/articles/why-is-the-battery-light-on-1420663031640/",
+    link: "/catalog",
     featured: true,
+    requiresAuth: false,
   },
   {
     id: 2,
-    title:
-      "Slate Reveals Modular Electric Pickup Truck, SUV Priced Under $20,000 After Tax Credits",
+    title: "Marketplace listings",
+    description: "Explore active listings, save the ones you like, and send viewing requests after login.",
     image: "https://ext.same-assets.com/569242764/3296848294.webp",
-    link: "/articles/slate-reveals-modular-electric-pickup-truck-suv-priced-under-20000-after-tax-credits-508448/",
+    link: "/listings",
     featured: false,
+    requiresAuth: false,
   },
   {
     id: 3,
-    title: "Kia EVs Get Access to Tesla Supercharger Network",
+    title: "Garage and notifications",
+    description: "Track your watchlist, requests, and ownership activity from a single dashboard.",
     image: "https://ext.same-assets.com/569242764/1361286067.webp",
-    link: "/articles/kia-evs-get-access-to-tesla-supercharger-network-508469/",
+    link: "/garage",
     featured: false,
+    requiresAuth: true,
   },
   {
     id: 4,
-    title:
-      "New 2025 Audi Q5 and Q5 Sportback: Daring New Look for the Brands Bestseller",
+    title: "AI-assisted decision support",
+    description: "Compare cars, predict price, calculate TCO, and ask the advisor before you buy.",
     image: "https://ext.same-assets.com/569242764/1269782033.webp",
-    link: "/articles/new-2025-audi-q5-and-q5-sportback-daring-new-look-for-the-brands-bestseller-508083/",
+    link: "/ai",
     featured: false,
+    requiresAuth: true,
   },
 ];
 
-const NewsSection = () => {
+const quickLinks = [
+  { label: "Open the catalog and search by make or model", href: "/catalog", requiresAuth: false },
+  { label: "Browse active listings from sellers", href: "/listings", requiresAuth: false },
+  { label: "Create or manage your own listings", href: "/my-listings", requiresAuth: true },
+  { label: "Launch AI compare, TCO, and chat tools", href: "/ai", requiresAuth: true },
+];
+
+export default function NewsSection() {
+  const router = useRouter();
+  const { openAuth } = useAuthModal();
+
+  function handleProtectedRoute(href: string) {
+    if (!hasToken()) {
+      openAuth({ mode: "login", next: href });
+      return;
+    }
+    router.push(href);
+  }
+
   return (
-    <section className="py-10 bg-cars-off-white">
+    <section className="py-10">
       <div className="container-cars">
-        <h2 className="text-2xl font-apercu-bold text-cars-primary mb-6">
-          News & reviews
-        </h2>
+        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="section-shell p-6 md:p-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
+              Platform flows
+            </p>
+            <h2 className="mt-2 text-3xl font-apercu-bold text-cars-primary">
+              The Home screen now leads into real product journeys
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
+              Instead of linking to outside content, this section now explains and opens the
+              workflows already supported inside CarVista.
+            </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {newsArticles.map((article) => (
-            <NewsCard
-              key={article.id}
-              title={article.title}
-              image={article.image}
-              link={article.link}
-              featured={article.featured}
-            />
-          ))}
-        </div>
+            <div className="mt-8 grid gap-5 md:grid-cols-2">
+              {workflows.map((item) =>
+                item.requiresAuth ? (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleProtectedRoute(item.link)}
+                    className="group overflow-hidden rounded-[28px] border border-cars-gray-light/80 bg-white text-left transition-all hover:-translate-y-1 hover:border-cars-accent/25 hover:shadow-[0_16px_38px_rgba(15,45,98,0.12)]"
+                  >
+                    <div className="relative h-48 w-full">
+                      <Image src={item.image} alt={item.title} fill className="object-cover" />
+                    </div>
+                    <div className="p-5">
+                      <h3 className="text-xl font-apercu-bold text-cars-primary">{item.title}</h3>
+                      <p className="mt-3 text-sm leading-6 text-cars-gray">{item.description}</p>
+                      <span className="mt-5 inline-flex text-sm font-semibold text-cars-primary transition-colors group-hover:text-cars-accent">
+                        Open this workflow
+                      </span>
+                    </div>
+                  </button>
+                ) : (
+                  <Link
+                    key={item.id}
+                    href={item.link}
+                    className="group overflow-hidden rounded-[28px] border border-cars-gray-light/80 bg-white transition-all hover:-translate-y-1 hover:border-cars-accent/25 hover:shadow-[0_16px_38px_rgba(15,45,98,0.12)]"
+                  >
+                    <div className="relative h-48 w-full">
+                      <Image src={item.image} alt={item.title} fill className="object-cover" />
+                      {item.featured ? (
+                        <div className="absolute left-4 top-4 rounded-full bg-cars-primary px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white">
+                          Core flow
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="p-5">
+                      <h3 className="text-xl font-apercu-bold text-cars-primary">{item.title}</h3>
+                      <p className="mt-3 text-sm leading-6 text-cars-gray">{item.description}</p>
+                      <span className="mt-5 inline-flex text-sm font-semibold text-cars-primary transition-colors group-hover:text-cars-accent">
+                        Open this workflow
+                      </span>
+                    </div>
+                  </Link>
+                )
+              )}
+            </div>
+          </div>
 
-        <div className="mt-10">
-          <h3 className="font-apercu-bold text-cars-primary mb-4">
-            Trending near you
-          </h3>
-          <ol className="list-decimal list-inside space-y-3 pl-4">
-            <li>
-              <Link
-                href="/articles/teslalternatives-what-should-you-buy-if-youre-tired-of-your-tesla-507404/"
-                className="text-cars-primary hover:text-cars-accent transition-colors"
-              >
-                Teslalternatives: What Should You Buy if You're Tired of Your
-                Tesla?
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/articles/what-are-the-best-used-cars-for-20000-437804/"
-                className="text-cars-primary hover:text-cars-accent transition-colors"
-              >
-                What Are the Best Used Cars for $20,000?
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/articles/2025-toyota-sienna-gains-new-vacuum-fridge-and-remote-rear-seat-alert-489510/"
-                className="text-cars-primary hover:text-cars-accent transition-colors"
-              >
-                2025 Toyota Sienna Gains New Vacuum, Fridge and Remote Rear-Seat
-                Alert
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/articles/can-the-2024-honda-ridgeline-trailsport-really-go-off-road-486634/"
-                className="text-cars-primary hover:text-cars-accent transition-colors"
-              >
-                Can the 2024 Honda Ridgeline TrailSport Really Go Off-Road?
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/articles/here-are-the-10-cheapest-new-cars-you-can-buy-right-now-421309/"
-                className="text-cars-primary hover:text-cars-accent transition-colors"
-              >
-                Here Are the 10 Cheapest New Cars You Can Buy Right Now
-              </Link>
-            </li>
-          </ol>
+          <div className="section-shell p-6 md:p-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
+              Quick launch
+            </p>
+            <h3 className="mt-2 text-2xl font-apercu-bold text-cars-primary">
+              Everything from Home should be one click away
+            </h3>
+            <div className="mt-6 space-y-3">
+              {quickLinks.map((item, index) =>
+                item.requiresAuth ? (
+                  <button
+                    key={item.href}
+                    type="button"
+                    onClick={() => handleProtectedRoute(item.href)}
+                    className="flex w-full items-start gap-4 rounded-[24px] bg-cars-off-white px-4 py-4 text-left transition-colors hover:bg-[#e9f1ff]"
+                  >
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-apercu-bold text-cars-primary shadow-sm">
+                      {index + 1}
+                    </span>
+                    <span className="pt-1 text-sm font-medium leading-6 text-cars-primary">
+                      {item.label}
+                    </span>
+                  </button>
+                ) : (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="flex items-start gap-4 rounded-[24px] bg-cars-off-white px-4 py-4 transition-colors hover:bg-[#e9f1ff]"
+                  >
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-apercu-bold text-cars-primary shadow-sm">
+                      {index + 1}
+                    </span>
+                    <span className="pt-1 text-sm font-medium leading-6 text-cars-primary">
+                      {item.label}
+                    </span>
+                  </Link>
+                )
+              )}
+            </div>
 
-          <div className="mt-6">
-            <Link
-              href="/news/"
-              className="text-cars-primary text-sm hover:text-cars-accent transition-colors"
-            >
-              See all news
-            </Link>
+            <div className="mt-6 rounded-[24px] bg-cars-primary p-5 text-white">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+                Thesis direction
+              </p>
+              <p className="mt-3 text-sm leading-6 text-white/85">
+                The current UI now mirrors a polished automotive marketplace while still keeping
+                your AI compare, forecasting, TCO, and seller-management features in the same
+                visual language.
+              </p>
+            </div>
           </div>
         </div>
       </div>
     </section>
   );
-};
-
-type NewsCardProps = {
-  title: string;
-  image: string;
-  link: string;
-  featured: boolean;
-};
-
-const NewsCard: React.FC<NewsCardProps> = ({
-  title,
-  image,
-  link,
-  featured,
-}) => {
-  return (
-    <Card className="overflow-hidden border-none shadow-md hover:shadow-lg transition-shadow h-full">
-      <CardContent className="p-0 h-full">
-        <Link href={link} className="flex flex-col h-full">
-          <div className="relative h-48 w-full">
-            <Image src={image} alt={title} fill className="object-cover" />
-            {featured && (
-              <div className="absolute top-2 left-2 bg-cars-primary text-white text-xs px-2 py-1 rounded">
-                Featured
-              </div>
-            )}
-          </div>
-          <div className="p-4 flex-grow flex flex-col">
-            <h3 className="text-cars-primary font-apercu-bold text-lg">
-              {title}
-            </h3>
-          </div>
-        </Link>
-      </CardContent>
-    </Card>
-  );
-};
-
-export default NewsSection;
+}

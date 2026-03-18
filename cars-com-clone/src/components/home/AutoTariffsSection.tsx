@@ -1,62 +1,92 @@
-import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
-const AutoTariffsSection = () => {
+export default function AutoTariffsSection() {
   return (
-    <section className="py-12 border-t border-cars-gray-light">
+    <section className="py-10">
       <div className="container-cars">
-        <div className="flex flex-col md:flex-row items-center">
-          <div className="w-full md:w-1/2 md:pr-12 mb-8 md:mb-0">
-            <div className="flex items-center mb-2">
-              <span className="text-xs text-cars-gray bg-cars-off-white px-2 py-1 rounded-sm">
-                Cars.com news
-              </span>
+        <div className="section-shell overflow-hidden">
+          <div className="grid gap-8 px-6 py-8 md:grid-cols-[1fr_0.9fr] md:items-center md:px-8 md:py-10">
+            <div>
+              <div className="mb-2 flex items-center">
+                <span className="rounded-full bg-cars-off-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
+                  Ownership planning
+                </span>
+              </div>
+              <h2 className="text-3xl font-apercu-bold text-cars-primary">
+                Understand taxes, insurance, and long-term car cost before you commit
+              </h2>
+              <p className="mt-4 max-w-xl text-sm leading-7 text-cars-gray">
+                This block now routes into live CarVista flows. Buyers can jump into AI tools to
+                estimate total cost of ownership, compare models, and validate whether a listing
+                matches their real budget.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-4">
+                <Button
+                  variant="outline"
+                  asChild
+                  className="h-11 rounded-full border-cars-primary text-cars-primary hover:bg-cars-primary hover:text-white"
+                >
+                  <Link href="/ai">Open AI TCO tools</Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  asChild
+                  className="h-11 rounded-full border-cars-primary text-cars-primary hover:bg-cars-primary hover:text-white"
+                >
+                  <Link href="/catalog?fuel=hybrid">Browse efficient cars</Link>
+                </Button>
+              </div>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-[22px] bg-cars-off-white px-4 py-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
+                    Compare
+                  </p>
+                  <p className="mt-2 text-sm font-medium text-cars-primary">
+                    See strengths and tradeoffs between variants.
+                  </p>
+                </div>
+                <div className="rounded-[22px] bg-cars-off-white px-4 py-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
+                    Predict
+                  </p>
+                  <p className="mt-2 text-sm font-medium text-cars-primary">
+                    Estimate future pricing before you buy or sell.
+                  </p>
+                </div>
+                <div className="rounded-[22px] bg-cars-off-white px-4 py-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
+                    Plan
+                  </p>
+                  <p className="mt-2 text-sm font-medium text-cars-primary">
+                    Calculate TCO using profile-based ownership inputs.
+                  </p>
+                </div>
+              </div>
             </div>
-            <h2 className="text-2xl font-apercu-bold text-cars-primary mb-4">
-              Auto tariffs explained
-            </h2>
-            <p className="text-cars-primary mb-6">
-              How will automotive tariffs affect your next car purchase? Our
-              experts explain everything you need to know.
-            </p>
-            <div className="flex flex-wrap gap-4">
-              <Button
-                variant="outline"
-                asChild
-                className="border-cars-primary text-cars-primary hover:bg-cars-primary hover:text-white"
-              >
-                <Link href="/articles/category/auto-tariff-news/">
-                  See all tariff news
-                </Link>
-              </Button>
-              <Button
-                variant="outline"
-                asChild
-                className="border-cars-primary text-cars-primary hover:bg-cars-primary hover:text-white"
-              >
-                <Link href="/shopping/american-made-index/">
-                  Shop American-made cars
-                </Link>
-              </Button>
+
+            <div className="relative min-h-[320px]">
+              <Image
+                src="https://ext.same-assets.com/569242764/2943101928.webp"
+                alt="Ownership cost planning"
+                fill
+                className="rounded-[32px] object-cover shadow-[0_18px_48px_rgba(15,45,98,0.12)]"
+              />
+              <div className="absolute bottom-5 left-5 max-w-[240px] rounded-[24px] bg-white/92 p-4 text-cars-primary shadow-lg backdrop-blur">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
+                  Buyer decision support
+                </p>
+                <p className="mt-2 text-sm leading-6">
+                  One polished flow from catalog research into AI-assisted ownership analysis.
+                </p>
+              </div>
+              <div className="absolute -bottom-6 -right-6 hidden h-20 w-20 rounded-full bg-cars-accent md:block" />
             </div>
-          </div>
-          <div className="w-full md:w-1/2 relative">
-            <Image
-              src="https://ext.same-assets.com/569242764/2943101928.webp"
-              alt="Auto tariffs explained"
-              width={600}
-              height={400}
-              className="rounded-lg shadow-md"
-            />
-            {/* Decorative element */}
-            <div className="absolute -bottom-6 -right-6 w-20 h-20 bg-cars-accent rounded-full hidden md:block" />
           </div>
         </div>
       </div>
     </section>
   );
-};
-
-export default AutoTariffsSection;
+}

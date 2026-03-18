@@ -52,6 +52,7 @@ export default class Reports extends Model {
     tableName: 'reports',
     timestamps: true,
     createdAt: 'created_at',
+    updatedAt: false,
     indexes: [
       {
         name: "PRIMARY",

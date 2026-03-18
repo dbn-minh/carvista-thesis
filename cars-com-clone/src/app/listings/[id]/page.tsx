@@ -1,16 +1,23 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import Header from "@/components/layout/Header";
 import StatusBanner from "@/components/common/StatusBanner";
-import JsonPreview from "@/components/common/JsonPreview";
 import { listingsApi, requestsApi, reviewsApi, watchlistApi } from "@/lib/carvista-api";
-import { toCurrency } from "@/lib/api-client";
+import { hasToken, toCurrency } from "@/lib/api-client";
 import type { ListingDetail, SellerReview } from "@/lib/types";
+
+function getImageUrl(image: Record<string, unknown>): string | null {
+  const value = image.url ?? image.image_url ?? image.src ?? image.image;
+  return typeof value === "string" && value ? value : null;
+}
 
 export default function ListingDetailPage() {
   const params = useParams<{ id: string }>();
+  const { openAuth } = useAuthModal();
   const id = Number(params.id);
 
   const [detail, setDetail] = useState<ListingDetail | null>(null);
@@ -18,6 +25,7 @@ export default function ListingDetailPage() {
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState<"success" | "error" | "info">("info");
   const [loading, setLoading] = useState(true);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const [requestMessage, setRequestMessage] = useState("I want to schedule a viewing.");
   const [contactName, setContactName] = useState("Test User");
@@ -53,8 +61,22 @@ export default function ListingDetailPage() {
     }
   }, [id]);
 
+  const gallery = useMemo(
+    () => (detail?.images || []).map(getImageUrl).filter((item): item is string => Boolean(item)),
+    [detail]
+  );
+
+  useEffect(() => {
+    setSelectedImage(gallery[0] || null);
+  }, [gallery]);
+
   async function sendRequest(e: FormEvent) {
     e.preventDefault();
+    if (!hasToken()) {
+      openAuth({ mode: "login", next: `/listings/${id}` });
+      return;
+    }
+
     try {
       await requestsApi.createRequest(id, {
         message: requestMessage,
@@ -71,6 +93,11 @@ export default function ListingDetailPage() {
   }
 
   async function saveListing() {
+    if (!hasToken()) {
+      openAuth({ mode: "login", next: `/listings/${id}` });
+      return;
+    }
+
     try {
       await watchlistApi.saveListing(id);
       setTone("success");
@@ -84,6 +111,11 @@ export default function ListingDetailPage() {
   async function submitSellerReview(e: FormEvent) {
     e.preventDefault();
     if (!detail) return;
+    if (!hasToken()) {
+      openAuth({ mode: "login", next: `/listings/${id}` });
+      return;
+    }
+
     try {
       await reviewsApi.createSellerReview({
         seller_id: detail.listing.owner_id,
@@ -105,123 +137,220 @@ export default function ListingDetailPage() {
     <>
       <Header />
       <main className="container-cars py-8">
-        <h1 className="mb-2 text-3xl font-bold">Listing detail</h1>
-        <p className="mb-6 text-sm text-slate-600">listing_id: {id}</p>
-        <div className="mb-6">
+        <section className="section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(233,241,255,0.9))] p-6 md:p-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
+                Listing detail
+              </p>
+              <h1 className="mt-2 text-4xl font-apercu-bold text-cars-primary">
+                Seller listing #{id}
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
+                Review the listing, then log in to save it, request a viewing, or submit a
+                seller review after your interaction.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/listings"
+                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-white"
+              >
+                Back to listings
+              </Link>
+              {!hasToken() ? (
+                <button
+                  type="button"
+                  onClick={() => openAuth({ mode: "login", next: `/listings/${id}` })}
+                  className="rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white"
+                >
+                  Login to interact
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </section>
+
+        <div className="mb-6 mt-6">
           <StatusBanner tone={tone}>{message}</StatusBanner>
         </div>
 
-        {loading ? <p>Loading listing detail...</p> : null}
+        {loading ? <p className="text-sm text-cars-gray">Loading listing detail...</p> : null}
 
         {detail?.listing ? (
-          <section className="mb-8 grid gap-6 lg:grid-cols-[2fr_1fr]">
-            <div className="rounded-2xl border p-5">
-              <h2 className="mb-4 text-xl font-semibold">Overview</h2>
-              <div className="grid gap-3 md:grid-cols-2 text-sm">
-                <p><span className="font-medium">Variant:</span> {detail.listing.variant_id}</p>
-                <p><span className="font-medium">Seller:</span> {detail.listing.owner_id}</p>
-                <p><span className="font-medium">Status:</span> {detail.listing.status}</p>
-                <p><span className="font-medium">Price:</span> {toCurrency(detail.listing.asking_price)}</p>
-                <p><span className="font-medium">Mileage:</span> {detail.listing.mileage_km ?? "-"} km</p>
-                <p><span className="font-medium">Location:</span> {detail.listing.location_city || "-"} / {detail.listing.location_country_code || "-"}</p>
+          <section className="mb-8 grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="section-shell p-6">
+              <h2 className="text-2xl font-apercu-bold text-cars-primary">Listing gallery</h2>
+              {selectedImage ? (
+                <div className="mt-5 overflow-hidden rounded-[28px] bg-cars-off-white">
+                  <img
+                    src={selectedImage}
+                    alt={`Listing ${id}`}
+                    className="h-[360px] w-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="mt-5 flex h-[360px] items-center justify-center rounded-[28px] bg-cars-off-white text-sm font-medium text-cars-gray">
+                  No listing images uploaded yet.
+                </div>
+              )}
+
+              {gallery.length > 1 ? (
+                <div className="mt-4 grid grid-cols-4 gap-3">
+                  {gallery.map((image) => (
+                    <button
+                      key={image}
+                      type="button"
+                      onClick={() => setSelectedImage(image)}
+                      className={
+                        image === selectedImage
+                          ? "overflow-hidden rounded-[18px] ring-2 ring-cars-accent"
+                          : "overflow-hidden rounded-[18px] border border-cars-gray-light/70"
+                      }
+                    >
+                      <img src={image} alt={`Listing ${id}`} className="h-20 w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="section-shell p-6">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
+                    Overview
+                  </p>
+                  <h2 className="mt-2 text-3xl font-apercu-bold text-cars-primary">
+                    {toCurrency(detail.listing.asking_price)}
+                  </h2>
+                </div>
+                <span className="rounded-full bg-cars-off-white px-3 py-1 text-sm font-semibold capitalize text-cars-primary">
+                  {detail.listing.status}
+                </span>
               </div>
-              <p className="mt-4 text-sm">{detail.listing.description || "No description"}</p>
-              <div className="mt-5 flex gap-2">
+
+              <div className="mt-6 grid gap-3 text-sm md:grid-cols-2">
+                <p className="rounded-[20px] bg-cars-off-white px-4 py-3">
+                  <span className="font-medium text-cars-primary">Variant:</span>{" "}
+                  {detail.listing.variant_id}
+                </p>
+                <p className="rounded-[20px] bg-cars-off-white px-4 py-3">
+                  <span className="font-medium text-cars-primary">Seller:</span>{" "}
+                  {detail.listing.owner_id}
+                </p>
+                <p className="rounded-[20px] bg-cars-off-white px-4 py-3">
+                  <span className="font-medium text-cars-primary">Mileage:</span>{" "}
+                  {detail.listing.mileage_km ?? "-"} km
+                </p>
+                <p className="rounded-[20px] bg-cars-off-white px-4 py-3">
+                  <span className="font-medium text-cars-primary">Location:</span>{" "}
+                  {detail.listing.location_city || "-"} /{" "}
+                  {detail.listing.location_country_code || "-"}
+                </p>
+              </div>
+
+              <p className="mt-6 text-sm leading-7 text-cars-gray">
+                {detail.listing.description || "Seller has not added a description yet."}
+              </p>
+
+              <div className="mt-6 flex gap-2">
                 <button
                   type="button"
                   onClick={saveListing}
-                  className="rounded border px-4 py-2 text-sm"
+                  className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
                 >
                   Save listing
                 </button>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border p-5">
-              <h2 className="mb-4 text-xl font-semibold">Listing images</h2>
-              {detail.images.length === 0 ? <p className="text-sm text-slate-600">No images.</p> : null}
-              <div className="space-y-2 text-sm">
-                {detail.images.map((img, index) => (
-                  <div key={index} className="rounded border p-3">
-                    <p>image_url: {String(img.image_url ?? "-")}</p>
-                    <p>sort_order: {String(img.sort_order ?? "-")}</p>
-                  </div>
-                ))}
               </div>
             </div>
           </section>
         ) : null}
 
         <section className="mb-8 grid gap-6 xl:grid-cols-2">
-          <div className="rounded-2xl border p-5">
-            <h2 className="mb-4 text-xl font-semibold">Create viewing request</h2>
+          <div className="section-shell p-6">
+            <h2 className="text-2xl font-apercu-bold text-cars-primary">Create viewing request</h2>
+            <p className="mt-3 text-sm leading-6 text-cars-gray">
+              This action opens the auth popup if you are not signed in yet.
+            </p>
             <form onSubmit={sendRequest} className="space-y-3">
               <input
-                className="w-full rounded border px-3 py-2"
+                className="mt-5 h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
                 value={contactName}
                 onChange={(e) => setContactName(e.target.value)}
                 placeholder="contact_name"
               />
               <input
-                className="w-full rounded border px-3 py-2"
+                className="h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
                 value={contactEmail}
                 onChange={(e) => setContactEmail(e.target.value)}
                 placeholder="contact_email"
               />
               <input
-                className="w-full rounded border px-3 py-2"
+                className="h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
                 value={contactPhone}
                 onChange={(e) => setContactPhone(e.target.value)}
                 placeholder="contact_phone"
               />
               <textarea
-                className="min-h-[120px] w-full rounded border px-3 py-2"
+                className="min-h-[120px] w-full rounded-[24px] border border-cars-gray-light px-4 py-3 text-sm"
                 value={requestMessage}
                 onChange={(e) => setRequestMessage(e.target.value)}
                 placeholder="message"
               />
-              <button className="rounded bg-purple-800 px-4 py-2 text-white" type="submit">
+              <button
+                className="rounded-full bg-cars-accent px-5 py-2.5 text-sm font-semibold text-white"
+                type="submit"
+              >
                 Submit request
               </button>
             </form>
           </div>
 
-          <div className="rounded-2xl border p-5">
-            <h2 className="mb-4 text-xl font-semibold">Create seller review</h2>
+          <div className="section-shell p-6">
+            <h2 className="text-2xl font-apercu-bold text-cars-primary">Create seller review</h2>
+            <p className="mt-3 text-sm leading-6 text-cars-gray">
+              Leave a rating and comment for the seller after a real interaction.
+            </p>
             <form onSubmit={submitSellerReview} className="space-y-3">
               <input
-                className="w-full rounded border px-3 py-2"
+                className="mt-5 h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
                 value={rating}
                 onChange={(e) => setRating(e.target.value)}
                 placeholder="rating 1-5"
               />
               <textarea
-                className="min-h-[120px] w-full rounded border px-3 py-2"
+                className="min-h-[120px] w-full rounded-[24px] border border-cars-gray-light px-4 py-3 text-sm"
                 value={reviewComment}
                 onChange={(e) => setReviewComment(e.target.value)}
                 placeholder="comment"
               />
-              <button className="rounded bg-purple-800 px-4 py-2 text-white" type="submit">
+              <button
+                className="rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white"
+                type="submit"
+              >
                 Submit seller review
               </button>
             </form>
           </div>
         </section>
 
-        <section className="mb-8 rounded-2xl border p-5">
-          <h2 className="mb-4 text-xl font-semibold">Seller reviews</h2>
+        <section className="mb-8 section-shell p-6">
+          <h2 className="text-2xl font-apercu-bold text-cars-primary">Seller reviews</h2>
           <div className="space-y-3 text-sm">
-            {reviews.length === 0 ? <p className="text-slate-600">No seller reviews yet.</p> : null}
+            {reviews.length === 0 ? <p className="mt-4 text-cars-gray">No seller reviews yet.</p> : null}
             {reviews.map((review, index) => (
-              <div key={review.seller_review_id || index} className="rounded border p-3">
-                <p className="font-medium">rating: {review.rating}/5</p>
-                <p className="mt-1">{review.comment || "-"}</p>
+              <div
+                key={review.seller_review_id || index}
+                className="mt-4 rounded-[22px] border border-cars-gray-light/70 p-4"
+              >
+                <p className="font-medium text-cars-primary">Rating: {review.rating}/5</p>
+                <p className="mt-2 text-cars-gray">{review.comment || "-"}</p>
               </div>
             ))}
           </div>
         </section>
-
-        <JsonPreview title="Raw listing payload" data={detail} />
       </main>
     </>
   );

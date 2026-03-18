@@ -31,6 +31,7 @@ export default class AiChatSessions extends Model {
     tableName: 'ai_chat_sessions',
     timestamps: true,
     createdAt: 'created_at',
+    updatedAt: false,
     indexes: [
       {
         name: "PRIMARY",

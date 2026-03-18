@@ -39,6 +39,7 @@ export default class VariantSpecKv extends Model {
     tableName: 'variant_spec_kv',
     timestamps: true,
     createdAt: 'created_at',
+    updatedAt: false,
     indexes: [
       {
         name: "PRIMARY",

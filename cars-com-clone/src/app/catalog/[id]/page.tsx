@@ -1,20 +1,27 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import Header from "@/components/layout/Header";
 import StatusBanner from "@/components/common/StatusBanner";
-import JsonPreview from "@/components/common/JsonPreview";
 import { catalogApi, reviewsApi, watchlistApi } from "@/lib/carvista-api";
-import { toCurrency } from "@/lib/api-client";
+import { hasToken, toCurrency } from "@/lib/api-client";
 import type { CarReview, VariantDetail } from "@/lib/types";
 
 function getText(value: unknown): string {
   return value == null ? "-" : String(value);
 }
 
+function getImageUrl(image: Record<string, unknown>): string | null {
+  const value = image.url ?? image.image_url ?? image.src ?? image.image;
+  return typeof value === "string" && value ? value : null;
+}
+
 export default function CatalogDetailPage() {
   const params = useParams<{ id: string }>();
+  const { openAuth } = useAuthModal();
   const id = Number(params.id);
 
   const [marketId, setMarketId] = useState("1");
@@ -24,6 +31,7 @@ export default function CatalogDetailPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState<"success" | "error" | "info">("info");
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const [rating, setRating] = useState("5");
   const [title, setTitle] = useState("Good car");
@@ -55,12 +63,26 @@ export default function CatalogDetailPage() {
     }
   }, [id]);
 
+  const gallery = useMemo(
+    () => (detail?.images || []).map(getImageUrl).filter((item): item is string => Boolean(item)),
+    [detail]
+  );
+
+  useEffect(() => {
+    setSelectedImage(gallery[0] || null);
+  }, [gallery]);
+
   async function reloadHistory(e: FormEvent) {
     e.preventDefault();
     await load(Number(marketId));
   }
 
   async function saveVariant() {
+    if (!hasToken()) {
+      openAuth({ mode: "login", next: `/catalog/${id}` });
+      return;
+    }
+
     try {
       await watchlistApi.saveVariant(id);
       setTone("success");
@@ -73,6 +95,11 @@ export default function CatalogDetailPage() {
 
   async function submitReview(e: FormEvent) {
     e.preventDefault();
+    if (!hasToken()) {
+      openAuth({ mode: "login", next: `/catalog/${id}` });
+      return;
+    }
+
     try {
       await reviewsApi.createCarReview({
         variant_id: id,
@@ -93,68 +120,108 @@ export default function CatalogDetailPage() {
   const heading = useMemo(() => {
     const variant = detail?.variant;
     if (!variant) return `Variant #${id}`;
-    return `${getText(variant.make_name || variant.make_id)} ${getText(
-      variant.model_name || variant.model_id
-    )} ${getText(variant.trim_name)}`.trim();
+    const modelYear = getText(variant.model_year);
+    const trim = getText(variant.trim_name);
+    return `${modelYear} ${trim}`.trim();
   }, [detail, id]);
+
+  const specCards = [
+    { label: "Body type", value: detail?.variant?.body_type },
+    { label: "Fuel", value: detail?.variant?.fuel_type },
+    { label: "Engine", value: detail?.variant?.engine },
+    { label: "Transmission", value: detail?.variant?.transmission },
+    { label: "Drivetrain", value: detail?.variant?.drivetrain },
+    { label: "MSRP", value: toCurrency(detail?.variant?.msrp_base) },
+  ];
 
   return (
     <>
       <Header />
       <main className="container-cars py-8">
-        <h1 className="mb-2 text-3xl font-bold">{heading}</h1>
-        <p className="mb-6 text-sm text-slate-600">variant_id: {id}</p>
-        <div className="mb-6">
+        <section className="section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(233,241,255,0.9))] p-6 md:p-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
+                Catalog detail
+              </p>
+              <h1 className="mt-2 text-4xl font-apercu-bold text-cars-primary">{heading}</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
+                Use this screen to review visuals, specs, price history, and user feedback before
+                saving the car or moving into marketplace and AI flows.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/catalog"
+                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-white"
+              >
+                Back to catalog
+              </Link>
+              <button
+                type="button"
+                onClick={saveVariant}
+                className="rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white"
+              >
+                Save to watchlist
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <div className="mb-6 mt-6">
           <StatusBanner tone={tone}>{message}</StatusBanner>
         </div>
 
-        {loading ? <p>Loading variant detail...</p> : null}
+        {loading ? <p className="text-sm text-cars-gray">Loading variant detail...</p> : null}
 
         {detail?.variant ? (
-          <section className="mb-8 grid gap-6 lg:grid-cols-[2fr_1fr]">
-            <div className="rounded-2xl border p-5">
-              <h2 className="mb-4 text-xl font-semibold">Overview</h2>
-              <div className="grid gap-3 md:grid-cols-2">
-                <p><span className="font-medium">Model year:</span> {getText(detail.variant.model_year)}</p>
-                <p><span className="font-medium">Body type:</span> {getText(detail.variant.body_type)}</p>
-                <p><span className="font-medium">Fuel:</span> {getText(detail.variant.fuel_type)}</p>
-                <p><span className="font-medium">Engine:</span> {getText(detail.variant.engine)}</p>
-                <p><span className="font-medium">Transmission:</span> {getText(detail.variant.transmission)}</p>
-                <p><span className="font-medium">Drivetrain:</span> {getText(detail.variant.drivetrain)}</p>
-                <p><span className="font-medium">MSRP:</span> {toCurrency(detail.variant.msrp_base)}</p>
-              </div>
+          <section className="mb-8 grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="section-shell p-6">
+              <h2 className="text-2xl font-apercu-bold text-cars-primary">Photo gallery</h2>
+              {selectedImage ? (
+                <div className="mt-5 overflow-hidden rounded-[28px] bg-cars-off-white">
+                  <img
+                    src={selectedImage}
+                    alt={heading}
+                    className="h-[360px] w-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="mt-5 flex h-[360px] items-center justify-center rounded-[28px] bg-cars-off-white text-sm font-medium text-cars-gray">
+                  No catalog images seeded for this variant yet.
+                </div>
+              )}
 
-              <div className="mt-5 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={saveVariant}
-                  className="rounded bg-purple-800 px-4 py-2 text-sm text-white"
-                >
-                  Save to watchlist
-                </button>
-              </div>
+              {gallery.length > 1 ? (
+                <div className="mt-4 grid grid-cols-4 gap-3">
+                  {gallery.map((image) => (
+                    <button
+                      key={image}
+                      type="button"
+                      onClick={() => setSelectedImage(image)}
+                      className={
+                        image === selectedImage
+                          ? "overflow-hidden rounded-[18px] ring-2 ring-cars-accent"
+                          : "overflow-hidden rounded-[18px] border border-cars-gray-light/70"
+                      }
+                    >
+                      <img src={image} alt={heading} className="h-20 w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
 
-            <div className="rounded-2xl border p-5">
-              <h2 className="mb-4 text-xl font-semibold">Price history</h2>
-              <form onSubmit={reloadHistory} className="mb-4 flex gap-2">
-                <input
-                  value={marketId}
-                  onChange={(e) => setMarketId(e.target.value)}
-                  className="w-full rounded border px-3 py-2"
-                  placeholder="marketId"
-                />
-                <button className="rounded border px-3 py-2 text-sm" type="submit">
-                  Reload
-                </button>
-              </form>
-              <div className="space-y-2 text-sm">
-                {priceHistory.length === 0 ? <p>No price history.</p> : null}
-                {priceHistory.map((row, index) => (
-                  <div key={index} className="rounded border p-3">
-                    <p>price: {toCurrency(row.price)}</p>
-                    <p>captured_at: {getText(row.captured_at)}</p>
-                    <p>source: {getText(row.source)}</p>
+            <div className="section-shell p-6">
+              <h2 className="text-2xl font-apercu-bold text-cars-primary">Overview</h2>
+              <div className="mt-5 grid gap-3">
+                {specCards.map((item) => (
+                  <div key={item.label} className="rounded-[20px] bg-cars-off-white px-4 py-3 text-sm">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
+                      {item.label}
+                    </p>
+                    <p className="mt-2 font-medium text-cars-primary">{getText(item.value)}</p>
                   </div>
                 ))}
               </div>
@@ -163,51 +230,88 @@ export default function CatalogDetailPage() {
         ) : null}
 
         <section className="mb-8 grid gap-6 xl:grid-cols-2">
-          <div className="rounded-2xl border p-5">
-            <h2 className="mb-4 text-xl font-semibold">Create car review</h2>
+          <div className="section-shell p-6">
+            <h2 className="text-2xl font-apercu-bold text-cars-primary">Price history</h2>
+            <form onSubmit={reloadHistory} className="mt-5 flex gap-3">
+              <input
+                value={marketId}
+                onChange={(e) => setMarketId(e.target.value)}
+                className="h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
+                placeholder="marketId"
+              />
+              <button
+                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary"
+                type="submit"
+              >
+                Reload
+              </button>
+            </form>
+            <div className="mt-5 space-y-3 text-sm">
+              {priceHistory.length === 0 ? <p className="text-cars-gray">No price history.</p> : null}
+              {priceHistory.map((row, index) => (
+                <div
+                  key={index}
+                  className="rounded-[22px] border border-cars-gray-light/70 p-4"
+                >
+                  <p className="font-medium text-cars-primary">Price: {toCurrency(row.price)}</p>
+                  <p className="mt-2 text-cars-gray">Captured: {getText(row.captured_at)}</p>
+                  <p className="mt-1 text-cars-gray">Source: {getText(row.source)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="section-shell p-6">
+            <h2 className="text-2xl font-apercu-bold text-cars-primary">Create car review</h2>
+            <p className="mt-3 text-sm leading-6 text-cars-gray">
+              Reviews require login and help build the user-generated feedback layer of CarVista.
+            </p>
             <form onSubmit={submitReview} className="space-y-3">
               <input
-                className="w-full rounded border px-3 py-2"
+                className="mt-5 h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
                 value={rating}
                 onChange={(e) => setRating(e.target.value)}
                 placeholder="rating 1-5"
               />
               <input
-                className="w-full rounded border px-3 py-2"
+                className="h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="title"
               />
               <textarea
-                className="min-h-[120px] w-full rounded border px-3 py-2"
+                className="min-h-[120px] w-full rounded-[24px] border border-cars-gray-light px-4 py-3 text-sm"
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="comment"
               />
-              <button className="rounded bg-purple-800 px-4 py-2 text-white" type="submit">
+              <button
+                className="rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white"
+                type="submit"
+              >
                 Submit review
               </button>
             </form>
           </div>
-
-          <div className="rounded-2xl border p-5">
-            <h2 className="mb-4 text-xl font-semibold">Car reviews</h2>
-            <div className="space-y-3">
-              {reviews.length === 0 ? <p className="text-sm text-slate-600">No reviews yet.</p> : null}
-              {reviews.map((review, index) => (
-                <div key={review.car_review_id || index} className="rounded border p-3 text-sm">
-                  <p className="font-medium">{review.title || `Rating ${review.rating}/5`}</p>
-                  <p className="mt-1">rating: {review.rating}/5</p>
-                  <p className="mt-1">{review.comment || "-"}</p>
-                </div>
-              ))}
-            </div>
-          </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-2">
-          <JsonPreview title="Raw variant payload" data={detail?.variant || null} />
-          <JsonPreview title="Raw specs payload" data={{ spec: detail?.spec, kv: detail?.kv, images: detail?.images }} />
+        <section className="section-shell p-6">
+          <h2 className="text-2xl font-apercu-bold text-cars-primary">Car reviews</h2>
+          <div className="mt-5 space-y-3">
+            {reviews.length === 0 ? <p className="text-sm text-cars-gray">No reviews yet.</p> : null}
+            {reviews.map((review, index) => (
+              <div
+                key={review.car_review_id || index}
+                className="rounded-[22px] border border-cars-gray-light/70 p-4 text-sm"
+              >
+                <p className="font-medium text-cars-primary">
+                  {review.title || `Rating ${review.rating}/5`}
+                </p>
+                <p className="mt-2 text-cars-gray">Rating: {review.rating}/5</p>
+                <p className="mt-2 text-cars-gray">{review.comment || "-"}</p>
+              </div>
+            ))}
+          </div>
         </section>
       </main>
     </>

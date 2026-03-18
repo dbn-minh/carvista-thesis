@@ -29,6 +29,7 @@ export default class CarMakes extends Model {
     tableName: 'car_makes',
     timestamps: true,
     createdAt: 'created_at',
+    updatedAt: false,
     indexes: [
       {
         name: "PRIMARY",

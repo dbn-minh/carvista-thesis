@@ -384,6 +384,7 @@ paths:
   /ai/compare:
     post:
       summary: AI compare variants
+      security: [{ BearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -402,6 +403,7 @@ paths:
   /ai/predict-price:
     post:
       summary: AI price prediction (simple trend)
+      security: [{ BearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -419,44 +421,35 @@ paths:
   /ai/tco:
     post:
       summary: AI TCO calculator (rule-based)
+      security: [{ BearerAuth: [] }]
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [profile_id, base_price]
+              required: [profile_id, base_price, ownership_years]
               properties:
                 profile_id: { type: integer }
                 base_price: { type: number }
-                years: { type: integer, default: 5 }
+                ownership_years: { type: integer, default: 5 }
       responses:
         "200": { description: OK }
 
-  /ai/chat/sessions:
+  /ai/chat:
     post:
-      summary: Create chat session
+      summary: AI advisor chat
       security: [{ BearerAuth: [] }]
-      responses:
-        "201": { description: Created }
-
-  /ai/chat/sessions/{id}/messages:
-    post:
-      summary: Send chat message (stored in DB)
-      security: [{ BearerAuth: [] }]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: integer }
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [content]
+              required: [message]
               properties:
-                content: { type: string }
+                session_id: { type: integer }
+                message: { type: string }
+                context: { type: object }
       responses:
         "200": { description: OK }

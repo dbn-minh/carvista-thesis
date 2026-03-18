@@ -1,275 +1,164 @@
-import type React from "react";
+"use client";
+
 import Link from "next/link";
-import Image from "next/image";
-import { Separator } from "@/components/ui/separator";
-import { ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useAuthModal } from "@/components/auth/AuthModalProvider";
+import { hasToken } from "@/lib/api-client";
 
-const Footer = () => {
+const quickLinks = [
+  { href: "/catalog", label: "Browse catalog", mode: "link" },
+  { href: "/listings", label: "Explore listings", mode: "link" },
+  { href: "/sell", label: "Sell your car", mode: "login" },
+  { href: "/garage", label: "Garage dashboard", mode: "login" },
+] as const;
+
+const featureLinks = [
+  { href: "/ai", label: "AI compare and advisor", mode: "login" },
+  { href: "/catalog", label: "Vehicle research", mode: "link" },
+  { href: "/my-listings", label: "Manage my listings", mode: "login" },
+  { href: "/register", label: "Create an account", mode: "register" },
+] as const;
+
+const thesisLinks = [
+  "Global catalog and detailed specs",
+  "Marketplace listing and seller contact flows",
+  "Watchlist, notifications, and user-generated reviews",
+  "AI compare, price trend, and TCO experiments",
+];
+
+export default function Footer() {
+  const router = useRouter();
+  const { openAuth } = useAuthModal();
+
+  function openProtected(href: string) {
+    if (!hasToken()) {
+      openAuth({ mode: "login", next: href });
+      return;
+    }
+    router.push(href);
+  }
+
   return (
-    <footer className="bg-white pt-8 pb-4">
-      <div className="container-cars">
-        {/* Footer Main Links Section */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div>
-            <h3 className="text-sm font-apercu-bold text-cars-primary mb-4">
-              Buying & Selling
-            </h3>
-            <ul className="space-y-2">
-              <FooterLink href="/finance/" label="Financing" />
-              <FooterLink href="/shopping/" label="Find a Car" />
-              <FooterLink href="/dealers/buy/" label="Find a Dealer" />
-              <FooterLink
-                href="/sitemap/city-listings/"
-                label="Listings by City"
-              />
-              <FooterLink href="/cpo/" label="Certified Pre-Owned" />
-              <FooterLink
-                href="/car-loan-calculator/"
-                label="Car Payment Calculators"
-              />
-              <FooterLink href="/reviews/" label="Car Reviews & Ratings" />
-              <FooterLink
-                href="/research/compare/"
-                label="Compare Side by Side"
-              />
-              <FooterLink href="/fraud-awareness/" label="Fraud Awareness" />
-              <FooterLink href="/sell/" label="Sell Your Car" />
-            </ul>
-          </div>
+    <footer className="border-t border-cars-gray-light/80 bg-white">
+      <div className="container-cars py-14">
+        <div className="section-shell overflow-hidden bg-cars-primary text-white">
+          <div className="grid gap-10 px-6 py-8 md:grid-cols-[1.5fr_1fr_1fr] md:px-10 md:py-10">
+            <div>
+              <p className="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-white/70">
+                CarVista
+              </p>
+              <h2 className="max-w-xl text-3xl font-apercu-bold leading-tight">
+                A thesis-ready car platform inspired by cars.com, expanded with AI-first
+                workflows.
+              </h2>
+              <p className="mt-4 max-w-xl text-sm leading-6 text-white/80">
+                The current product combines catalog exploration, marketplace listings,
+                seller communication, reviews, saved logs, and AI-assisted insights in one
+                consistent experience.
+              </p>
+            </div>
 
-          <div>
-            <h3 className="text-sm font-apercu-bold text-cars-primary mb-4">
-              Explore Our Brand
-            </h3>
-            <ul className="space-y-2">
-              <FooterLink
-                href="https://www.newcars.com/"
-                label="NewCars.com"
-                external
-              />
-              <FooterLink
-                href="https://www.dealerrater.com/"
-                label="DealerRater"
-                external
-              />
-            </ul>
-          </div>
+            <div>
+              <h3 className="mb-4 text-sm font-apercu-bold uppercase tracking-[0.18em] text-white/70">
+                Explore
+              </h3>
+              <ul className="space-y-3 text-sm">
+                {quickLinks.map((item) => (
+                  <li key={item.href}>
+                    {item.mode === "link" ? (
+                      <Link href={item.href} className="transition-colors hover:text-white/70">
+                        {item.label}
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openProtected(item.href)}
+                        className="transition-colors hover:text-white/70"
+                      >
+                        {item.label}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
 
-          <div>
-            <h3 className="text-sm font-apercu-bold text-cars-primary mb-4">
-              For Dealer Partners
-            </h3>
-            <ul className="space-y-2">
-              <FooterLink
-                href="https://hub.carscommerce.inc/"
-                label="Platform Log-In"
-                external
-              />
-              <FooterLink
-                href="https://www.carscommerce.inc/"
-                label="Cars Commerce Overview"
-                external
-              />
-              <FooterLink
-                href="https://www.carscommerce.inc/marketplace/"
-                label="Cars.com"
-                external
-              />
-              <FooterLink
-                href="https://www.carscommerce.inc/dealer-inspire/"
-                label="Dealer Inspire"
-                external
-              />
-              <FooterLink
-                href="https://www.carscommerce.inc/accutrade/"
-                label="AccuTrade"
-                external
-              />
-              <FooterLink
-                href="https://www.carscommerce.inc/media-network/"
-                label="Cars Commerce Media Network"
-                external
-              />
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="text-sm font-apercu-bold text-cars-primary mb-4">
-              Our Company
-            </h3>
-            <ul className="space-y-2">
-              <FooterLink href="/about/" label="About Cars.com" />
-              <FooterLink href="/contact/" label="Contact Cars.com" />
-              <FooterLink
-                href="https://investor.cars.com/overview/default.aspx"
-                label="Investor Relations"
-                external
-              />
-              <FooterLink href="/careers/" label="Careers" />
-              <FooterLink
-                href="https://info.wrightsmedia.com/cars-licensing-reprints"
-                label="Licensing & Reprints"
-                external
-              />
-              <FooterLink href="/sitemap/" label="Site Map" />
-            </ul>
+            <div>
+              <h3 className="mb-4 text-sm font-apercu-bold uppercase tracking-[0.18em] text-white/70">
+                Features
+              </h3>
+              <ul className="space-y-3 text-sm">
+                {featureLinks.map((item) => (
+                  <li key={item.href}>
+                    {item.mode === "link" ? (
+                      <Link href={item.href} className="transition-colors hover:text-white/70">
+                        {item.label}
+                      </Link>
+                    ) : item.mode === "register" ? (
+                      <button
+                        type="button"
+                        onClick={() => openAuth({ mode: "register", next: "/" })}
+                        className="transition-colors hover:text-white/70"
+                      >
+                        {item.label}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openProtected(item.href)}
+                        className="transition-colors hover:text-white/70"
+                      >
+                        {item.label}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
 
-        {/* Mobile App Links */}
-        <div className="mb-8">
-          <h3 className="text-sm font-apercu-bold text-cars-primary mb-4">
-            Our Mobile App
-          </h3>
-          <div className="flex space-x-4">
-            <Link
-              href="https://apps.apple.com/us/app/cars-com-new-used-cars/id353263352"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Image
-                src="https://ext.same-assets.com/569242764/207591330.webp"
-                alt="Download on the App Store"
-                width={120}
-                height={40}
-              />
-            </Link>
-            <Link
-              href="https://play.google.com/store/apps/details?id=com.cars.android&hl=en_US"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Image
-                src="https://ext.same-assets.com/569242764/2621382653.webp"
-                alt="Get it on Google Play"
-                width={120}
-                height={40}
-              />
-            </Link>
+        <div className="mt-8 grid gap-8 md:grid-cols-[1.2fr_1fr]">
+          <div className="section-shell p-6">
+            <h3 className="text-lg font-apercu-bold text-cars-primary">Current project scope</h3>
+            <ul className="mt-4 grid gap-3 text-sm text-cars-primary md:grid-cols-2">
+              {thesisLinks.map((item) => (
+                <li key={item} className="rounded-2xl bg-cars-off-white px-4 py-3">
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="section-shell p-6">
+            <h3 className="text-lg font-apercu-bold text-cars-primary">Need a quick start?</h3>
+            <p className="mt-3 text-sm leading-6 text-cars-gray">
+              Start from Catalog to research cars, move to Listings to see marketplace
+              inventory, then use AI tools to compare vehicles and estimate ownership cost.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link
+                href="/catalog"
+                className="rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white"
+              >
+                Browse catalog
+              </Link>
+              <button
+                type="button"
+                onClick={() => openProtected("/ai")}
+                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary"
+              >
+                Open AI tools
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Social Media Links */}
-        <div className="mb-8">
-          <h3 className="text-sm font-apercu-bold text-cars-primary mb-4">
-            Connect With Us
-          </h3>
-          <div className="flex space-x-4">
-            <SocialLink
-              href="https://www.tiktok.com/@carsdotcom"
-              icon="tiktok"
-            />
-            <SocialLink
-              href="https://www.facebook.com/CarsDotCom/"
-              icon="facebook"
-            />
-            <SocialLink
-              href="https://www.youtube.com/user/Carscom/"
-              icon="youtube"
-            />
-            <SocialLink
-              href="https://www.instagram.com/carsdotcom/"
-              icon="instagram"
-            />
-            <SocialLink
-              href="https://www.pinterest.com/carsdotcom/"
-              icon="pinterest"
-            />
-          </div>
+        <div className="mt-8 flex flex-col gap-2 border-t border-cars-gray-light/70 pt-5 text-sm text-cars-gray md:flex-row md:items-center md:justify-between">
+          <p>CarVista thesis prototype. Inspired by cars.com, extended with AI-powered workflows.</p>
+          <p>Built with Next.js, Node.js, MySQL, Sequelize, and custom AI services.</p>
         </div>
-
-        {/* Legal Links */}
-        <Separator className="mb-4" />
-        <div className="flex flex-wrap justify-start gap-4 text-xs text-cars-primary mb-4">
-          <Link
-            href="/about/terms/"
-            className="hover:text-cars-accent transition-colors"
-          >
-            Terms & Conditions of Use
-          </Link>
-          <Link
-            href="/about/privacy/"
-            className="hover:text-cars-accent transition-colors"
-          >
-            Privacy Notice
-          </Link>
-          <Link
-            href="/about/ccpa-privacy-notice/"
-            className="hover:text-cars-accent transition-colors"
-          >
-            California Privacy Notice
-          </Link>
-          <Link
-            href="/about/ccpa-privacy-notice/#exercising-access-use-limitation-data-portability-deletion-and-correction-rights"
-            className="hover:text-cars-accent transition-colors"
-          >
-            My Privacy Choices
-          </Link>
-          <button className="hover:text-cars-accent transition-colors">
-            Cookie Preferences
-          </button>
-          <Link
-            href="/about/accessibility/"
-            className="hover:text-cars-accent transition-colors"
-          >
-            Accessibility Statement
-          </Link>
-          <Link
-            href="/about/ad-choices/"
-            className="hover:text-cars-accent transition-colors"
-          >
-            Ad Choices
-          </Link>
-        </div>
-
-        {/* Copyright */}
-        <p className="text-xs text-cars-primary">
-          © 2025 Cars.com. All rights reserved.
-        </p>
       </div>
     </footer>
   );
-};
-
-type FooterLinkProps = {
-  href: string;
-  label: string;
-  external?: boolean;
-};
-
-const FooterLink: React.FC<FooterLinkProps> = ({ href, label, external }) => {
-  return (
-    <li>
-      <Link
-        href={href}
-        target={external ? "_blank" : "_self"}
-        rel={external ? "noopener noreferrer" : ""}
-        className="text-sm text-cars-primary hover:text-cars-accent transition-colors flex items-center"
-      >
-        {label}
-        {external && <ChevronRight className="ml-1 h-3 w-3" />}
-      </Link>
-    </li>
-  );
-};
-
-type SocialLinkProps = {
-  href: string;
-  icon: "tiktok" | "facebook" | "youtube" | "instagram" | "pinterest";
-};
-
-const SocialLink: React.FC<SocialLinkProps> = ({ href, icon }) => {
-  return (
-    <Link
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="w-8 h-8 rounded-full bg-cars-gray-light hover:bg-cars-accent transition-colors flex items-center justify-center"
-    >
-      {/* Icon SVGs would go here - simplified for now */}
-      <span className="text-white text-xs">{icon.charAt(0).toUpperCase()}</span>
-    </Link>
-  );
-};
-
-export default Footer;
+}

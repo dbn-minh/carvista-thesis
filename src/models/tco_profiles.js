@@ -31,6 +31,7 @@ export default class TcoProfiles extends Model {
     tableName: 'tco_profiles',
     timestamps: true,
     createdAt: 'created_at',
+    updatedAt: false,
     indexes: [
       {
         name: "PRIMARY",

@@ -49,6 +49,7 @@ export default class TcoRules extends Model {
     tableName: 'tco_rules',
     timestamps: true,
     createdAt: 'created_at',
+    updatedAt: false,
     indexes: [
       {
         name: "PRIMARY",

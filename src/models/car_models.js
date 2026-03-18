@@ -36,6 +36,7 @@ export default class CarModels extends Model {
     tableName: 'car_models',
     timestamps: true,
     createdAt: 'created_at',
+    updatedAt: false,
     indexes: [
       {
         name: "PRIMARY",

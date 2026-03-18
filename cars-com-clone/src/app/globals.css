@@ -54,7 +54,14 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-dm-sans;
+    background:
+      radial-gradient(circle at top left, rgba(47, 111, 237, 0.1), transparent 28%),
+      linear-gradient(180deg, #f8fbff 0%, #f4f7fb 28%, #ffffff 100%);
+  }
+
+  ::selection {
+    background: rgba(47, 111, 237, 0.18);
   }
 }
 
@@ -62,5 +69,9 @@
 @layer components {
   .container-cars {
     @apply mx-auto px-4 max-w-[1280px];
+  }
+
+  .section-shell {
+    @apply rounded-[28px] border border-white/70 bg-white/90 shadow-[0_18px_60px_rgba(15,45,98,0.08)] backdrop-blur;
   }
 }

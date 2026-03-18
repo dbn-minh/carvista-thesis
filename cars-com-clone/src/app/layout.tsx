@@ -4,9 +4,9 @@ import ClientBody from "./ClientBody";
 import { apercuRegular, apercuBold, dmSans } from "@/lib/fonts";
 
 export const metadata: Metadata = {
-  title: "New Cars, Used Cars, Car Dealers, Prices & Reviews | Cars.com",
+  title: "CarVista | AI-Powered Intelligent Car Platform",
   description:
-    "Find the perfect car for your needs at Cars.com. Shop new and used cars, sell your car, compare prices, and explore financing options to find your dream car today!",
+    "Explore real car data, compare models intelligently, track listings, and use AI-powered insights for price trends, total cost of ownership, and expert-style guidance.",
 };
 
 export default function RootLayout({

@@ -47,6 +47,7 @@ export default class SellerReviews extends Model {
     tableName: 'seller_reviews',
     timestamps: true,
     createdAt: 'created_at',
+    updatedAt: false,
     indexes: [
       {
         name: "PRIMARY",

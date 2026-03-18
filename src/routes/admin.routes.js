@@ -5,7 +5,7 @@ import { validate } from "../middlewares/validate.js";
 import { addVariantPricePoint } from "../services/price.service.js";
 
 export const adminRoutes = Router();
-adminRoutes.use(requireAuth, requireRole("admin"));
+adminRoutes.use("/admin", requireAuth, requireRole("admin"));
 
 // manage users
 adminRoutes.get("/admin/users", async (req, res, next) => {

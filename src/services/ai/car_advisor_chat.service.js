@@ -41,7 +41,7 @@ export async function chatAdvisor(ctx, input) {
 
     if (!message) throw { status: 400, message: "message is required" };
     if (session_id != null && !Number.isInteger(session_id)) throw { status: 400, message: "session_id invalid" };
-    if (user_id != null && !Number.isInteger(user_id)) throw { status: 400, message: "user_id invalid" };
+    if (!Number.isInteger(user_id)) throw { status: 401, message: "Authenticated user is required" };
 
     const {
         models: { AiChatSessions, AiChatMessages, TcoProfiles },
@@ -52,7 +52,7 @@ export async function chatAdvisor(ctx, input) {
 
     if (session_id == null) {
         session = await AiChatSessions.create({
-            user_id: user_id ?? null,
+            user_id,
             last_active_at: new Date(),
             context_json: context ?? null,
         });
