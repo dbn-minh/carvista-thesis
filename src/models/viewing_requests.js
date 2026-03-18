@@ -51,6 +51,8 @@ export default class ViewingRequests extends Model {
     sequelize,
     tableName: 'viewing_requests',
     timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     indexes: [
       {
         name: "PRIMARY",

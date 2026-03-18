@@ -26,6 +26,8 @@ export default class WatchedVariants extends Model {
     sequelize,
     tableName: 'watched_variants',
     timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: false,
     indexes: [
       {
         name: "PRIMARY",

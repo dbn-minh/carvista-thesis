@@ -26,6 +26,8 @@ export default class SavedListings extends Model {
     sequelize,
     tableName: 'saved_listings',
     timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: false,
     indexes: [
       {
         name: "PRIMARY",

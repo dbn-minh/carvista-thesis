@@ -34,6 +34,8 @@ export default class SavedLogs extends Model {
     sequelize,
     tableName: 'saved_logs',
     timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: false,
     indexes: [
       {
         name: "PRIMARY",

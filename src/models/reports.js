@@ -51,6 +51,7 @@ export default class Reports extends Model {
     sequelize,
     tableName: 'reports',
     timestamps: true,
+    createdAt: 'created_at',
     indexes: [
       {
         name: "PRIMARY",

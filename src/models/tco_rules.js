@@ -48,6 +48,7 @@ export default class TcoRules extends Model {
     sequelize,
     tableName: 'tco_rules',
     timestamps: true,
+    createdAt: 'created_at',
     indexes: [
       {
         name: "PRIMARY",

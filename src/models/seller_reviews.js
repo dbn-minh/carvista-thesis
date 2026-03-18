@@ -46,6 +46,7 @@ export default class SellerReviews extends Model {
     sequelize,
     tableName: 'seller_reviews',
     timestamps: true,
+    createdAt: 'created_at',
     indexes: [
       {
         name: "PRIMARY",

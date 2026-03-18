@@ -56,6 +56,8 @@ export default class Listings extends Model {
     sequelize,
     tableName: 'listings',
     timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     indexes: [
       {
         name: "PRIMARY",

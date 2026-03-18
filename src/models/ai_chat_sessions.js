@@ -30,6 +30,7 @@ export default class AiChatSessions extends Model {
     sequelize,
     tableName: 'ai_chat_sessions',
     timestamps: true,
+    createdAt: 'created_at',
     indexes: [
       {
         name: "PRIMARY",

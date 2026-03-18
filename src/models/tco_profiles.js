@@ -30,6 +30,7 @@ export default class TcoProfiles extends Model {
     sequelize,
     tableName: 'tco_profiles',
     timestamps: true,
+    createdAt: 'created_at',
     indexes: [
       {
         name: "PRIMARY",

@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 270 22% 17%;
+    --card: 0 0% 100%;
+    --card-foreground: 270 22% 17%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 270 22% 17%;
+    --primary: 270 26% 25%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 270 2% 92%;
+    --secondary-foreground: 270 22% 17%;
+    --muted: 270 2% 92%;
+    --muted-foreground: 270 10% 50%;
+    --accent: 262 46% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 270 5% 85%;
+    --input: 270 5% 85%;
+    --ring: 262 46% 50%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 270 22% 17%;
+    --foreground: 0 0% 100%;
+    --card: 270 22% 17%;
+    --card-foreground: 0 0% 100%;
+    --popover: 270 22% 17%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 270 26% 25%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 270 10% 20%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 270 10% 20%;
+    --muted-foreground: 270 5% 70%;
+    --accent: 262 46% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 270 10% 20%;
+    --input: 270 10% 20%;
+    --ring: 262 46% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom Classes for Cars.com */
+@layer components {
+  .container-cars {
+    @apply mx-auto px-4 max-w-[1280px];
+  }
+}

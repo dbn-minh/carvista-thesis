@@ -35,6 +35,7 @@ export default class CarModels extends Model {
     sequelize,
     tableName: 'car_models',
     timestamps: true,
+    createdAt: 'created_at',
     indexes: [
       {
         name: "PRIMARY",

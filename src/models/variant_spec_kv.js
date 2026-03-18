@@ -38,6 +38,7 @@ export default class VariantSpecKv extends Model {
     sequelize,
     tableName: 'variant_spec_kv',
     timestamps: true,
+    createdAt: 'created_at',
     indexes: [
       {
         name: "PRIMARY",
