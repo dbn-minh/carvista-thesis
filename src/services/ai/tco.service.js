@@ -1,200 +1,325 @@
-// src/services/ai/tco.service.js
-import { currencySymbolMap, roundMoney, toRateFraction, pickLatestByKey } from "./_helpers.js";
+import { clamp, currencySymbolMap, roundMoney, toRateFraction, pickLatestByKey } from "./_helpers.js";
+import { buildConfidence, buildEvidence } from "./contracts.js";
+import { buildTcoPresentation } from "./presentation.service.js";
+import {
+  buildInternalSource,
+  fetchOfficialVehicleSignals,
+  loadTcoProfileWithRules,
+  loadVariantContext,
+} from "./source_retrieval.service.js";
+
+const DEFAULT_KM_PER_YEAR = 15000;
+const EPA_BASELINE_KM = 24140;
+const EMPTY_COSTS = {
+  registration_tax: null,
+  excise_tax: null,
+  vat: null,
+  import_duty: null,
+  insurance_total: null,
+  maintenance_total: null,
+  energy_total: null,
+  depreciation_total: null,
+  other: null,
+};
+
+function estimateEnergyCostPerYear({ officialSignals, kmPerYear, currency }) {
+  if (!officialSignals?.fuel_economy?.annual_fuel_cost_usd) {
+    return { annual_cost: null, assumption: null };
+  }
+
+  if (currency !== "USD") {
+    return {
+      annual_cost: null,
+      assumption: "Official fuel cost fallback exists only in USD, so it was not converted automatically for this market.",
+    };
+  }
+
+  const annualFuelCost = Number(officialSignals.fuel_economy.annual_fuel_cost_usd);
+  if (!Number.isFinite(annualFuelCost)) return { annual_cost: null, assumption: null };
+
+  return {
+    annual_cost: annualFuelCost * (kmPerYear / EPA_BASELINE_KM),
+    assumption: "Energy cost uses the official FuelEconomy.gov annual fuel-cost estimate scaled to the selected yearly distance.",
+  };
+}
 
 export async function calculateTco(ctx, input) {
-    const profile_id = Number(input?.profile_id);
-    const base_price = Number(input?.base_price);
-    const ownership_years = Number(input?.ownership_years);
-    const km_per_year = input?.km_per_year == null ? null : Number(input.km_per_year);
+  const profile_id = input?.profile_id == null ? null : Number(input.profile_id);
+  const market_id = input?.market_id == null ? null : Number(input.market_id);
+  const variant_id = input?.variant_id == null ? null : Number(input.variant_id);
+  const ownership_years = Number(input?.ownership_years);
+  const km_per_year = input?.km_per_year == null ? DEFAULT_KM_PER_YEAR : Number(input.km_per_year);
 
-    if (!Number.isInteger(profile_id)) throw { status: 400, message: "profile_id must be integer" };
-    if (!Number.isFinite(base_price) || base_price <= 0) throw { status: 400, message: "base_price invalid" };
-    if (!Number.isInteger(ownership_years) || ownership_years <= 0 || ownership_years > 10)
-        throw { status: 400, message: "ownership_years must be 1..10" };
-    if (km_per_year != null && (!Number.isInteger(km_per_year) || km_per_year <= 0))
-        throw { status: 400, message: "km_per_year invalid" };
+  if (profile_id != null && !Number.isInteger(profile_id)) throw { status: 400, message: "profile_id must be integer" };
+  if (market_id != null && !Number.isInteger(market_id)) throw { status: 400, message: "market_id must be integer" };
+  if (variant_id != null && !Number.isInteger(variant_id)) throw { status: 400, message: "variant_id must be integer" };
+  if (!Number.isInteger(ownership_years) || ownership_years <= 0 || ownership_years > 10) {
+    throw { status: 400, message: "ownership_years must be 1..10" };
+  }
+  if (!Number.isFinite(km_per_year) || km_per_year <= 0) throw { status: 400, message: "km_per_year invalid" };
 
-    const { TcoProfiles, TcoRules, Markets } = ctx.models;
+  const explicitBasePrice = input?.base_price == null ? null : Number(input.base_price);
+  if (explicitBasePrice != null && (!Number.isFinite(explicitBasePrice) || explicitBasePrice <= 0)) {
+    throw { status: 400, message: "base_price invalid" };
+  }
 
-    const profile = await TcoProfiles.findOne({
-        where: { profile_id },
-        include: [{ model: Markets, as: "market" }],
-    });
-
-    if (!profile) {
-        return {
-            status: "error",
-            code: "PROFILE_NOT_FOUND",
-            message: `TCO profile không tồn tại: ${profile_id}`,
-        };
-    }
-
-    const currency = profile.market?.currency_code ?? "USD";
-    const currency_symbol = currencySymbolMap[currency] ?? "";
-
-    const rulesAll = await TcoRules.findAll({
-        where: { profile_id },
-        order: [["cost_type", "ASC"], ["created_at", "DESC"]],
-    });
-
-    // pick newest per cost_type
-    const newest = pickLatestByKey(rulesAll, (r) => r.cost_type);
-
-    const notes = [];
-    const usedKm = km_per_year ?? 15000;
-    if (km_per_year == null) notes.push("km_per_year not provided, using default 15,000 km/year.");
-
-    const percentOfBase = (rateFraction) => base_price * rateFraction;
-
-    function computeCost(costType) {
-        const r = newest.get(costType);
-        if (!r) return { value: null, applied: null };
-
-        if (r.rule_kind === "rate") {
-            const frac = toRateFraction(r.rate);
-            if (frac == null) return { value: null, applied: r };
-            if (Number(r.rate) > 1) notes.push(`rate for ${costType} appears percent; normalized by /100.`);
-            return { value: percentOfBase(frac), applied: r };
+  const variantContext = variant_id != null ? await loadVariantContext(ctx, { variant_id, market_id: market_id ?? 1 }) : null;
+  const resolvedMarketId = market_id ?? variantContext?.variant?.market_id ?? 1;
+  const market = await ctx.models.Markets.findByPk(resolvedMarketId).catch(() => null);
+  const profileBundle =
+    profile_id != null
+      ? {
+          profile: await ctx.models.TcoProfiles.findByPk(profile_id),
+          rules: await ctx.models.TcoRules.findAll({
+            where: { profile_id },
+            order: [["cost_type", "ASC"], ["created_at", "DESC"]],
+          }),
+          sources: [buildInternalSource("Country-specific TCO rules from local configuration")],
         }
+      : await loadTcoProfileWithRules(ctx, resolvedMarketId);
 
-        if (r.rule_kind === "fixed") {
-            const amt = r.fixed_amount == null ? null : Number(r.fixed_amount);
-            return { value: Number.isFinite(amt) ? amt : null, applied: r };
-        }
+  const currency = market?.currency_code ?? "USD";
+  const currency_symbol = currencySymbolMap[currency] ?? "";
+  const base_price =
+    explicitBasePrice ??
+    Number(variantContext?.variant?.latest_price ?? variantContext?.variant?.msrp_base ?? Number.NaN);
 
-        if (r.rule_kind === "formula") {
-            const f = r.formula_json || {};
-            if (costType === "maintenance" && f.formula === "per_km") {
-                const fracOrNum = Number(f.rate);
-                if (!Number.isFinite(fracOrNum)) return { value: null, applied: r };
-                return { value: fracOrNum * usedKm, applied: r }; // annual
-            }
-            // for other cost types, formula_json is optional in your schema; keep null if unknown
-            return { value: null, applied: r };
-        }
-
-        return { value: null, applied: r };
-    }
-
-    // One-time taxes
-    const registration = computeCost("registration_tax");
-    const excise = computeCost("excise_tax");
-    const vat = computeCost("vat");
-    const importDuty = computeCost("import_duty");
-    const other = computeCost("other");
-
-    // insurance annual -> total
-    const insuranceRule = newest.get("insurance");
-    let insuranceAnnual = null;
-    if (insuranceRule) {
-        if (insuranceRule.rule_kind === "fixed") insuranceAnnual = insuranceRule.fixed_amount != null ? Number(insuranceRule.fixed_amount) : null;
-        if (insuranceRule.rule_kind === "rate") {
-            const frac = toRateFraction(insuranceRule.rate);
-            if (frac != null) insuranceAnnual = percentOfBase(frac);
-            if (Number(insuranceRule.rate) > 1) notes.push("rate for insurance appears percent; normalized by /100.");
-        }
-        if (insuranceRule.rule_kind === "formula") {
-            const f = insuranceRule.formula_json || {};
-            if (f.formula === "fixed" && Number.isFinite(Number(f.amount))) insuranceAnnual = Number(f.amount);
-        }
-    }
-    const insurance_total = insuranceAnnual != null ? insuranceAnnual * ownership_years : null;
-
-    // maintenance annual -> total
-    const maintenance = computeCost("maintenance");
-    const maintenance_total = maintenance.value != null ? maintenance.value * ownership_years : null;
-
-    // depreciation total + yearly
-    const depRule = newest.get("depreciation");
-    let depreciation_total = null;
-    const depreciationByYear = [];
-    if (depRule) {
-        const f = depRule.rule_kind === "formula" ? (depRule.formula_json || {}) : {};
-        const formula = f.formula || "straight_line";
-        const frac = toRateFraction(f.rate ?? depRule.rate);
-        if (frac == null) {
-            depreciation_total = null;
-        } else {
-            if ((f.rate ?? depRule.rate) > 1) notes.push("rate for depreciation appears percent; normalized by /100.");
-
-            if (formula === "straight_line") {
-                const perYear = base_price * frac;
-                for (let i = 0; i < ownership_years; i++) depreciationByYear.push(perYear);
-                depreciation_total = perYear * ownership_years;
-            } else if (formula === "declining_balance") {
-                for (let i = 1; i <= ownership_years; i++) {
-                    const prev = base_price * Math.pow(1 - frac, i - 1);
-                    const curr = base_price * Math.pow(1 - frac, i);
-                    depreciationByYear.push(prev - curr);
-                }
-                depreciation_total = base_price - base_price * Math.pow(1 - frac, ownership_years);
-            } else {
-                depreciation_total = null;
-            }
-        }
-    }
-    if (depreciation_total != null && depreciation_total > base_price) depreciation_total = base_price;
-
-    // yearly breakdown
-    const yearly_breakdown = {};
-    for (let y = 1; y <= ownership_years; y++) {
-        const oneTime =
-            y === 1
-                ? (registration.value ?? 0) + (excise.value ?? 0) + (vat.value ?? 0) + (importDuty.value ?? 0) + (other.value ?? 0)
-                : 0;
-
-        const depY = depreciationByYear[y - 1] ?? 0;
-        yearly_breakdown[`year_${y}`] = oneTime + (insuranceAnnual ?? 0) + (maintenance.value ?? 0) + depY;
-    }
-
-    const total_cost =
-        base_price +
-        (registration.value ?? 0) +
-        (excise.value ?? 0) +
-        (vat.value ?? 0) +
-        (importDuty.value ?? 0) +
-        (other.value ?? 0) +
-        (insurance_total ?? 0) +
-        (maintenance_total ?? 0) +
-        (depreciation_total ?? 0);
-
-    const yearly_cost_avg = total_cost / ownership_years;
-
-    const rules_applied = [...newest.values()].map((r) => ({
-        cost_type: r.cost_type,
-        rule_kind: r.rule_kind,
-        rate: r.rate,
-        fixed_amount: r.fixed_amount,
-        formula_json: r.formula_json,
-        applies_to: r.applies_to,
-    }));
-
+  if (!profileBundle.profile) {
     return {
-        profile_id,
-        profile_name: profile.name,
-        market_id: profile.market_id,
-        market_name: profile.market?.name ?? null,
-        currency,
-        currency_symbol,
-        base_price: roundMoney(base_price, currency),
-        ownership_years,
-        km_per_year: usedKm,
-        costs: {
-            registration_tax: roundMoney(registration.value, currency),
-            excise_tax: roundMoney(excise.value, currency),
-            vat: roundMoney(vat.value, currency),
-            import_duty: roundMoney(importDuty.value, currency),
-            insurance_total: roundMoney(insurance_total, currency),
-            maintenance_total: roundMoney(maintenance_total, currency),
-            depreciation_total: roundMoney(depreciation_total, currency),
-            other: roundMoney(other.value, currency),
-        },
-        yearly_breakdown: Object.fromEntries(
-            Object.entries(yearly_breakdown).map(([k, v]) => [k, roundMoney(v, currency)])
-        ),
-        total_cost: roundMoney(total_cost, currency),
-        yearly_cost_avg: roundMoney(yearly_cost_avg, currency),
-        rules_applied,
-        notes: notes.join(" "),
+      status: "partial",
+      code: "PROFILE_NOT_FOUND",
+      message: `No TCO profile is configured for market ${resolvedMarketId}.`,
+      profile_id: null,
+      profile_name: null,
+      market_id: resolvedMarketId,
+      market_name: market?.name ?? null,
+      currency,
+      currency_symbol,
+      base_price: Number.isFinite(base_price) && base_price > 0 ? roundMoney(base_price, currency) : null,
+      ownership_years,
+      km_per_year,
+      costs: { ...EMPTY_COSTS },
+      yearly_breakdown: {},
+      total_cost: null,
+      yearly_cost_avg: null,
+      monthly_cost_avg: null,
+      rules_applied: [],
+      assumptions: [
+        "Tax and fee configuration for this market is incomplete, so only a guarded fallback response can be returned.",
+      ],
+      confidence: buildConfidence(0.22, ["The market tax configuration is incomplete, so TCO cannot be fully grounded."]),
+      evidence: buildEvidence({
+        verified: [],
+        inferred: [],
+        estimated: ["No complete market tax profile was available for the selected market."],
+      }),
+      sources: [...profileBundle.sources],
+      caveats: [
+        "Registration tax, VAT, excise, import duty, insurance, and depreciation could not be computed because the market rule set is incomplete.",
+      ],
     };
+  }
+
+  if (!Number.isFinite(base_price) || base_price <= 0) {
+    throw { status: 400, message: "base_price invalid and no usable variant price anchor was found" };
+  }
+
+  const newestRules = pickLatestByKey(profileBundle.rules, (row) => row.cost_type);
+  const assumptions = [];
+
+  function percentOfBase(rateFraction) {
+    return base_price * rateFraction;
+  }
+
+  function computeRuleCost(costType) {
+    const rule = newestRules.get(costType);
+    if (!rule) return { value: null, rule: null };
+
+    if (rule.rule_kind === "rate") {
+      const fraction = toRateFraction(rule.rate);
+      if (fraction == null) return { value: null, rule };
+      return { value: percentOfBase(fraction), rule };
+    }
+
+    if (rule.rule_kind === "fixed") {
+      const amount = Number(rule.fixed_amount);
+      return { value: Number.isFinite(amount) ? amount : null, rule };
+    }
+
+    if (rule.rule_kind === "formula") {
+      const formula = rule.formula_json || {};
+      if (costType === "maintenance" && formula.formula === "per_km") {
+        const rate = Number(formula.rate);
+        return { value: Number.isFinite(rate) ? rate * km_per_year : null, rule };
+      }
+      return { value: null, rule };
+    }
+
+    return { value: null, rule };
+  }
+
+  const registration = computeRuleCost("registration_tax");
+  const excise = computeRuleCost("excise_tax");
+  const vat = computeRuleCost("vat");
+  const importDuty = computeRuleCost("import_duty");
+  const other = computeRuleCost("other");
+  const maintenanceAnnual = computeRuleCost("maintenance");
+
+  let insuranceAnnual = null;
+  const insuranceRule = newestRules.get("insurance");
+  if (insuranceRule?.rule_kind === "fixed") insuranceAnnual = Number(insuranceRule.fixed_amount);
+  if (insuranceRule?.rule_kind === "rate") insuranceAnnual = percentOfBase(toRateFraction(insuranceRule.rate) ?? 0);
+
+  let depreciation_total = null;
+  const depreciationByYear = [];
+  const depreciationRule = newestRules.get("depreciation");
+  if (depreciationRule) {
+    const formula = depreciationRule.rule_kind === "formula" ? depreciationRule.formula_json || {} : {};
+    const depreciationRate = toRateFraction(formula.rate ?? depreciationRule.rate);
+    if (depreciationRate != null) {
+      if ((formula.formula || "straight_line") === "declining_balance") {
+        for (let year = 1; year <= ownership_years; year += 1) {
+          const previous = base_price * Math.pow(1 - depreciationRate, year - 1);
+          const current = base_price * Math.pow(1 - depreciationRate, year);
+          depreciationByYear.push(previous - current);
+        }
+        depreciation_total = base_price - base_price * Math.pow(1 - depreciationRate, ownership_years);
+      } else {
+        const perYear = base_price * depreciationRate;
+        for (let year = 0; year < ownership_years; year += 1) depreciationByYear.push(perYear);
+        depreciation_total = perYear * ownership_years;
+      }
+    }
+  }
+
+  const officialSignals =
+    variantContext != null
+      ? await fetchOfficialVehicleSignals({
+          year: variantContext.variant.model_year,
+          make: variantContext.variant.make_name,
+          model: variantContext.variant.model_name,
+        })
+      : { fuel_economy: null, recalls: [], sources: [], caveats: [] };
+
+  const explicitEnergyAnnual = input?.energy_cost_per_year == null ? null : Number(input.energy_cost_per_year);
+  let energyAnnual = Number.isFinite(explicitEnergyAnnual) ? explicitEnergyAnnual : null;
+  if (energyAnnual == null) {
+    const fallbackEnergy = estimateEnergyCostPerYear({
+      officialSignals,
+      kmPerYear: km_per_year,
+      currency,
+    });
+    energyAnnual = fallbackEnergy.annual_cost;
+    if (fallbackEnergy.assumption) assumptions.push(fallbackEnergy.assumption);
+  } else {
+    assumptions.push("Annual energy cost was supplied directly by the caller.");
+  }
+
+  if (!Number.isFinite(energyAnnual)) {
+    assumptions.push("Energy cost could not be grounded automatically, so it is excluded from the total.");
+    energyAnnual = null;
+  }
+
+  const insurance_total = insuranceAnnual != null ? insuranceAnnual * ownership_years : null;
+  const maintenance_total = maintenanceAnnual.value != null ? maintenanceAnnual.value * ownership_years : null;
+  const energy_total = energyAnnual != null ? energyAnnual * ownership_years : null;
+
+  const yearly_breakdown = {};
+  for (let year = 1; year <= ownership_years; year += 1) {
+    const oneTime =
+      year === 1
+        ? (registration.value ?? 0) + (excise.value ?? 0) + (vat.value ?? 0) + (importDuty.value ?? 0) + (other.value ?? 0)
+        : 0;
+    yearly_breakdown[`year_${year}`] =
+      oneTime + (insuranceAnnual ?? 0) + (maintenanceAnnual.value ?? 0) + (energyAnnual ?? 0) + (depreciationByYear[year - 1] ?? 0);
+  }
+
+  const total_cost =
+    base_price +
+    (registration.value ?? 0) +
+    (excise.value ?? 0) +
+    (vat.value ?? 0) +
+    (importDuty.value ?? 0) +
+    (other.value ?? 0) +
+    (insurance_total ?? 0) +
+    (maintenance_total ?? 0) +
+    (energy_total ?? 0) +
+    (depreciation_total ?? 0);
+  const yearly_cost_avg = total_cost / ownership_years;
+  const monthly_cost_avg = yearly_cost_avg / 12;
+
+  const confidence = buildConfidence(
+    clamp(0.48 + (newestRules.size >= 4 ? 0.18 : 0) + (energy_total != null ? 0.12 : 0) + (variantContext ? 0.1 : 0), 0.35, 0.9),
+    [
+      newestRules.size >= 4 ? "Multiple local tax and ownership rules were configured for the selected market." : "The market rule set is still somewhat thin.",
+      energy_total != null ? "Energy cost was grounded rather than omitted." : "Energy cost remains incomplete and reduces confidence.",
+      variantContext ? "The estimate is tied to a specific vehicle context." : "The estimate is based on a generic base price rather than a full vehicle context.",
+    ]
+  );
+
+  const result = {
+    profile_id: profileBundle.profile.profile_id,
+    profile_name: profileBundle.profile.name,
+    market_id: profileBundle.profile.market_id,
+    market_name: market?.name ?? null,
+    currency,
+    currency_symbol,
+    base_price: roundMoney(base_price, currency),
+    ownership_years,
+    km_per_year,
+    costs: {
+      ...EMPTY_COSTS,
+      registration_tax: roundMoney(registration.value, currency),
+      excise_tax: roundMoney(excise.value, currency),
+      vat: roundMoney(vat.value, currency),
+      import_duty: roundMoney(importDuty.value, currency),
+      insurance_total: roundMoney(insurance_total, currency),
+      maintenance_total: roundMoney(maintenance_total, currency),
+      energy_total: roundMoney(energy_total, currency),
+      depreciation_total: roundMoney(depreciation_total, currency),
+      other: roundMoney(other.value, currency),
+    },
+    yearly_breakdown: Object.fromEntries(
+      Object.entries(yearly_breakdown).map(([key, value]) => [key, roundMoney(value, currency)])
+    ),
+    total_cost: roundMoney(total_cost, currency),
+    yearly_cost_avg: roundMoney(yearly_cost_avg, currency),
+    monthly_cost_avg: roundMoney(monthly_cost_avg, currency),
+    rules_applied: [...newestRules.values()].map((rule) => ({
+      cost_type: rule.cost_type,
+      rule_kind: rule.rule_kind,
+      rate: rule.rate,
+      fixed_amount: rule.fixed_amount,
+      formula_json: rule.formula_json,
+      applies_to: rule.applies_to,
+    })),
+    assumptions,
+    confidence,
+    evidence: buildEvidence({
+      verified: [
+        "Configured local tax and fee rules were used to compute one-time government costs.",
+        variantContext ? "The estimate was tied to a grounded vehicle record." : null,
+      ].filter(Boolean),
+      inferred: [],
+      estimated: [
+        energy_total == null ? "Energy cost is excluded because no grounded estimate was available." : null,
+        officialSignals.sources.length > 0 && energy_total != null ? "Energy cost uses official EPA-style annual fuel-cost fallback where applicable." : null,
+      ].filter(Boolean),
+    }),
+    sources: [
+      buildInternalSource("Local TCO market rules and formulas"),
+      ...(variantContext ? variantContext.sources : []),
+      ...officialSignals.sources,
+    ],
+    caveats: [
+      "Insurance is formula-based or profile-based, not a live insurer quote.",
+      "Registration, VAT, excise, and import-duty treatment remain only as good as the configured market rules.",
+      ...officialSignals.caveats,
+    ],
+  };
+
+  return {
+    ...result,
+    ...buildTcoPresentation(result),
+  };
 }

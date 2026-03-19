@@ -1,8 +1,13 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import { Button } from "@/components/ui/button";
 
 export default function AutoTariffsSection() {
+  const { openAssistant } = useAiAssistant();
+
   return (
     <section className="py-10">
       <div className="container-cars">
@@ -25,10 +30,11 @@ export default function AutoTariffsSection() {
               <div className="mt-6 flex flex-wrap gap-4">
                 <Button
                   variant="outline"
-                  asChild
+                  type="button"
+                  onClick={() => openAssistant()}
                   className="h-11 rounded-full border-cars-primary text-cars-primary hover:bg-cars-primary hover:text-white"
                 >
-                  <Link href="/ai">Open AI TCO tools</Link>
+                  Open AI TCO tools
                 </Button>
                 <Button
                   variant="outline"

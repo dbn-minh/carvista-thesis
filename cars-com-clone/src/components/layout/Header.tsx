@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import { clearStoredToken, getStoredToken } from "@/lib/api-client";
 
@@ -19,9 +20,10 @@ const nav = [
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
+  const { openAssistant } = useAiAssistant();
   const { openAuth } = useAuthModal();
   const [loggedIn, setLoggedIn] = useState(false);
-  const protectedRoutes = new Set(["/sell", "/garage", "/my-listings", "/ai"]);
+  const protectedRoutes = new Set(["/sell", "/garage", "/my-listings"]);
 
   useEffect(() => {
     const refresh = () => setLoggedIn(Boolean(getStoredToken()));
@@ -48,9 +50,7 @@ export default function Header() {
           </p>
           <button
             type="button"
-            onClick={() =>
-              loggedIn ? router.push("/ai") : openAuth({ mode: "login", next: "/ai" })
-            }
+            onClick={() => openAssistant()}
             className="font-semibold text-white/90 hover:text-white"
           >
             Explore AI tools
@@ -79,6 +79,11 @@ export default function Header() {
                 key={item.href}
                 href={item.href}
                 onClick={(e) => {
+                  if (item.href === "/ai") {
+                    e.preventDefault();
+                    openAssistant();
+                    return;
+                  }
                   if (!loggedIn && protectedRoutes.has(item.href)) {
                     e.preventDefault();
                     openAuth({ mode: "login", next: item.href });

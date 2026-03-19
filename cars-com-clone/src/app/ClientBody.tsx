@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { AiAssistantProvider } from "@/components/ai/AiAssistantProvider";
 import { AuthModalProvider } from "@/components/auth/AuthModalProvider";
 
 export default function ClientBody({
@@ -16,7 +17,9 @@ export default function ClientBody({
 
   return (
     <AuthModalProvider>
-      <div className="antialiased font-apercu-regular">{children}</div>
+      <AiAssistantProvider>
+        <div className="antialiased font-apercu-regular">{children}</div>
+      </AiAssistantProvider>
     </AuthModalProvider>
   );
 }

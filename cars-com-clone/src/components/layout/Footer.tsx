@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import { hasToken } from "@/lib/api-client";
 
@@ -28,9 +29,14 @@ const thesisLinks = [
 
 export default function Footer() {
   const router = useRouter();
+  const { openAssistant } = useAiAssistant();
   const { openAuth } = useAuthModal();
 
   function openProtected(href: string) {
+    if (href === "/ai") {
+      openAssistant();
+      return;
+    }
     if (!hasToken()) {
       openAuth({ mode: "login", next: href });
       return;

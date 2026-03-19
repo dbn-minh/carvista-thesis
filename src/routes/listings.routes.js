@@ -1,20 +1,366 @@
 import { Router } from "express";
+import { Op } from "sequelize";
 import { z } from "zod";
 import { requireAuth } from "../middlewares/auth.js";
+import { listingImageUpload } from "../middlewares/listing-image-upload.js";
 import { validate } from "../middlewares/validate.js";
+import { LISTING_IMAGE_LIMITS } from "../services/listing-images/image-validation.service.js";
+import { createListingImageService } from "../services/listing-images/listing-image.service.js";
 
 export const listingsRoutes = Router();
 
+const BODY_TYPES = [
+  "sedan",
+  "hatchback",
+  "suv",
+  "cuv",
+  "mpv",
+  "pickup",
+  "coupe",
+  "convertible",
+  "wagon",
+  "van",
+  "other",
+];
+
+const FUEL_TYPES = ["gasoline", "diesel", "hybrid", "phev", "ev", "other"];
+
+const LISTING_STATUSES = ["active", "hidden", "reserved", "sold"];
+
+function normalizeText(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeVehicleName(value) {
+  return normalizeText(value)
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function parseJsonField(value, message) {
+  if (value == null) return undefined;
+  if (typeof value !== "string") return value;
+
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    throw {
+      status: 400,
+      safe: true,
+      message,
+    };
+  }
+}
+
+function coerceNumber(value) {
+  if (value == null || value === "") return undefined;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : value;
+}
+
+const OptionalTrimmedString = z.preprocess((value) => {
+  const normalized = normalizeText(value);
+  return normalized.length > 0 ? normalized : undefined;
+}, z.string().optional());
+
+const OptionalInteger = z.preprocess((value) => coerceNumber(value), z.number().int().min(0).optional());
+const RequiredPositiveNumber = z.preprocess((value) => coerceNumber(value), z.number().positive());
+const OptionalPositiveInteger = z.preprocess((value) => coerceNumber(value), z.number().int().positive().optional());
+
+const CustomVehicleSchema = z.object({
+  make: z.preprocess((value) => normalizeText(value), z.string().min(1)),
+  model: z.preprocess((value) => normalizeText(value), z.string().min(1)),
+  year: z.preprocess((value) => coerceNumber(value), z.number().int().min(1900).max(2100)),
+  trim_name: OptionalTrimmedString,
+  body_type: z.preprocess(
+    (value) => {
+      const normalized = normalizeText(value).toLowerCase();
+      return normalized || undefined;
+    },
+    z.enum(BODY_TYPES).optional()
+  ),
+  transmission: OptionalTrimmedString,
+  fuel_type: z.preprocess(
+    (value) => {
+      const normalized = normalizeText(value).toLowerCase();
+      return normalized || undefined;
+    },
+    z.enum(FUEL_TYPES).optional()
+  ),
+  drivetrain: OptionalTrimmedString,
+  engine: OptionalTrimmedString,
+  vin: OptionalTrimmedString,
+});
+
+const CreateListingBodySchema = z
+  .object({
+    variant_id: OptionalPositiveInteger,
+    asking_price: RequiredPositiveNumber,
+    mileage_km: OptionalInteger,
+    location_city: z.preprocess((value) => normalizeText(value), z.string().min(1)),
+    location_country_code: z.preprocess(
+      (value) => normalizeText(value).toUpperCase(),
+      z.string().length(2)
+    ),
+    description: OptionalTrimmedString,
+    status: z.preprocess(
+      (value) => {
+        const normalized = normalizeText(value).toLowerCase();
+        return normalized || undefined;
+      },
+      z.enum(LISTING_STATUSES).optional()
+    ),
+    image_urls: z.array(z.string()).max(LISTING_IMAGE_LIMITS.maxCount).optional(),
+    custom_vehicle: CustomVehicleSchema.optional(),
+  })
+  .superRefine((body, ctx) => {
+    if (!body.variant_id && !body.custom_vehicle) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Select a catalog vehicle or provide custom vehicle details.",
+        path: ["variant_id"],
+      });
+    }
+  });
+
+function normalizeCreateListingPayload(body) {
+  return {
+    ...body,
+    custom_vehicle: parseJsonField(body.custom_vehicle, "Custom vehicle details are malformed."),
+    image_urls: parseJsonField(body.image_urls, "Listing image references are malformed."),
+  };
+}
+
+function buildListingTitle(variant) {
+  if (!variant) return null;
+
+  const make = variant.model?.make?.name;
+  const model = variant.model?.name;
+  const trim = variant.trim_name;
+
+  return [make, model, trim].filter(Boolean).join(" ").trim() || null;
+}
+
+async function resolveVariantForListing(models, payload) {
+  if (payload.variant_id) {
+    return {
+      variantId: payload.variant_id,
+      customVehicleCreated: false,
+    };
+  }
+
+  const custom = payload.custom_vehicle;
+  if (!custom) {
+    return {
+      variantId: null,
+      customVehicleCreated: false,
+    };
+  }
+
+  const { CarMakes, CarModels, CarVariants } = models;
+  const makeName = normalizeVehicleName(custom.make);
+  const modelName = normalizeVehicleName(custom.model);
+  const trimName = normalizeText(custom.trim_name) || "Custom listing";
+
+  const [make] = await CarMakes.findOrCreate({
+    where: { name: makeName },
+    defaults: {
+      name: makeName,
+      country_of_origin: null,
+      is_placeholder: true,
+    },
+  });
+
+  const [model] = await CarModels.findOrCreate({
+    where: {
+      make_id: make.make_id,
+      name: modelName,
+    },
+    defaults: {
+      make_id: make.make_id,
+      name: modelName,
+      segment: null,
+      is_placeholder: true,
+    },
+  });
+
+  const [variant, created] = await CarVariants.findOrCreate({
+    where: {
+      model_id: model.model_id,
+      model_year: custom.year,
+      trim_name: trimName,
+    },
+    defaults: {
+      model_id: model.model_id,
+      model_year: custom.year,
+      trim_name: trimName,
+      body_type: custom.body_type ?? "other",
+      engine: normalizeText(custom.engine) || null,
+      transmission: normalizeText(custom.transmission) || null,
+      drivetrain: normalizeText(custom.drivetrain) || null,
+      fuel_type: custom.fuel_type ?? "other",
+      is_placeholder: true,
+    },
+  });
+
+  if (!created) {
+    const updates = {};
+    if ((!variant.body_type || variant.body_type === "other") && custom.body_type) {
+      updates.body_type = custom.body_type;
+    }
+    if ((!variant.fuel_type || variant.fuel_type === "other") && custom.fuel_type) {
+      updates.fuel_type = custom.fuel_type;
+    }
+    if (!variant.transmission && custom.transmission) {
+      updates.transmission = normalizeText(custom.transmission);
+    }
+    if (!variant.drivetrain && custom.drivetrain) {
+      updates.drivetrain = normalizeText(custom.drivetrain);
+    }
+    if (!variant.engine && custom.engine) updates.engine = normalizeText(custom.engine);
+    if (Object.keys(updates).length > 0) {
+      await variant.update(updates);
+    }
+  }
+
+  return {
+    variantId: variant.variant_id,
+    customVehicleCreated: created,
+  };
+}
+
 listingsRoutes.get("/listings", async (req, res, next) => {
   try {
-    const { Listings } = req.ctx.models;
+    const {
+      Listings,
+      ListingImages,
+      VariantImages,
+      CarVariants,
+      CarModels,
+      CarMakes,
+    } = req.ctx.models;
     const { status = "active", ownerId, variantId } = req.query;
 
     const where = { status };
     if (ownerId) where.owner_id = Number(ownerId);
     if (variantId) where.variant_id = Number(variantId);
 
-    const items = await Listings.findAll({ where, order: [["created_at","DESC"]], limit: 50 });
+    const rows = await Listings.findAll({
+      where,
+      order: [["created_at", "DESC"]],
+      limit: 50,
+      include: [
+        {
+          model: CarVariants,
+          as: "variant",
+          attributes: [
+            "variant_id",
+            "model_year",
+            "trim_name",
+            "body_type",
+            "fuel_type",
+            "transmission",
+            "engine",
+          ],
+          include: [
+            {
+              model: CarModels,
+              as: "model",
+              attributes: ["model_id", "name"],
+              include: [
+                {
+                  model: CarMakes,
+                  as: "make",
+                  attributes: ["make_id", "name"],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const listingIds = rows.map((row) => row.listing_id);
+    const variantIds = rows.map((row) => row.variant_id);
+
+    const [listingImageRows, variantImageRows] = await Promise.all([
+      listingIds.length > 0
+        ? ListingImages.findAll({
+            where: { listing_id: { [Op.in]: listingIds } },
+            order: [
+              ["listing_id", "ASC"],
+              ["sort_order", "ASC"],
+            ],
+          })
+        : Promise.resolve([]),
+      variantIds.length > 0
+        ? VariantImages.findAll({
+            where: { variant_id: { [Op.in]: variantIds } },
+            order: [
+              ["variant_id", "ASC"],
+              ["sort_order", "ASC"],
+            ],
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const listingImageService = createListingImageService(req.ctx);
+    const listingImageMap = new Map();
+    for (const image of listingImageService.normalizeRecords(listingImageRows)) {
+      const existing = listingImageMap.get(image.listing_id) || [];
+      existing.push(image.url);
+      listingImageMap.set(image.listing_id, existing);
+    }
+
+    const variantImageMap = new Map();
+    for (const image of variantImageRows) {
+      const existing = variantImageMap.get(image.variant_id) || [];
+      existing.push(image.url);
+      variantImageMap.set(image.variant_id, existing);
+    }
+
+    const items = rows.map((row) => {
+      const plain = row.get({ plain: true });
+      const listingPhotos = listingImageMap.get(row.listing_id) || [];
+      const catalogPhotos = variantImageMap.get(row.variant_id) || [];
+      const images = listingPhotos.length > 0 ? listingPhotos : catalogPhotos;
+      const photoSource =
+        listingPhotos.length > 0 ? "listing" : images.length > 0 ? "catalog" : "none";
+
+      return {
+        listing_id: plain.listing_id,
+        owner_id: plain.owner_id,
+        variant_id: plain.variant_id,
+        asking_price: plain.asking_price,
+        mileage_km: plain.mileage_km,
+        location_city: plain.location_city,
+        location_country_code: plain.location_country_code,
+        description: plain.description,
+        status: plain.status,
+        created_at: plain.created_at,
+        title: buildListingTitle(plain.variant),
+        model_year: plain.variant?.model_year ?? null,
+        trim_name: plain.variant?.trim_name ?? null,
+        body_type: plain.variant?.body_type ?? null,
+        fuel_type: plain.variant?.fuel_type ?? null,
+        transmission: plain.variant?.transmission ?? null,
+        engine: plain.variant?.engine ?? null,
+        make_name: plain.variant?.model?.make?.name ?? null,
+        model_name: plain.variant?.model?.name ?? null,
+        seller_type: "Private seller",
+        photo_source: photoSource,
+        image_count: images.length,
+        cover_image: images[0] ?? null,
+        thumbnail: images[0] ?? null,
+        images,
+      };
+    });
+
     res.json({ items });
   } catch (e) { next(e); }
 });
@@ -22,47 +368,95 @@ listingsRoutes.get("/listings", async (req, res, next) => {
 listingsRoutes.get("/listings/:id", async (req, res, next) => {
   try {
     const { Listings, ListingImages } = req.ctx.models;
+    const listingImageService = createListingImageService(req.ctx);
     const id = Number(req.params.id);
 
     const listing = await Listings.findByPk(id);
     if (!listing) return next({ status: 404, message: "Listing not found" });
 
-    const images = await ListingImages.findAll({ where: { listing_id: id }, order: [["sort_order","ASC"]] });
+    const imageRows = await ListingImages.findAll({
+      where: { listing_id: id },
+      order: [["sort_order", "ASC"]],
+    });
+    const images = listingImageService.normalizeRecords(imageRows);
     res.json({ listing, images });
   } catch (e) { next(e); }
 });
 
-const CreateListingSchema = z.object({
-  body: z.object({
-    variant_id: z.number().int(),
-    asking_price: z.number(),
-    mileage_km: z.number().int().optional(),
-    location_city: z.string().optional(),
-    location_country_code: z.string().length(2).optional(),
-    description: z.string().optional(),
-  }),
-  query: z.any(),
-  params: z.any(),
+listingsRoutes.get("/listings/:id/images/:imageId", async (req, res, next) => {
+  try {
+    const listingId = Number(req.params.id);
+    const imageId = Number(req.params.imageId);
+
+    if (!Number.isFinite(listingId) || !Number.isFinite(imageId)) {
+      return next({ status: 400, safe: true, message: "Invalid listing image request." });
+    }
+
+    const listingImageService = createListingImageService(req.ctx);
+    const imageContent = await listingImageService.resolveImageContent(listingId, imageId);
+
+    if (!imageContent) {
+      return next({ status: 404, safe: true, message: "Listing image not found." });
+    }
+
+    if (imageContent.kind === "redirect") {
+      return res.redirect(imageContent.url);
+    }
+
+    res.set("Cache-Control", "public, max-age=86400");
+    res.type(imageContent.mimeType);
+    return res.send(imageContent.buffer);
+  } catch (e) { next(e); }
 });
 
-listingsRoutes.post("/listings", requireAuth, validate(CreateListingSchema), async (req, res, next) => {
+listingsRoutes.post("/listings", requireAuth, listingImageUpload, async (req, res, next) => {
   try {
     const { Listings } = req.ctx.models;
-    const b = req.validated.body;
+    const listingImageService = createListingImageService(req.ctx);
+    const normalizedPayload = normalizeCreateListingPayload(req.body);
+    const b = CreateListingBodySchema.parse(normalizedPayload);
+    const { variantId, customVehicleCreated } = await resolveVariantForListing(req.ctx.models, b);
+
+    if (!variantId) {
+      return next({ status: 400, message: "A valid vehicle selection is required." });
+    }
 
     const created = await Listings.create({
       owner_id: req.user.userId,
-      variant_id: b.variant_id,
+      variant_id: variantId,
       asking_price: b.asking_price,
       mileage_km: b.mileage_km ?? null,
       location_city: b.location_city ?? null,
       location_country_code: b.location_country_code ?? "VN",
-      status: "active",
+      status: b.status ?? "active",
       description: b.description ?? null,
     });
 
-    res.status(201).json({ listing_id: created.listing_id });
-  } catch (e) { next(e); }
+    const uploadedFiles = Array.isArray(req.files) ? req.files : [];
+    if (uploadedFiles.length > 0) {
+      await listingImageService.persistUploadedImages(created.listing_id, uploadedFiles);
+    } else if (Array.isArray(b.image_urls) && b.image_urls.length > 0) {
+      await listingImageService.persistImageReferences(created.listing_id, b.image_urls);
+    }
+
+    res.status(201).json({
+      listing_id: created.listing_id,
+      variant_id: variantId,
+      custom_vehicle_created: customVehicleCreated,
+      image_count: uploadedFiles.length || b.image_urls?.length || 0,
+    });
+  } catch (e) {
+    if (e instanceof z.ZodError) {
+      return next({
+        status: 400,
+        safe: true,
+        message: e.issues[0]?.message || "Listing details are incomplete.",
+        details: e.issues,
+      });
+    }
+
+    next(e);
+  }
 });
 
 const UpdateListingSchema = z.object({

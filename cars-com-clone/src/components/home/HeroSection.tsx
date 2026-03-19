@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import { hasToken } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ const quickActions = [
 
 export default function HeroSection() {
   const router = useRouter();
+  const { openAssistant } = useAiAssistant();
   const { openAuth } = useAuthModal();
   const [query, setQuery] = useState("");
 
@@ -72,6 +74,10 @@ export default function HeroSection() {
                   key={item.href}
                   type="button"
                   onClick={() => {
+                    if (item.href === "/ai") {
+                      openAssistant();
+                      return;
+                    }
                     if (item.requiresAuth && !hasToken()) {
                       openAuth({ mode: "login", next: item.href });
                       return;

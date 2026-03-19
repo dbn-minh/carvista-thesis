@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import Header from "@/components/layout/Header";
 import StatusBanner from "@/components/common/StatusBanner";
@@ -24,6 +25,7 @@ type CatalogFilters = {
 function CatalogPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { openAssistant } = useAiAssistant();
   const { openAuth } = useAuthModal();
   const [q, setQ] = useState("");
   const [items, setItems] = useState<VariantListItem[]>([]);
@@ -180,11 +182,7 @@ function CatalogPageContent() {
           <button
             type="button"
             onClick={() => {
-              if (!hasToken()) {
-                openAuth({ mode: "login", next: "/ai" });
-                return;
-              }
-              router.push("/ai");
+              openAssistant();
             }}
             className="inline-flex h-12 items-center justify-center rounded-full border border-cars-primary/15 px-6 text-sm font-semibold text-cars-primary transition-colors hover:bg-white"
           >

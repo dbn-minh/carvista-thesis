@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import { hasToken } from "@/lib/api-client";
 
@@ -54,9 +55,14 @@ const quickLinks = [
 
 export default function NewsSection() {
   const router = useRouter();
+  const { openAssistant } = useAiAssistant();
   const { openAuth } = useAuthModal();
 
   function handleProtectedRoute(href: string) {
+    if (href === "/ai") {
+      openAssistant();
+      return;
+    }
     if (!hasToken()) {
       openAuth({ mode: "login", next: href });
       return;

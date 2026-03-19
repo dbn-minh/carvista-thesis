@@ -5,6 +5,7 @@ import { calculateTco } from "../services/ai/tco.service.js";
 import { predictPrice } from "../services/ai/predict_price.service.js";
 import { compareVariants } from "../services/ai/compare_variants.service.js";
 import { chatAdvisor } from "../services/ai/car_advisor_chat.service.js";
+import { mapAiHttpError } from "../services/ai/error_mapper.service.js";
 
 export const aiRoutes = Router();
 aiRoutes.use(requireAuth);
@@ -14,7 +15,7 @@ aiRoutes.post("/ai/tco", async (req, res, next) => {
     const out = await calculateTco(req.ctx, req.body);
     res.json(out);
   } catch (e) {
-    next(e);
+    next(mapAiHttpError(e, "calculate_tco"));
   }
 });
 
@@ -23,7 +24,7 @@ aiRoutes.post("/ai/predict-price", async (req, res, next) => {
     const out = await predictPrice(req.ctx, req.body);
     res.json(out);
   } catch (e) {
-    next(e);
+    next(mapAiHttpError(e, "predict_vehicle_value"));
   }
 });
 
@@ -32,7 +33,7 @@ aiRoutes.post("/ai/compare", async (req, res, next) => {
     const out = await compareVariants(req.ctx, req.body);
     res.json(out);
   } catch (e) {
-    next(e);
+    next(mapAiHttpError(e, "compare_car"));
   }
 });
 
@@ -44,6 +45,6 @@ aiRoutes.post("/ai/chat", async (req, res, next) => {
     });
     res.json(out);
   } catch (e) {
-    next(e);
+    next(mapAiHttpError(e, "vehicle_general_qa"));
   }
 });

@@ -2,10 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuthModal } from "@/components/auth/AuthModalProvider";
+import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import { catalogApi } from "@/lib/carvista-api";
-import { hasToken } from "@/lib/api-client";
 import type { VariantListItem } from "@/lib/types";
 
 type FeaturedCard = {
@@ -26,14 +24,13 @@ function buildTitle(item: VariantListItem) {
 }
 
 function buildSubtitle(item: VariantListItem) {
-  return `${item.model_year} • ${item.body_type || "Body type pending"} • ${
+  return `${item.model_year} - ${item.body_type || "Body type pending"} - ${
     item.fuel_type || "Fuel pending"
   }`;
 }
 
 export default function FeaturedEVs() {
-  const router = useRouter();
-  const { openAuth } = useAuthModal();
+  const { openAssistant } = useAiAssistant();
   const [cards, setCards] = useState<FeaturedCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasElectricCars, setHasElectricCars] = useState(false);
@@ -44,6 +41,7 @@ export default function FeaturedEVs() {
       setLoading(true);
       setErrorMessage("");
       setHasElectricCars(false);
+
       try {
         const electric = await catalogApi.variants({ fuel: "electric" });
         let source = electric.items.slice(0, 6);
@@ -59,7 +57,10 @@ export default function FeaturedEVs() {
           source.map(async (item) => {
             try {
               const detail = await catalogApi.variantDetail(item.variant_id);
-              const image = detail.images.map(getImageUrl).find((value): value is string => Boolean(value)) || null;
+              const image =
+                detail.images.map(getImageUrl).find((value): value is string => Boolean(value)) ||
+                null;
+
               return {
                 variantId: item.variant_id,
                 title: buildTitle(item),
@@ -92,7 +93,7 @@ export default function FeaturedEVs() {
       }
     }
 
-    load();
+    void load();
   }, []);
 
   const heading = useMemo(
@@ -141,9 +142,12 @@ export default function FeaturedEVs() {
           </div>
 
           {loading ? <p className="text-sm text-cars-gray">Loading featured vehicles...</p> : null}
+
           {!loading && errorMessage ? (
             <div className="rounded-[24px] border border-cars-accent/15 bg-white px-5 py-4 text-sm leading-6 text-cars-gray shadow-[0_16px_34px_rgba(15,45,98,0.08)]">
-              <p className="font-semibold text-cars-primary">Featured vehicles are unavailable right now.</p>
+              <p className="font-semibold text-cars-primary">
+                Featured vehicles are unavailable right now.
+              </p>
               <p className="mt-2">{errorMessage}</p>
             </div>
           ) : null}
@@ -188,11 +192,7 @@ export default function FeaturedEVs() {
             <button
               type="button"
               onClick={() => {
-                if (!hasToken()) {
-                  openAuth({ mode: "login", next: "/ai" });
-                  return;
-                }
-                router.push("/ai");
+                openAssistant();
               }}
               className="rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
             >

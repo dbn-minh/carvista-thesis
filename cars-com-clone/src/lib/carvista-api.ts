@@ -1,5 +1,9 @@
 import { apiFetch } from "./api-client";
 import type {
+  AiCompareResponse,
+  AiPredictResponse,
+  AiTcoResponse,
+  CatalogOwnershipSummary,
   CarReview,
   ChatResponse,
   Listing,
@@ -80,6 +84,22 @@ export const catalogApi = {
       `/catalog/variants/${id}/price-history?marketId=${marketId}&limit=${limit}`
     );
   },
+
+  variantOwnershipSummary(
+    id: number,
+    params?: {
+      marketId?: number;
+      ownershipYears?: number;
+      kmPerYear?: number;
+    }
+  ) {
+    const qs = new URLSearchParams();
+    if (params?.marketId) qs.set("marketId", String(params.marketId));
+    if (params?.ownershipYears) qs.set("ownershipYears", String(params.ownershipYears));
+    if (params?.kmPerYear) qs.set("kmPerYear", String(params.kmPerYear));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return apiFetch<CatalogOwnershipSummary>(`/catalog/variants/${id}/ownership-summary${suffix}`);
+  },
 };
 
 export const listingsApi = {
@@ -100,17 +120,40 @@ export const listingsApi = {
     return apiFetch<ListingDetail>(`/listings/${id}`);
   },
 
-  create(payload: {
-    variant_id: number;
-    asking_price: number;
-    mileage_km?: number;
-    location_city?: string;
-    location_country_code?: string;
-    description?: string;
-  }) {
-    return apiFetch<{ listing_id: number }>("/listings", {
+  create(
+    payload:
+      | FormData
+      | {
+        variant_id?: number;
+        asking_price: number;
+        mileage_km?: number;
+        location_city: string;
+        location_country_code: string;
+        description?: string;
+        status?: "active" | "reserved" | "sold" | "hidden";
+        image_urls?: string[];
+        custom_vehicle?: {
+          make: string;
+          model: string;
+          year: number;
+          trim_name?: string;
+          body_type?: string;
+          transmission?: string;
+          fuel_type?: string;
+          drivetrain?: string;
+          engine?: string;
+          vin?: string;
+        };
+      }
+  ) {
+    return apiFetch<{
+      listing_id: number;
+      variant_id: number;
+      custom_vehicle_created: boolean;
+      image_count: number;
+    }>("/listings", {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: payload instanceof FormData ? payload : JSON.stringify(payload),
     });
   },
 
@@ -256,7 +299,7 @@ export const aiApi = {
     ownership_years: number;
     km_per_year?: number;
   }) {
-    return apiFetch<Record<string, unknown>>("/ai/tco", {
+    return apiFetch<AiTcoResponse>("/ai/tco", {
       method: "POST",
       body: JSON.stringify(payload),
     });
@@ -268,7 +311,7 @@ export const aiApi = {
     price_type?: string;
     horizon_months?: number;
   }) {
-    return apiFetch<Record<string, unknown>>("/ai/predict-price", {
+    return apiFetch<AiPredictResponse>("/ai/predict-price", {
       method: "POST",
       body: JSON.stringify(payload),
     });
@@ -279,7 +322,7 @@ export const aiApi = {
     market_id: number;
     price_type?: string;
   }) {
-    return apiFetch<Record<string, unknown>>("/ai/compare", {
+    return apiFetch<AiCompareResponse>("/ai/compare", {
       method: "POST",
       body: JSON.stringify(payload),
     });
@@ -287,6 +330,7 @@ export const aiApi = {
 
   chat(payload: {
     message: string;
+    session_id?: number;
     context?: Record<string, unknown>;
   }) {
     return apiFetch<ChatResponse>("/ai/chat", {

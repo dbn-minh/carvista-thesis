@@ -19,7 +19,7 @@ export default class ListingImages extends Model {
       }
     },
     url: {
-      type: DataTypes.TEXT,
+      type: DataTypes.TEXT('long'),
       allowNull: false
     },
     sort_order: {

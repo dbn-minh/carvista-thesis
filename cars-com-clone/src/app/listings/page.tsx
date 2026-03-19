@@ -1,25 +1,48 @@
 "use client";
 
-import { ChangeEvent, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
-import Header from "@/components/layout/Header";
-import StatusBanner from "@/components/common/StatusBanner";
-import EmptyState from "@/components/common/EmptyState";
 import ListingCard from "@/components/cards/ListingCard";
+import EmptyState from "@/components/common/EmptyState";
+import StatusBanner from "@/components/common/StatusBanner";
+import ListingCardSkeleton from "@/components/listings/ListingCardSkeleton";
+import ListingFilters from "@/components/listings/ListingFilters";
+import ListingToolbar from "@/components/listings/ListingToolbar";
+import {
+  applyListingFilters,
+  buildActiveListingFilters,
+  buildListingFilterOptions,
+  sortListings,
+  type ListingFilterState,
+} from "@/components/listings/listing-utils";
+import Header from "@/components/layout/Header";
 import { listingsApi, requestsApi, watchlistApi } from "@/lib/carvista-api";
 import { hasToken } from "@/lib/api-client";
 import type { Listing } from "@/lib/types";
 
+const initialFilters: ListingFilterState = {
+  query: "",
+  minPrice: "",
+  maxPrice: "",
+  make: "",
+  bodyType: "",
+  year: "",
+  maxMileage: "",
+  transmission: "",
+  fuelType: "",
+  location: "",
+  sort: "newest",
+};
+
 export default function ListingsPage() {
-  const router = useRouter();
   const { openAuth } = useAuthModal();
   const [items, setItems] = useState<Listing[]>([]);
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState<"success" | "error" | "info">("info");
   const [loading, setLoading] = useState(true);
-  const [requestMessage, setRequestMessage] = useState("I want to view this car.");
+  const [requestMessage, setRequestMessage] = useState("Hi, I'd like to schedule a viewing for this car.");
   const [savedListingIds, setSavedListingIds] = useState<number[]>([]);
+  const [filters, setFilters] = useState<ListingFilterState>(initialFilters);
 
   async function load() {
     setLoading(true);
@@ -42,7 +65,7 @@ export default function ListingsPage() {
       }
 
       if (saved.status === "fulfilled") {
-        setSavedListingIds(saved.value.items.map((x) => x.listing_id));
+        setSavedListingIds(saved.value.items.map((item) => item.listing_id));
       } else {
         setSavedListingIds([]);
       }
@@ -55,7 +78,7 @@ export default function ListingsPage() {
   }
 
   useEffect(() => {
-    load();
+    void load();
   }, []);
 
   async function sendRequest(listingId: number) {
@@ -65,9 +88,11 @@ export default function ListingsPage() {
     }
 
     try {
-      await requestsApi.createRequest(listingId, { message: requestMessage });
+      await requestsApi.createRequest(listingId, {
+        message: requestMessage.trim() || "Hi, I'd like to schedule a viewing for this car.",
+      });
       setTone("success");
-      setMessage(`Viewing request created for listing ${listingId}.`);
+      setMessage("Viewing request sent. The seller can now review your request in their inbox.");
     } catch (error) {
       setTone("error");
       setMessage(error instanceof Error ? error.message : "Request failed");
@@ -85,12 +110,12 @@ export default function ListingsPage() {
         await watchlistApi.unsaveListing(listingId);
         setSavedListingIds((prev) => prev.filter((id) => id !== listingId));
         setTone("success");
-        setMessage(`Listing ${listingId} removed from saved list.`);
+        setMessage("Listing removed from your saved cars.");
       } else {
         await watchlistApi.saveListing(listingId);
         setSavedListingIds((prev) => [...prev, listingId]);
         setTone("success");
-        setMessage(`Listing ${listingId} saved.`);
+        setMessage("Listing saved to your Garage.");
       }
     } catch (error) {
       setTone("error");
@@ -98,90 +123,86 @@ export default function ListingsPage() {
     }
   }
 
-  function onMessageChange(e: ChangeEvent<HTMLInputElement>) {
-    setRequestMessage(e.target.value);
-  }
+  const filterOptions = useMemo(() => buildListingFilterOptions(items), [items]);
+  const activeFilters = useMemo(() => buildActiveListingFilters(filters), [filters]);
+  const filteredItems = useMemo(
+    () => sortListings(applyListingFilters(items, filters), filters.sort),
+    [items, filters]
+  );
 
   return (
     <>
       <Header />
       <main className="container-cars py-8">
-        <section className="section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(233,241,255,0.9))] p-6 md:p-8">
-          <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr] xl:items-end">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
-                Marketplace inventory
-              </p>
-              <h1 className="mt-2 text-4xl font-apercu-bold text-cars-primary">Listings</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
-                Browse active seller listings, save promising cars, and send viewing requests
-                after authentication. The listing logic stays unchanged; this refactor only
-                upgrades the buying experience around it.
-              </p>
-            </div>
-
-            <div className="rounded-[28px] bg-cars-primary p-5 text-white shadow-[0_18px_44px_rgba(15,45,98,0.18)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/70">
-                Buyer actions
-              </p>
-              <ul className="mt-4 space-y-3 text-sm leading-6 text-white/85">
-                <li>Open any listing detail without logging in.</li>
-                <li>Save listings and request viewings after login.</li>
-                <li>Use Garage to monitor requests and notifications.</li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-xl rounded-[24px] bg-white p-4 shadow-[0_16px_34px_rgba(15,45,98,0.08)]">
-              <label className="mb-1 block text-sm font-semibold text-cars-primary">
-                Default message for viewing requests
-              </label>
-              <input
-                className="h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm text-cars-primary"
-                value={requestMessage}
-                onChange={onMessageChange}
-              />
-            </div>
-
-            {!hasToken() ? (
-              <button
-                type="button"
-                onClick={() => openAuth({ mode: "login", next: "/listings" })}
-                className="rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-white"
-              >
-                Login to save and request
-              </button>
-            ) : null}
-          </div>
-        </section>
+        <ListingFilters
+          filters={filters}
+          setFilters={setFilters}
+          options={filterOptions}
+          requestMessage={requestMessage}
+          setRequestMessage={setRequestMessage}
+        />
 
         <div className="mt-6">
           <StatusBanner tone={tone}>{message}</StatusBanner>
         </div>
 
-        {loading ? <p className="mt-6 text-sm text-cars-gray">Loading listings...</p> : null}
+        <div className="mt-6">
+          <ListingToolbar
+            totalCount={items.length}
+            filteredCount={filteredItems.length}
+            activeFilters={activeFilters}
+            onClearFilters={() => setFilters(initialFilters)}
+          />
+        </div>
+
+        {loading ? (
+          <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <ListingCardSkeleton key={index} />
+            ))}
+          </div>
+        ) : null}
 
         {!loading && items.length === 0 ? (
           <div className="mt-6">
             <EmptyState
               title="No active listings"
-              description="Create a listing from Sell or check the current seed data in the backend."
+              description="Create a listing from Sell or seed more marketplace cars in the backend."
             />
           </div>
         ) : null}
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {items.map((item) => (
-            <ListingCard
-              key={item.listing_id}
-              item={item}
-              saved={savedListingIds.includes(item.listing_id)}
-              onRequest={sendRequest}
-              onToggleSave={toggleSave}
+        {!loading && items.length > 0 && filteredItems.length === 0 ? (
+          <div className="mt-6">
+            <EmptyState
+              title="No listings match these filters"
+              description="Try widening the price range, clearing a few filters, or using a broader keyword."
             />
-          ))}
-        </div>
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={() => setFilters(initialFilters)}
+                className="rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+              >
+                Reset marketplace filters
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {!loading && filteredItems.length > 0 ? (
+          <div className="mt-6 grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
+            {filteredItems.map((item) => (
+              <ListingCard
+                key={item.listing_id}
+                item={item}
+                saved={savedListingIds.includes(item.listing_id)}
+                onRequest={sendRequest}
+                onToggleSave={toggleSave}
+              />
+            ))}
+          </div>
+        ) : null}
       </main>
     </>
   );
