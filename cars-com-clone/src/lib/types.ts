@@ -12,6 +12,36 @@ export type User = {
   role: string;
 };
 
+export type AuthResponse = {
+  token: string;
+  user?: User | null;
+};
+
+export type OtpRequestResponse = {
+  challenge_id: number;
+  destination_type: "email" | "phone";
+  destination_value: string;
+  expires_at: string;
+  resend_available_at: string;
+};
+
+export type OtpVerifyResponse = AuthResponse & {
+  user_created?: boolean;
+};
+
+export type AuthProvidersResponse = {
+  otp: {
+    email: boolean;
+    phone: boolean;
+    expires_in_minutes: number;
+    resend_cooldown_seconds: number;
+  };
+  social: {
+    google: boolean;
+    facebook: boolean;
+  };
+};
+
 export type Make = {
   make_id: number;
   name: string;
@@ -233,12 +263,15 @@ export type ViewingRequest = {
   request_id: number;
   listing_id: number;
   buyer_id: number;
+  seller_user_id?: number | null;
   contact_name?: string | null;
   contact_email?: string | null;
   contact_phone?: string | null;
+  preferred_viewing_time?: string | null;
   message?: string | null;
   status: string;
   created_at?: string;
+  notified_at?: string | null;
 };
 
 export type WatchVariantItem = {

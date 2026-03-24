@@ -26,6 +26,14 @@ export default class ViewingRequests extends Model {
         key: 'user_id'
       }
     },
+    seller_user_id: {
+      type: DataTypes.BIGINT,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'user_id'
+      }
+    },
     contact_name: {
       type: DataTypes.STRING(120),
       allowNull: true
@@ -42,10 +50,18 @@ export default class ViewingRequests extends Model {
       type: DataTypes.TEXT,
       allowNull: true
     },
+    preferred_viewing_time: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
     status: {
       type: DataTypes.ENUM('pending','accepted','rejected','cancelled'),
       allowNull: false,
       defaultValue: "pending"
+    },
+    notified_at: {
+      type: DataTypes.DATE,
+      allowNull: true
     }
   }, {
     sequelize,
@@ -74,6 +90,13 @@ export default class ViewingRequests extends Model {
         using: "BTREE",
         fields: [
           { name: "buyer_id" },
+        ]
+      },
+      {
+        name: "idx_requests_seller",
+        using: "BTREE",
+        fields: [
+          { name: "seller_user_id" },
         ]
       },
       {

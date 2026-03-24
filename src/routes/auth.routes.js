@@ -1,10 +1,9 @@
 import { Router } from "express";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { env } from "../config/env.js";
-import { validate } from "../middlewares/validate.js";
 import { requireAuth } from "../middlewares/auth.js";
+import { validate } from "../middlewares/validate.js";
+import { createAuthService } from "../services/auth/auth.service.js";
 
 export const authRoutes = Router();
 
@@ -19,27 +18,6 @@ const RegisterSchema = z.object({
   params: z.any(),
 });
 
-authRoutes.post("/auth/register", validate(RegisterSchema), async (req, res, next) => {
-  try {
-    const { Users } = req.ctx.models;
-    const b = req.validated.body;
-
-    const exists = await Users.findOne({ where: { email: b.email } });
-    if (exists) return next({ status: 409, message: "Email already exists" });
-
-    const password_hash = await bcrypt.hash(b.password, env.auth.bcryptRounds);
-    const user = await Users.create({
-      name: b.name,
-      email: b.email,
-      phone: b.phone ?? null,
-      password_hash,
-      role: "user",
-    });
-
-    res.status(201).json({ user_id: user.user_id, email: user.email });
-  } catch (e) { next(e); }
-});
-
 const LoginSchema = z.object({
   body: z.object({
     email: z.string().email(),
@@ -49,30 +27,207 @@ const LoginSchema = z.object({
   params: z.any(),
 });
 
-authRoutes.post("/auth/login", validate(LoginSchema), async (req, res, next) => {
+const OtpRequestSchema = z.object({
+  body: z.object({
+    destination_type: z.enum(["email", "phone"]),
+    destination_value: z.string().min(3),
+    purpose: z.enum(["login", "register", "verify_contact", "passwordless_signin"]).optional(),
+  }),
+  query: z.any(),
+  params: z.any(),
+});
+
+const OtpVerifySchema = z.object({
+  body: z.object({
+    challenge_id: z.preprocess((value) => Number(value), z.number().int().positive()),
+    destination_type: z.enum(["email", "phone"]),
+    destination_value: z.string().min(3),
+    code: z.string().min(4).max(10),
+    profile_name: z.string().min(1).optional(),
+  }),
+  query: z.any(),
+  params: z.any(),
+});
+
+const SocialProviderParamsSchema = z.object({
+  body: z.any(),
+  query: z.object({
+    next: z.string().optional(),
+  }),
+  params: z.object({
+    provider: z.enum(["google", "facebook"]),
+  }),
+});
+
+authRoutes.post(
+  ["/auth/register", "/auth/password/register"],
+  validate(RegisterSchema),
+  async (req, res, next) => {
+    try {
+      const authService = createAuthService(req.ctx);
+      const result = await authService.registerWithPassword(req.validated.body, {
+        ipAddress: req.ip,
+      });
+
+      res.status(201).json({
+        user_id: result.user.user_id,
+        email: result.user.email,
+        token: result.token,
+        user: sanitizeUser(result.user),
+      });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+authRoutes.post(
+  ["/auth/login", "/auth/password/login"],
+  validate(LoginSchema),
+  async (req, res, next) => {
+    try {
+      const authService = createAuthService(req.ctx);
+      const result = await authService.loginWithPassword(req.validated.body, {
+        ipAddress: req.ip,
+      });
+
+      res.json({
+        token: result.token,
+        user: sanitizeUser(result.user),
+      });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+authRoutes.post("/auth/otp/request", validate(OtpRequestSchema), async (req, res, next) => {
   try {
-    const { Users } = req.ctx.models;
-    const b = req.validated.body;
+    const authService = createAuthService(req.ctx);
+    const result = await authService.requestOtp({
+      destinationType: req.validated.body.destination_type,
+      destinationValue: req.validated.body.destination_value,
+      purpose: req.validated.body.purpose || "login",
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") || null,
+    });
 
-    const user = await Users.findOne({ where: { email: b.email } });
-    if (!user) return next({ status: 401, message: "Invalid credentials" });
+    res.status(202).json(result);
+  } catch (e) {
+    next(e);
+  }
+});
 
-    const ok = await bcrypt.compare(b.password, user.password_hash);
-    if (!ok) return next({ status: 401, message: "Invalid credentials" });
+authRoutes.post("/auth/otp/verify", validate(OtpVerifySchema), async (req, res, next) => {
+  try {
+    const authService = createAuthService(req.ctx);
+    const result = await authService.verifyOtp({
+      challengeId: req.validated.body.challenge_id,
+      destinationType: req.validated.body.destination_type,
+      destinationValue: req.validated.body.destination_value,
+      code: req.validated.body.code,
+      profileName: req.validated.body.profile_name,
+      ipAddress: req.ip,
+    });
 
-    const token = jwt.sign(
-      { userId: user.user_id, role: user.role },
-      env.auth.jwtSecret,
-      { expiresIn: env.auth.jwtExpiresIn }
-    );
-    res.json({ token });
-  } catch (e) { next(e); }
+    res.json({
+      token: result.token,
+      user: sanitizeUser(result.user),
+      user_created: result.user_created,
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+authRoutes.get("/auth/providers", (_req, res) => {
+  res.json({
+    otp: {
+      email: true,
+      phone: true,
+      expires_in_minutes: env.auth.otpExpiresInMinutes,
+      resend_cooldown_seconds: env.auth.otpResendCooldownSeconds,
+    },
+    social: {
+      google: Boolean(env.auth.social.google.clientId && env.auth.social.google.clientSecret),
+      facebook: Boolean(
+        env.auth.social.facebook.appId && env.auth.social.facebook.appSecret
+      ),
+    },
+  });
+});
+
+authRoutes.get(
+  "/auth/social/:provider/start",
+  validate(SocialProviderParamsSchema),
+  async (req, res, next) => {
+    try {
+      const authService = createAuthService(req.ctx);
+      const nextPath = sanitizeNext(req.validated.query.next);
+      const authorizationUrl = authService.buildSocialStartUrl(
+        req.validated.params.provider,
+        nextPath
+      );
+      res.redirect(authorizationUrl);
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+authRoutes.get("/auth/social/:provider/callback", async (req, res) => {
+  const provider = req.params.provider;
+  const authService = createAuthService(req.ctx);
+
+  try {
+    const result = await authService.handleSocialCallback(provider, {
+      code: req.query.code,
+      state: req.query.state,
+      error: req.query.error,
+      errorDescription: req.query.error_description,
+      ipAddress: req.ip,
+    });
+    return res.redirect(result.redirectUrl);
+  } catch (error) {
+    const safeMessage =
+      error?.safe || error?.status && error.status < 500
+        ? error.message
+        : "Social login could not be completed right now.";
+    return res.redirect(buildSocialErrorRedirect(provider, safeMessage));
+  }
 });
 
 authRoutes.get("/auth/me", requireAuth, async (req, res, next) => {
   try {
-    const { Users } = req.ctx.models;
-    const user = await Users.findByPk(req.user.userId, { attributes: ["user_id","name","email","phone","role"] });
-    res.json({ user });
-  } catch (e) { next(e); }
+    const authService = createAuthService(req.ctx);
+    const user = await authService.getCurrentUser(req.user.userId);
+    res.json({ user: sanitizeUser(user) });
+  } catch (e) {
+    next(e);
+  }
 });
+
+function sanitizeUser(user) {
+  if (!user) return null;
+  return {
+    user_id: user.user_id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone ?? null,
+    role: user.role,
+  };
+}
+
+function sanitizeNext(nextPath) {
+  const candidate = String(nextPath || "").trim();
+  if (!candidate.startsWith("/")) return "/garage";
+  return candidate;
+}
+
+function buildSocialErrorRedirect(provider, message) {
+  const hash = new URLSearchParams({
+    provider: String(provider || ""),
+    error: message || "Social login failed.",
+  });
+  return `${env.frontendUrl}/auth/social/callback#${hash.toString()}`;
+}

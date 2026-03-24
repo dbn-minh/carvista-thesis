@@ -3,6 +3,8 @@ import type {
   AiCompareResponse,
   AiPredictResponse,
   AiTcoResponse,
+  AuthProvidersResponse,
+  AuthResponse,
   CatalogOwnershipSummary,
   CarReview,
   ChatResponse,
@@ -11,6 +13,8 @@ import type {
   Make,
   Model,
   NotificationItem,
+  OtpRequestResponse,
+  OtpVerifyResponse,
   SellerReview,
   User,
   VariantDetail,
@@ -20,6 +24,9 @@ import type {
   WatchVariantItem,
 } from "./types";
 
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
+
 export const authApi = {
   register(payload: {
     name: string;
@@ -27,17 +34,52 @@ export const authApi = {
     phone?: string;
     password: string;
   }) {
-    return apiFetch<{ user_id: number; email: string }>("/auth/register", {
+    return apiFetch<AuthResponse & { user_id: number; email: string }>("/auth/register", {
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
 
   login(payload: { email: string; password: string }) {
-    return apiFetch<{ token: string }>("/auth/login", {
+    return apiFetch<AuthResponse>("/auth/login", {
       method: "POST",
       body: JSON.stringify(payload),
     });
+  },
+
+  requestOtp(payload: {
+    destination_type: "email" | "phone";
+    destination_value: string;
+    purpose?: "login" | "register" | "verify_contact" | "passwordless_signin";
+  }) {
+    return apiFetch<OtpRequestResponse>("/auth/otp/request", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  verifyOtp(payload: {
+    challenge_id: number;
+    destination_type: "email" | "phone";
+    destination_value: string;
+    code: string;
+    profile_name?: string;
+  }) {
+    return apiFetch<OtpVerifyResponse>("/auth/otp/verify", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  providers() {
+    return apiFetch<AuthProvidersResponse>("/auth/providers");
+  },
+
+  socialStartUrl(provider: "google" | "facebook", next?: string) {
+    const qs = new URLSearchParams();
+    if (next) qs.set("next", next);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return `${API_BASE_URL}/auth/social/${provider}/start${suffix}`;
   },
 
   me() {
@@ -217,9 +259,14 @@ export const requestsApi = {
       contact_name?: string;
       contact_email?: string;
       contact_phone?: string;
+      preferred_viewing_time?: string;
     }
   ) {
-    return apiFetch<{ request_id: number }>(`/listings/${listingId}/requests`, {
+    return apiFetch<{
+      request_id: number;
+      seller_notified: boolean;
+      notification_provider?: string | null;
+    }>(`/listings/${listingId}/requests`, {
       method: "POST",
       body: JSON.stringify(payload),
     });

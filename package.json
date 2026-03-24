@@ -7,7 +7,8 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "gen:models": "sequelize-auto -h localhost -d carvista -u user -x password -p 3308 --dialect mysql -o ./src/models -l esm --cm p",
-    "test:ai": "node --test src/services/ai/assistant.test.js"
+    "test:ai": "node --test src/services/ai/assistant.test.js",
+    "test:auth": "node --test src/services/auth/auth.test.js"
   },
   "keywords": [],
   "author": "",

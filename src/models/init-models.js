@@ -2,10 +2,12 @@ import _sequelize from "sequelize";
 const DataTypes = _sequelize.DataTypes;
 import _AiChatMessages from  "./ai_chat_messages.js";
 import _AiChatSessions from  "./ai_chat_sessions.js";
+import _AuthEventLogs from  "./auth_event_logs.js";
 import _CarMakes from  "./car_makes.js";
 import _CarModels from  "./car_models.js";
 import _CarReviews from  "./car_reviews.js";
 import _CarVariants from  "./car_variants.js";
+import _ExternalIdentities from  "./external_identities.js";
 import _ListingImages from  "./listing_images.js";
 import _ListingPriceHistory from  "./listing_price_history.js";
 import _Listings from  "./listings.js";
@@ -17,6 +19,7 @@ import _SavedLogs from  "./saved_logs.js";
 import _SellerReviews from  "./seller_reviews.js";
 import _TcoProfiles from  "./tco_profiles.js";
 import _TcoRules from  "./tco_rules.js";
+import _OtpChallenges from  "./otp_challenges.js";
 import _Users from  "./users.js";
 import _VariantImages from  "./variant_images.js";
 import _VariantPriceHistory from  "./variant_price_history.js";
@@ -28,10 +31,12 @@ import _WatchedVariants from  "./watched_variants.js";
 export default function initModels(sequelize) {
   const AiChatMessages = _AiChatMessages.init(sequelize, DataTypes);
   const AiChatSessions = _AiChatSessions.init(sequelize, DataTypes);
+  const AuthEventLogs = _AuthEventLogs.init(sequelize, DataTypes);
   const CarMakes = _CarMakes.init(sequelize, DataTypes);
   const CarModels = _CarModels.init(sequelize, DataTypes);
   const CarReviews = _CarReviews.init(sequelize, DataTypes);
   const CarVariants = _CarVariants.init(sequelize, DataTypes);
+  const ExternalIdentities = _ExternalIdentities.init(sequelize, DataTypes);
   const ListingImages = _ListingImages.init(sequelize, DataTypes);
   const ListingPriceHistory = _ListingPriceHistory.init(sequelize, DataTypes);
   const Listings = _Listings.init(sequelize, DataTypes);
@@ -43,6 +48,7 @@ export default function initModels(sequelize) {
   const SellerReviews = _SellerReviews.init(sequelize, DataTypes);
   const TcoProfiles = _TcoProfiles.init(sequelize, DataTypes);
   const TcoRules = _TcoRules.init(sequelize, DataTypes);
+  const OtpChallenges = _OtpChallenges.init(sequelize, DataTypes);
   const Users = _Users.init(sequelize, DataTypes);
   const VariantImages = _VariantImages.init(sequelize, DataTypes);
   const VariantPriceHistory = _VariantPriceHistory.init(sequelize, DataTypes);
@@ -93,8 +99,12 @@ export default function initModels(sequelize) {
   TcoProfiles.hasMany(TcoRules, { as: "tco_rules", foreignKey: "profile_id"});
   AiChatSessions.belongsTo(Users, { as: "user", foreignKey: "user_id"});
   Users.hasMany(AiChatSessions, { as: "ai_chat_sessions", foreignKey: "user_id"});
+  AuthEventLogs.belongsTo(Users, { as: "user", foreignKey: "user_id"});
+  Users.hasMany(AuthEventLogs, { as: "auth_event_logs", foreignKey: "user_id"});
   CarReviews.belongsTo(Users, { as: "user", foreignKey: "user_id"});
   Users.hasMany(CarReviews, { as: "car_reviews", foreignKey: "user_id"});
+  ExternalIdentities.belongsTo(Users, { as: "user", foreignKey: "user_id"});
+  Users.hasMany(ExternalIdentities, { as: "external_identities", foreignKey: "user_id"});
   Listings.belongsTo(Users, { as: "owner", foreignKey: "owner_id"});
   Users.hasMany(Listings, { as: "listings", foreignKey: "owner_id"});
   Notifications.belongsTo(Users, { as: "user", foreignKey: "user_id"});
@@ -113,16 +123,20 @@ export default function initModels(sequelize) {
   Users.hasMany(SellerReviews, { as: "seller_seller_reviews", foreignKey: "seller_id"});
   ViewingRequests.belongsTo(Users, { as: "buyer", foreignKey: "buyer_id"});
   Users.hasMany(ViewingRequests, { as: "viewing_requests", foreignKey: "buyer_id"});
+  ViewingRequests.belongsTo(Users, { as: "seller", foreignKey: "seller_user_id"});
+  Users.hasMany(ViewingRequests, { as: "seller_viewing_requests", foreignKey: "seller_user_id"});
   WatchedVariants.belongsTo(Users, { as: "user", foreignKey: "user_id"});
   Users.hasMany(WatchedVariants, { as: "watched_variants", foreignKey: "user_id"});
 
   return {
     AiChatMessages,
     AiChatSessions,
+    AuthEventLogs,
     CarMakes,
     CarModels,
     CarReviews,
     CarVariants,
+    ExternalIdentities,
     ListingImages,
     ListingPriceHistory,
     Listings,
@@ -134,6 +148,7 @@ export default function initModels(sequelize) {
     SellerReviews,
     TcoProfiles,
     TcoRules,
+    OtpChallenges,
     Users,
     VariantImages,
     VariantPriceHistory,
