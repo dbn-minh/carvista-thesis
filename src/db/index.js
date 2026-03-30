@@ -3,12 +3,32 @@ import { env } from "../config/env.js";
 import initModels from "../models/init-models.js";
 
 export function createDb() {
-  const sequelize = new Sequelize(env.db.name, env.db.user, env.db.password, {
-    host: env.db.host,
-    port: env.db.port,
-    dialect: "mysql",
+  const baseConfig = {
+    dialect: env.db.dialect,
     logging: false,
-  });
+    pool: {
+      max: env.db.poolMax,
+      min: env.db.poolMin,
+      acquire: env.db.poolAcquireMs,
+      idle: env.db.poolIdleMs,
+    },
+    dialectOptions: env.db.ssl
+      ? {
+          ssl: {
+            require: true,
+            rejectUnauthorized: env.db.sslRejectUnauthorized,
+          },
+        }
+      : undefined,
+  };
+
+  const sequelize = env.db.url
+    ? new Sequelize(env.db.url, baseConfig)
+    : new Sequelize(env.db.name, env.db.user, env.db.password, {
+        ...baseConfig,
+        host: env.db.host,
+        port: env.db.port,
+      });
 
   const models = initModels(sequelize);
 

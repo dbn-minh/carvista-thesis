@@ -1,2 +1,11 @@
 node_modules
 .gitnexus
+.env
+.env.*
+!.env.example
+cars-com-clone/.env.local
+cars-com-clone/.env.*
+!cars-com-clone/.env.example
+cars-com-clone/.next
+cars-com-clone/out
+dist

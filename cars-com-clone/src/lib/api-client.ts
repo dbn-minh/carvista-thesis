@@ -1,7 +1,5 @@
 import type { ApiErrorShape } from "./types";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
+import { API_BASE_URL, getApiOriginLabel } from "./runtime-config";
 
 export class ApiError extends Error {
   status?: number;
@@ -61,7 +59,7 @@ export async function apiFetch<T>(
     });
   } catch (error) {
     const message =
-      "Cannot reach the CarVista backend right now. Please make sure the backend server is running on http://localhost:4000.";
+      `Cannot reach the CarVista backend right now. Please verify NEXT_PUBLIC_API_BASE_URL or make sure the API is available at ${getApiOriginLabel()}.`;
     throw new ApiError(
       message,
       undefined,

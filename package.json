@@ -5,7 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon src/server.js",
+    "build": "node -e \"console.log('No build step required for CarVista backend')\"",
     "start": "node src/server.js",
+    "data:seed": "python seed.py",
+    "data:refresh": "python -m data.ingestion.refresh_intelligence_materializations",
+    "data:ingest:facts": "python -m data.ingestion.ingest_vehicle_facts",
+    "data:ingest:market": "python -m data.ingestion.ingest_market_listings",
+    "data:ingest:history": "python -m data.ingestion.ingest_price_history",
+    "data:ingest:fuel": "python -m data.ingestion.ingest_fuel_economy",
+    "data:ingest:recalls": "python -m data.ingestion.ingest_safety_recalls",
     "gen:models": "sequelize-auto -h localhost -d carvista -u user -x password -p 3308 --dialect mysql -o ./src/models -l esm --cm p",
     "test:ai": "node --test src/services/ai/assistant.test.js",
     "test:auth": "node --test src/services/auth/auth.test.js"

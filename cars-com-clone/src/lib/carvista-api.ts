@@ -1,4 +1,5 @@
 import { apiFetch } from "./api-client";
+import { API_BASE_URL } from "./runtime-config";
 import type {
   AdvisorProfile,
   AiCompareResponse,
@@ -25,9 +26,6 @@ import type {
   WatchListingItem,
   WatchVariantItem,
 } from "./types";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
 
 function appendAdvisorProfileParams(qs: URLSearchParams, profile?: AdvisorProfile) {
   if (!profile) return;

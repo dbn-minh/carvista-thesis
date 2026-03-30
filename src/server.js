@@ -8,12 +8,13 @@ async function main() {
 
   const app = createApp(db);
   app.listen(env.appPort, () => {
-    console.log(`✅ API running: http://localhost:${env.appPort}`);
-    console.log(`✅ Swagger:     http://localhost:${env.appPort}/api-docs`);
+    console.log(`[startup] CarVista API listening on ${env.appPublicUrl}`);
+    console.log(`[startup] Health check: ${env.appPublicUrl}/health`);
+    console.log(`[startup] API docs: ${env.appPublicUrl}/api-docs`);
   });
 }
 
-main().catch((e) => {
-  console.error("❌ Startup error:", e);
+main().catch((error) => {
+  console.error("[startup] Fatal startup error:", error);
   process.exit(1);
 });
