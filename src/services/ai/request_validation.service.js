@@ -1,5 +1,7 @@
 import { resolveMarketByText, searchVariantsByText } from "./source_retrieval.service.js";
 
+const FOCUS_REFERENCE_PATTERN = /\b(this car|this vehicle|this one|that car|that vehicle|that one|current car|current vehicle|xe nay|xe do|mau nay|mau do)\b/i;
+
 function extractVariantIds(message) {
   const match = String(message || "").match(/\[(\s*\d+\s*(,\s*\d+\s*)+)\]/);
   if (!match) return [];
@@ -47,7 +49,17 @@ function filterContextMentions(mentions, focusLabel) {
   return (mentions ?? []).filter((mention) => String(mention || "").trim().toLowerCase() !== normalizedFocus);
 }
 
+function hasExplicitVehicleMentions(entities, context) {
+  const mentions = filterContextMentions(entities?.vehicles, context.focus_variant_label);
+  return mentions.length > 0 && !FOCUS_REFERENCE_PATTERN.test(String(context.message || ""));
+}
+
 async function resolvePrimaryVehicle(ctx, entities, context) {
+  const explicitMentions = filterContextMentions(entities.vehicles, context.focus_variant_label);
+  if (explicitMentions[0]) {
+    return resolveVehicleByMention(ctx, explicitMentions[0]);
+  }
+
   if (Number.isInteger(context.focus_variant_id)) {
     return {
       variant_id: context.focus_variant_id,
@@ -110,13 +122,66 @@ async function validateCompareRequest(ctx, intentResult, context) {
     };
   }
 
+  const explicitMentions = filterContextMentions(intentResult.entities.vehicles, context.focus_variant_label);
+  if (explicitMentions.length >= 2) {
+    const resolvedVehicles = await Promise.all(explicitMentions.slice(0, 2).map((mention) => resolveVehicleByMention(ctx, mention)));
+    const variantIds = uniqueIntegers(resolvedVehicles.map((vehicle) => vehicle?.variant_id));
+    if (variantIds.length >= 2) {
+      const [left, right] = resolvedVehicles;
+      return {
+        ok: true,
+        payload: {
+          variant_ids: variantIds.slice(0, 5),
+          market_id: context.market_id ?? 1,
+          buyer_profile: context.advisor_profile,
+        },
+        context_updates: {
+          compare_variant_ids: variantIds.slice(0, 5),
+          ...(left?.variant_id ? { focus_variant_id: left.variant_id } : {}),
+          ...(left?.label ? { focus_variant_label: left.label } : {}),
+        },
+      };
+    }
+  }
+
+  if (explicitMentions.length === 1 && Number.isInteger(context.focus_variant_id)) {
+    const right = await resolveVehicleByMention(ctx, explicitMentions[0]);
+    const variantIds = uniqueIntegers([context.focus_variant_id, right?.variant_id]).slice(0, 5);
+    if (variantIds.length >= 2) {
+      return {
+        ok: true,
+        payload: {
+          variant_ids: variantIds,
+          market_id: context.market_id ?? 1,
+          buyer_profile: context.advisor_profile,
+        },
+        context_updates: {
+          compare_variant_ids: variantIds,
+          focus_variant_id: context.focus_variant_id,
+          ...(context.focus_variant_label ? { focus_variant_label: context.focus_variant_label } : {}),
+        },
+      };
+    }
+  }
+
   const left = await resolvePrimaryVehicle(ctx, intentResult.entities, context);
   const right = await resolveSecondaryCompareVehicle(ctx, intentResult.entities, {
     ...context,
-    compare_variant_ids: left?.variant_id != null ? [left.variant_id, ...(context.compare_variant_ids ?? []).slice(1)] : context.compare_variant_ids,
+    compare_variant_ids:
+      explicitMentions.length > 0
+        ? left?.variant_id != null
+          ? [left.variant_id]
+          : []
+        : left?.variant_id != null
+          ? [left.variant_id, ...(context.compare_variant_ids ?? []).slice(1)]
+          : context.compare_variant_ids,
   });
 
-  const variantIds = uniqueIntegers([left?.variant_id, right?.variant_id, ...(context.compare_variant_ids ?? [])]).slice(0, 5);
+  const variantIds = uniqueIntegers([
+    left?.variant_id,
+    right?.variant_id,
+    ...(hasExplicitVehicleMentions(intentResult.entities, context) ? [] : context.compare_variant_ids ?? []),
+  ]).slice(0, 5);
   if (variantIds.length < 2) {
     return buildClarification(
       "compare_car",

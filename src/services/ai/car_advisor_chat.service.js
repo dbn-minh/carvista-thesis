@@ -4,6 +4,14 @@ import { mapAiChatErrorToResponse } from "./error_mapper.service.js";
 import { orchestrateChatRequest } from "./chat_orchestrator.service.js";
 import { classifyIntent } from "./intent_classifier.service.js";
 import { logAiEvent } from "./logger.service.js";
+import { pickNextDiscoveryQuestion } from "./question_policy.service.js";
+import {
+  buildActiveTopic,
+  buildConversationState,
+  classifyConversationTurn,
+  isShortClarificationReply,
+  pruneConversationContext,
+} from "./conversation_state.service.js";
 
 const PROFILE_QUESTIONS = [
   {
@@ -40,6 +48,24 @@ const PROFILE_QUESTIONS = [
     key: "preferred_fuel_type",
     question: "Would you rather own gasoline, hybrid, plug-in hybrid, or EV?",
     examples: ["hybrid", "EV", "no strong preference"],
+    required: false,
+  },
+  {
+    key: "new_vs_used",
+    question: "Are you looking for something close to new, definitely used, or are you open to either?",
+    examples: ["new only", "used is fine", "either works"],
+    required: false,
+  },
+  {
+    key: "maintenance_sensitivity",
+    question: "How sensitive are you to maintenance cost and repair complexity?",
+    examples: ["very sensitive", "I want the simplest ownership path", "I can accept some complexity"],
+    required: false,
+  },
+  {
+    key: "brand_openness",
+    question: "Are you open to any brand, or do you already have a shortlist?",
+    examples: ["open to any brand", "Japanese brands only", "I prefer BMW or Mercedes"],
     required: false,
   },
 ];
@@ -151,6 +177,9 @@ function humanizeQuestionKey(key) {
     passenger_count: "Passenger count",
     preferred_body_type: "Body style",
     preferred_fuel_type: "Fuel type",
+    new_vs_used: "New or used",
+    maintenance_sensitivity: "Maintenance sensitivity",
+    brand_openness: "Brand openness",
   };
 
   return map[key] || key;
@@ -422,6 +451,45 @@ function extractPersonality(message) {
   return null;
 }
 
+function extractNewVsUsed(message) {
+  const normalized = normalizeText(message);
+  if (includesAny(normalized, ["either", "both are fine", "open to both", "open to either", "ca hai deu duoc"])) {
+    return "either";
+  }
+  if (includesAny(normalized, ["used", "pre owned", "pre-owned", "second hand", "xe luot", "xe cu"])) {
+    return "used";
+  }
+  if (includesAny(normalized, ["new", "brand new", "xe moi"])) {
+    return "new";
+  }
+  return null;
+}
+
+function extractMaintenanceSensitivity(message) {
+  const normalized = normalizeText(message);
+  if (includesAny(normalized, ["very sensitive", "low maintenance", "cheap to maintain", "simple ownership", "avoid repair", "it bao duong", "de nuoi"])) {
+    return "high";
+  }
+  if (includesAny(normalized, ["somewhat sensitive", "balanced", "normal maintenance", "khong qua ngat ngheo"])) {
+    return "medium";
+  }
+  if (includesAny(normalized, ["dont mind maintenance", "don't mind maintenance", "ok with maintenance", "willing to maintain", "chap nhan bao duong", "khong ngai chi phi"])) {
+    return "low";
+  }
+  return null;
+}
+
+function extractBrandOpenness(message) {
+  const normalized = normalizeText(message);
+  if (includesAny(normalized, ["open to any brand", "no brand preference", "any brand is fine", "thuong hieu nao cung duoc", "khong co thuong hieu yeu thich"])) {
+    return "open";
+  }
+  if (includesAny(normalized, ["only", "prefer", "shortlist", "nhat dinh", "uu tien"])) {
+    return "shortlist";
+  }
+  return null;
+}
+
 function extractAnswerForQuestion(questionKey, message) {
   switch (questionKey) {
     case "budget_max":
@@ -436,6 +504,12 @@ function extractAnswerForQuestion(questionKey, message) {
       return extractBodyTypePreference(message);
     case "preferred_fuel_type":
       return extractFuelPreference(message);
+    case "new_vs_used":
+      return extractNewVsUsed(message);
+    case "maintenance_sensitivity":
+      return extractMaintenanceSensitivity(message);
+    case "brand_openness":
+      return extractBrandOpenness(message);
     default:
       return null;
   }
@@ -456,13 +530,18 @@ function extractAdvisorProfilePatch(message, expectedQuestionKey = null) {
   setIfPresent(patch, "preferred_fuel_type", extractFuelPreference(message));
   setIfPresent(patch, "favorite_color", extractFavoriteColor(message));
   setIfPresent(patch, "personality", extractPersonality(message));
+  setIfPresent(patch, "new_vs_used", extractNewVsUsed(message));
+  setIfPresent(patch, "maintenance_sensitivity", extractMaintenanceSensitivity(message));
+  setIfPresent(patch, "brand_openness", extractBrandOpenness(message));
 
   return patch;
 }
 
 function nextAdvisorQuestion(profile, mode = "required") {
-  const keys = mode === "required" ? REQUIRED_QUESTION_KEYS : OPTIONAL_QUESTION_KEYS;
-  return keys.map((key) => QUESTION_BY_KEY[key]).find((item) => profile?.[item.key] == null) ?? null;
+  const candidates = (mode === "required" ? REQUIRED_QUESTION_KEYS : OPTIONAL_QUESTION_KEYS)
+    .map((key) => QUESTION_BY_KEY[key])
+    .filter(Boolean);
+  return pickNextDiscoveryQuestion(profile, candidates, mode);
 }
 
 function mergeAdvisorProfile(currentProfile, patch) {
@@ -503,6 +582,18 @@ function buildProfileSnapshot(profile) {
   if (profile?.preferred_fuel_type && profile.preferred_fuel_type !== "any") parts.push(`prefers ${profile.preferred_fuel_type} powertrains`);
   if (profile?.preferred_body_type === "any") parts.push("no strong body-style preference");
   if (profile?.preferred_fuel_type === "any") parts.push("no strong fuel-type preference");
+  if (profile?.new_vs_used && profile.new_vs_used !== "either") parts.push(`${profile.new_vs_used} vehicle preference`);
+  if (profile?.new_vs_used === "either") parts.push("open to both new and used options");
+  if (profile?.maintenance_sensitivity) {
+    const maintenanceMap = {
+      high: "cares a lot about keeping maintenance simple",
+      medium: "wants a balanced ownership-cost profile",
+      low: "is open to a more complex ownership path if the car is worth it",
+    };
+    parts.push(maintenanceMap[profile.maintenance_sensitivity] || profile.maintenance_sensitivity);
+  }
+  if (profile?.brand_openness === "open") parts.push("open to different brands");
+  if (profile?.brand_openness === "shortlist") parts.push("already leans toward a shortlist of brands");
 
   return parts.length > 0 ? parts.join(", ") : "I am still collecting your driving profile";
 }
@@ -888,10 +979,19 @@ function buildCardsFromStructuredResult(intent, structuredResult, advisor_profil
     const vehicleCards = (structuredResult.ranked_vehicles ?? []).map((item) => ({
       title: item.name,
       value: `Score ${item.score.toFixed(1)}`,
-      description:
+      description: [
         item.reasons?.length > 0
           ? item.reasons.join(", ")
           : "This car still ranks well, but the structured reasons are limited.",
+        item.links?.detail_page_url ? "Open the vehicle detail page to review specs and ownership insights." : null,
+        item.links?.related_listings_url
+          ? item.links.related_listings_count > 0
+            ? `${item.links.related_listings_count} related listing(s) are available right now.`
+            : "No exact listing is live yet, but the closest browse path is ready."
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" "),
     }));
 
     return [profileCard, ...vehicleCards].filter(Boolean);
@@ -948,8 +1048,43 @@ function buildSuggestedActions(intent, structuredResult, { market_id, focus_vari
     return [{ type: "open_compare_modal", payload: { variant_id: focus_variant_id } }];
   }
 
-  if (intent === "recommend_car" && Number.isInteger(structuredResult?.ranked_vehicles?.[0]?.variant_id)) {
-    return [{ type: "open_catalog_variant", payload: { variant_id: structuredResult.ranked_vehicles[0].variant_id } }];
+  if (intent === "recommend_car" && structuredResult?.ranked_vehicles?.[0]) {
+    const top = structuredResult.ranked_vehicles[0];
+    return [
+      top.links?.detail_page_url
+        ? {
+            type: "open_vehicle_detail",
+            payload: {
+              url: top.links.detail_page_url,
+              label: `Open ${top.name}`,
+              variant_id: top.variant_id ?? null,
+            },
+          }
+        : null,
+      top.links?.related_listings_url
+        ? {
+            type: "open_related_listings",
+            payload: {
+              url: top.links.related_listings_url,
+              label:
+                top.links.related_listings_count > 0
+                  ? `Browse ${top.links.related_listings_count} matching listing(s)`
+                  : "Browse related listings",
+              related_listing_ids: top.links.related_listing_ids,
+            },
+          }
+        : null,
+      structuredResult.ranked_vehicles[1]?.links?.detail_page_url
+        ? {
+            type: "open_vehicle_detail",
+            payload: {
+              url: structuredResult.ranked_vehicles[1].links.detail_page_url,
+              label: `See alternative: ${structuredResult.ranked_vehicles[1].name}`,
+              variant_id: structuredResult.ranked_vehicles[1].variant_id ?? null,
+            },
+          }
+        : null,
+    ].filter(Boolean);
   }
 
   if (intent === "recommend_car" && nextOptionalQuestion) {
@@ -1033,11 +1168,27 @@ function createFlowId() {
   return `flow_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function isShortClarificationReply(message) {
-  const normalized = String(message || "").trim();
-  if (!normalized) return false;
-  const tokenCount = normalized.split(/\s+/).filter(Boolean).length;
-  return normalized.length <= 48 || tokenCount <= 6;
+function extractRecommendationFocus(structuredResult) {
+  const top = structuredResult?.ranked_vehicles?.[0] ?? null;
+  if (!top) return { focus_variant_id: null, focus_variant_label: null };
+  return {
+    focus_variant_id: Number.isInteger(top.variant_id) ? top.variant_id : null,
+    focus_variant_label: typeof top.name === "string" && top.name ? top.name : null,
+  };
+}
+
+function collectCompareVariantIds(intent, structuredResult, contextUpdates = {}, fallback = []) {
+  const contextVariantIds = Array.isArray(contextUpdates?.compare_variant_ids)
+    ? contextUpdates.compare_variant_ids.filter((value) => Number.isInteger(value))
+    : [];
+  if (contextVariantIds.length > 0) return contextVariantIds.slice(0, 5);
+  if (intent === "compare_car") {
+    const resultVariantIds = (structuredResult?.vehicles ?? [])
+      .map((vehicle) => vehicle.variant_id)
+      .filter((value) => Number.isInteger(value));
+    if (resultVariantIds.length > 0) return resultVariantIds.slice(0, 5);
+  }
+  return Array.isArray(fallback) ? fallback.filter((value) => Number.isInteger(value)).slice(0, 5) : [];
 }
 
 function buildPendingFlow({ id, intent, missing_fields = [], context_snapshot = {}, source = "service_validation" }) {
@@ -1052,11 +1203,70 @@ function buildPendingFlow({ id, intent, missing_fields = [], context_snapshot = 
   };
 }
 
-function shouldBindPendingFlow(message, pendingFlow, previewIntent) {
+function shouldBindPendingFlow(message, pendingFlow, previewIntent, transition, hasVehicleMentions = false) {
   if (!pendingFlow?.intent) return false;
+  if (transition && typeof transition.bind_pending_flow === "boolean") return transition.bind_pending_flow;
   if (isShortClarificationReply(message)) return true;
+  if (hasVehicleMentions) return true;
   if (previewIntent === pendingFlow.intent) return true;
   return false;
+}
+
+function buildAmbiguousTurnPayload({
+  session_id,
+  flow_id,
+  advisor_profile,
+  market_id,
+  pendingFlow = null,
+  activeTopic = null,
+  turn,
+}) {
+  const answer =
+    pendingFlow?.missing_fields?.includes("vehicles") || activeTopic?.intent === "compare_car"
+      ? "I'm not fully sure which car you mean yet. Tell me the vehicle name directly, or open the vehicle detail page first so I can stay grounded."
+      : pendingFlow?.missing_fields?.includes("country")
+        ? "I still need the country or market for that estimate. A short answer like 'Vietnam' is enough."
+        : "I'm not fully sure what 'this one' points to yet. Tell me the car name directly and I'll continue from there.";
+
+  const followUp =
+    pendingFlow?.missing_fields?.includes("country")
+      ? "Which country or market should I use?"
+      : pendingFlow?.missing_fields?.includes("vehicles") || activeTopic?.intent === "compare_car"
+        ? "Which vehicle do you want me to use?"
+        : "Which vehicle do you mean?";
+
+  return {
+    session_id,
+    flow_id,
+    intent: pendingFlow?.intent ?? activeTopic?.intent ?? "unknown",
+    answer,
+    cards: [],
+    advisor_profile,
+    suggested_actions: [],
+    follow_up_questions: [followUp],
+    facts_used: [],
+    market_id,
+    sources: [],
+    caveats: [],
+    confidence: buildConfidence(0.46, ["The assistant is asking for clarification instead of guessing from weak context."]),
+    evidence: buildEvidence({
+      verified: ["Conversation state does not contain a confident referent for the latest short reply."],
+      inferred: [],
+      estimated: [],
+    }),
+    freshness_note: null,
+    needs_clarification: true,
+    structured_result: null,
+    meta: {
+      services_used: ["ConversationStateService", "ClarificationPolicy"],
+      sources_used: [],
+      fallback_used: false,
+      latency_ms: 0,
+      route_service: "AmbiguousTurnClarification",
+      missing_fields: pendingFlow?.missing_fields ?? [],
+      turn_type: turn?.turn_type ?? "ambiguous",
+    },
+  };
 }
 
 async function finalizeTurn({
@@ -1130,44 +1340,169 @@ export async function chatAdvisor(ctx, input) {
   });
 
   const persistedContext = session.context_json || {};
-  const market_id =
-    context?.market_id != null ? Number(context.market_id) : Number(persistedContext.market_id ?? 1);
-  const focus_variant_id_raw =
+  const persistedConversationState =
+    persistedContext?.conversation_state && typeof persistedContext.conversation_state === "object"
+      ? persistedContext.conversation_state
+      : null;
+  const activeTopic =
+    persistedConversationState?.active_topic && typeof persistedConversationState.active_topic === "object"
+      ? persistedConversationState.active_topic
+      : persistedContext?.active_topic && typeof persistedContext.active_topic === "object"
+        ? persistedContext.active_topic
+        : null;
+  const statePendingClarification =
+    persistedConversationState?.pending_clarification &&
+    typeof persistedConversationState.pending_clarification === "object"
+      ? persistedConversationState.pending_clarification
+      : null;
+  const pendingFlowFromState = statePendingClarification?.intent
+    ? {
+        id: statePendingClarification.flow_id ?? persistedConversationState?.active_flow_id ?? createFlowId(),
+        intent: statePendingClarification.intent,
+        status: "clarifying",
+        missing_fields: statePendingClarification.missing_fields ?? (statePendingClarification.field ? [statePendingClarification.field] : []),
+        source: statePendingClarification.type ?? "state_rehydration",
+        created_at: statePendingClarification.created_at ?? new Date().toISOString(),
+        context_snapshot: {
+          market_id: persistedContext.market_id ?? persistedConversationState?.active_entities?.market_id ?? 1,
+          market_name: persistedContext.market_name ?? persistedConversationState?.active_entities?.market_name ?? null,
+          country: persistedContext.country ?? persistedConversationState?.active_entities?.country ?? null,
+          focus_variant_id:
+            persistedContext.focus_variant_id ?? persistedConversationState?.active_entities?.focus_variant_id ?? null,
+          focus_variant_label:
+            persistedContext.focus_variant_label ??
+            persistedConversationState?.active_entities?.focus_variant_label ??
+            null,
+          compare_variant_ids:
+            persistedContext.compare_variant_ids ??
+            persistedConversationState?.active_entities?.compare_variant_ids ??
+            [],
+          advisor_profile: persistedContext.advisor_profile ?? {},
+        },
+      }
+    : null;
+  const initialMarketId =
+    context?.market_id != null
+      ? Number(context.market_id)
+      : Number(persistedContext.market_id ?? persistedConversationState?.active_entities?.market_id ?? 1);
+  const initialFocusVariantIdRaw =
     context?.focus_variant_id != null
       ? Number(context.focus_variant_id)
       : persistedContext.focus_variant_id != null
         ? Number(persistedContext.focus_variant_id)
+        : persistedConversationState?.active_entities?.focus_variant_id != null
+          ? Number(persistedConversationState.active_entities.focus_variant_id)
+          : (persistedConversationState?.referenced_vehicle_ids?.length ?? 0) === 1
+            ? Number(persistedConversationState.referenced_vehicle_ids[0])
+            : null;
+  const initialFocusVariantId = Number.isInteger(initialFocusVariantIdRaw) ? initialFocusVariantIdRaw : null;
+  const initialFocusVariantLabel =
+    typeof context?.focus_variant_label === "string" && context.focus_variant_label
+      ? context.focus_variant_label
+      : typeof persistedContext.focus_variant_label === "string"
+        ? persistedContext.focus_variant_label
+        : typeof persistedConversationState?.active_entities?.focus_variant_label === "string"
+          ? persistedConversationState.active_entities.focus_variant_label
+          : null;
+  const initialPendingQuestionKey =
+    typeof persistedContext.pending_question_key === "string"
+      ? persistedContext.pending_question_key
+      : typeof statePendingClarification?.field === "string"
+        ? statePendingClarification.field
+        : null;
+  const initialPendingQuestion = initialPendingQuestionKey ? QUESTION_BY_KEY[initialPendingQuestionKey] ?? null : null;
+  const initialPendingFlow =
+    persistedContext?.pending_flow && typeof persistedContext.pending_flow === "object"
+      ? persistedContext.pending_flow
+      : pendingFlowFromState;
+  const existingProfile = persistedContext.advisor_profile || {};
+  const profilePatch = extractAdvisorProfilePatch(message, initialPendingQuestion?.key ?? null);
+  const recognizedPendingQuestion = initialPendingQuestion ? hasOwn(profilePatch, initialPendingQuestion.key) : false;
+  const advisor_profile = mergeAdvisorProfile(existingProfile, profilePatch);
+  const legacyIntent = detectIntent(message);
+  const freshClassifierPreview = classifyIntent(message, {
+    market_id: initialMarketId,
+    focus_variant_id: initialFocusVariantId,
+    focus_variant_label: initialFocusVariantLabel,
+    advisor_profile,
+    budget: advisor_profile.budget_max ?? null,
+  });
+  const hasVehicleMentions =
+    (freshClassifierPreview.entities?.vehicles?.length ?? 0) > 0;
+  const turn = classifyConversationTurn({
+    message,
+    pendingFlow: initialPendingFlow,
+    pendingQuestionKey: initialPendingQuestionKey,
+    previewIntent: freshClassifierPreview.intent,
+    previewEntities: freshClassifierPreview.entities,
+    activeTopic,
+    conversationState: persistedConversationState,
+    profilePatch,
+    recognizedPendingQuestion,
+    hasVehicleMentions,
+  });
+  const turnBaseContext = turn.should_clear_stale_result
+    ? pruneConversationContext(persistedContext, {
+        topicSwitched: true,
+        preserveFocus: turn.preserve_focus,
+        turnType: turn.turn_type,
+      })
+    : { ...(persistedContext || {}) };
+  const market_id =
+    context?.market_id != null ? Number(context.market_id) : Number(turnBaseContext.market_id ?? initialMarketId ?? 1);
+  const focus_variant_id_raw =
+    context?.focus_variant_id != null
+      ? Number(context.focus_variant_id)
+      : turnBaseContext.focus_variant_id != null
+        ? Number(turnBaseContext.focus_variant_id)
+        : turn.preserve_focus && persistedConversationState?.active_entities?.focus_variant_id != null
+          ? Number(persistedConversationState.active_entities.focus_variant_id)
+          : turn.preserve_focus && (persistedConversationState?.referenced_vehicle_ids?.length ?? 0) === 1
+            ? Number(persistedConversationState.referenced_vehicle_ids[0])
         : null;
   const focus_variant_id = Number.isInteger(focus_variant_id_raw) ? focus_variant_id_raw : null;
   const focus_variant_label =
     typeof context?.focus_variant_label === "string" && context.focus_variant_label
       ? context.focus_variant_label
-      : typeof persistedContext.focus_variant_label === "string"
-        ? persistedContext.focus_variant_label
+      : typeof turnBaseContext.focus_variant_label === "string"
+        ? turnBaseContext.focus_variant_label
+        : turn.preserve_focus && typeof persistedConversationState?.active_entities?.focus_variant_label === "string"
+          ? persistedConversationState.active_entities.focus_variant_label
         : null;
   const pending_question_key =
-    typeof persistedContext.pending_question_key === "string" ? persistedContext.pending_question_key : null;
+    typeof turnBaseContext.pending_question_key === "string" ? turnBaseContext.pending_question_key : null;
   const pendingQuestion = pending_question_key ? QUESTION_BY_KEY[pending_question_key] ?? null : null;
   const pendingFlow =
-    persistedContext?.pending_flow && typeof persistedContext.pending_flow === "object"
-      ? persistedContext.pending_flow
+    turnBaseContext?.pending_flow && typeof turnBaseContext.pending_flow === "object"
+      ? turnBaseContext.pending_flow
       : null;
-  const existingProfile = persistedContext.advisor_profile || {};
-  const profilePatch = extractAdvisorProfilePatch(message, pendingQuestion?.key ?? null);
-  const recognizedPendingQuestion = pendingQuestion ? hasOwn(profilePatch, pendingQuestion.key) : false;
-  const advisor_profile = mergeAdvisorProfile(existingProfile, profilePatch);
-  const legacyIntent = detectIntent(message);
-  const freshClassifierPreview = classifyIntent(message, {
-    market_id,
-    focus_variant_id,
-    focus_variant_label,
-    advisor_profile,
-    budget: advisor_profile.budget_max ?? null,
-  });
-  const activeFlowId = pendingFlow?.id ?? createFlowId();
-  const bindPendingFlow = shouldBindPendingFlow(message, pendingFlow, freshClassifierPreview.intent);
-  const forced_intent = bindPendingFlow ? pendingFlow.intent : null;
-  const baseFlowContext = bindPendingFlow ? { ...(pendingFlow.context_snapshot || {}) } : {};
+  const activeFlowId =
+    (turn.bind_pending_flow ? pendingFlow?.id : null) ??
+    (turn.should_preserve_topic ? persistedConversationState?.active_flow_id : null) ??
+    createFlowId();
+  const bindPendingFlow = shouldBindPendingFlow(message, pendingFlow, freshClassifierPreview.intent, turn, hasVehicleMentions);
+  const forced_intent =
+    bindPendingFlow
+      ? pendingFlow.intent
+      : turn.effective_intent && turn.effective_intent !== freshClassifierPreview.intent
+        ? turn.effective_intent
+        : null;
+  const baseFlowContext = bindPendingFlow
+    ? { ...(pendingFlow.context_snapshot || {}) }
+    : turn.should_preserve_topic
+      ? {
+          market_id: turnBaseContext.market_id ?? initialMarketId ?? 1,
+          market_name:
+            turnBaseContext.market_name ?? persistedConversationState?.active_entities?.market_name ?? null,
+          country: turnBaseContext.country ?? persistedConversationState?.active_entities?.country ?? null,
+          focus_variant_id,
+          focus_variant_label,
+          compare_variant_ids:
+            turnBaseContext.compare_variant_ids ??
+            persistedConversationState?.active_entities?.compare_variant_ids ??
+            [],
+        }
+      : {};
   const classifierPreview = classifyIntent(message, {
     ...baseFlowContext,
     market_id: market_id ?? baseFlowContext.market_id ?? null,
@@ -1182,16 +1517,110 @@ export async function chatAdvisor(ctx, input) {
     session_id: session.session_id,
     pending_intent: pendingFlow?.intent ?? null,
     bind_pending_flow: bindPendingFlow,
+    turn_type: turn.turn_type,
+    topic_switched: turn.turn_type === "new_topic" || turn.turn_type === "task_replacement",
+    preserve_focus: turn.preserve_focus,
+    active_topic_intent: activeTopic?.intent ?? null,
     preview_intent: freshClassifierPreview.intent,
     effective_preview_intent: classifierPreview.intent,
+    effective_intent: forced_intent ?? classifierPreview.intent,
+    follow_up_dimension: turn.follow_up_dimension ?? null,
+    notes: turn.notes,
   });
 
-  if (legacyIntent === "sell_guidance") {
+  if (turn.turn_type === "ambiguous") {
+    const ambiguousPendingFlow =
+      pendingFlow ??
+      buildPendingFlow({
+        id: activeFlowId,
+        intent: activeTopic?.intent ?? classifierPreview.intent ?? "unknown",
+        missing_fields:
+          activeTopic?.intent === "compare_car"
+            ? ["vehicles"]
+            : activeTopic?.intent === "calculate_tco"
+              ? ["vehicle"]
+              : ["vehicle"],
+        context_snapshot: {
+          market_id,
+          market_name: turnBaseContext.market_name ?? persistedConversationState?.active_entities?.market_name ?? null,
+          country: turnBaseContext.country ?? persistedConversationState?.active_entities?.country ?? null,
+          focus_variant_id,
+          focus_variant_label,
+          compare_variant_ids:
+            turnBaseContext.compare_variant_ids ??
+            persistedConversationState?.active_entities?.compare_variant_ids ??
+            [],
+          advisor_profile,
+        },
+        source: "ambiguous_turn",
+      });
+    const ambiguousConversationState = buildConversationState({
+      previousState: persistedConversationState,
+      turn,
+      intent: ambiguousPendingFlow.intent,
+      market_id,
+      market_name: turnBaseContext.market_name ?? persistedConversationState?.active_entities?.market_name ?? null,
+      country: turnBaseContext.country ?? persistedConversationState?.active_entities?.country ?? null,
+      focus_variant_id,
+      focus_variant_label,
+      compare_variant_ids:
+        turnBaseContext.compare_variant_ids ??
+        persistedConversationState?.active_entities?.compare_variant_ids ??
+        [],
+      pending_flow: ambiguousPendingFlow,
+      pending_question_key: pending_question_key ?? ambiguousPendingFlow.missing_fields?.[0] ?? null,
+      structured_result: null,
+      needs_clarification: true,
+      flow_id: activeFlowId,
+    });
+
     return finalizeTurn({
       session,
       AiChatMessages,
       updatedContext: {
-        ...(persistedContext || {}),
+        ...(turnBaseContext || {}),
+        ...(context || {}),
+        market_id,
+        focus_variant_id,
+        focus_variant_label,
+        advisor_profile,
+        pending_question_key: pending_question_key ?? ambiguousPendingFlow.missing_fields?.[0] ?? null,
+        pending_flow: ambiguousPendingFlow,
+        active_topic: ambiguousConversationState.active_topic,
+        conversation_state: ambiguousConversationState,
+      },
+      responsePayload: buildAmbiguousTurnPayload({
+        session_id: session.session_id,
+        flow_id: activeFlowId,
+        advisor_profile,
+        market_id,
+        pendingFlow: ambiguousPendingFlow,
+        activeTopic,
+        turn,
+      }),
+    });
+  }
+
+  if (legacyIntent === "sell_guidance") {
+    const sellConversationState = buildConversationState({
+      previousState: persistedConversationState,
+      turn,
+      intent: "sell_guidance",
+      market_id,
+      focus_variant_id,
+      focus_variant_label,
+      compare_variant_ids: [],
+      pending_flow: null,
+      pending_question_key: null,
+      structured_result: null,
+      needs_clarification: false,
+      flow_id: activeFlowId,
+    });
+    return finalizeTurn({
+      session,
+      AiChatMessages,
+      updatedContext: {
+        ...(turnBaseContext || {}),
         ...(context || {}),
         market_id,
         focus_variant_id,
@@ -1199,6 +1628,8 @@ export async function chatAdvisor(ctx, input) {
         advisor_profile,
         pending_question_key: null,
         pending_flow: null,
+        active_topic: sellConversationState.active_topic,
+        conversation_state: sellConversationState,
       },
       responsePayload: {
         session_id: session.session_id,
@@ -1230,6 +1661,7 @@ export async function chatAdvisor(ctx, input) {
           latency_ms: 0,
           route_service: "SellGuidance",
           missing_fields: [],
+          turn_type: turn.turn_type,
         },
       },
     });
@@ -1240,29 +1672,49 @@ export async function chatAdvisor(ctx, input) {
     const nextOptionalQuestion = nextAdvisorQuestion(advisor_profile, "optional");
 
     if (pendingQuestion && !recognizedPendingQuestion && Object.keys(profilePatch).length === 0) {
+      const recommendationPendingFlow = buildPendingFlow({
+        id: activeFlowId,
+        intent: "recommend_car",
+        missing_fields: [pendingQuestion.key],
+        context_snapshot: {
+          market_id,
+          focus_variant_id,
+          focus_variant_label,
+          advisor_profile,
+        },
+        source: "recommendation_profile",
+      });
+      const recommendationConversationState = buildConversationState({
+        previousState: persistedConversationState,
+        turn,
+        intent: "recommend_car",
+        market_id,
+        focus_variant_id,
+        focus_variant_label,
+        compare_variant_ids:
+          turnBaseContext.compare_variant_ids ??
+          persistedConversationState?.active_entities?.compare_variant_ids ??
+          [],
+        pending_flow: recommendationPendingFlow,
+        pending_question_key: pendingQuestion.key,
+        structured_result: null,
+        needs_clarification: true,
+        flow_id: activeFlowId,
+      });
       return finalizeTurn({
         session,
         AiChatMessages,
         updatedContext: {
-          ...(persistedContext || {}),
+          ...(turnBaseContext || {}),
           ...(context || {}),
           market_id,
           focus_variant_id,
           focus_variant_label,
           advisor_profile,
           pending_question_key: pendingQuestion.key,
-          pending_flow: buildPendingFlow({
-            id: activeFlowId,
-            intent: "recommend_car",
-            missing_fields: [pendingQuestion.key],
-            context_snapshot: {
-              market_id,
-              focus_variant_id,
-              focus_variant_label,
-              advisor_profile,
-            },
-            source: "recommendation_profile",
-          }),
+          pending_flow: recommendationPendingFlow,
+          active_topic: recommendationConversationState.active_topic,
+          conversation_state: recommendationConversationState,
         },
         responsePayload: {
           session_id: session.session_id,
@@ -1293,35 +1745,56 @@ export async function chatAdvisor(ctx, input) {
             latency_ms: 0,
             route_service: "RecommendationClarification",
             missing_fields: [pendingQuestion.key],
+            turn_type: turn.turn_type,
           },
         },
       });
     }
 
     if (nextRequiredQuestion) {
+      const recommendationPendingFlow = buildPendingFlow({
+        id: activeFlowId,
+        intent: "recommend_car",
+        missing_fields: [nextRequiredQuestion.key],
+        context_snapshot: {
+          market_id,
+          focus_variant_id,
+          focus_variant_label,
+          advisor_profile,
+        },
+        source: "recommendation_profile",
+      });
+      const recommendationConversationState = buildConversationState({
+        previousState: persistedConversationState,
+        turn,
+        intent: "recommend_car",
+        market_id,
+        focus_variant_id,
+        focus_variant_label,
+        compare_variant_ids:
+          turnBaseContext.compare_variant_ids ??
+          persistedConversationState?.active_entities?.compare_variant_ids ??
+          [],
+        pending_flow: recommendationPendingFlow,
+        pending_question_key: nextRequiredQuestion.key,
+        structured_result: null,
+        needs_clarification: true,
+        flow_id: activeFlowId,
+      });
       return finalizeTurn({
         session,
         AiChatMessages,
         updatedContext: {
-          ...(persistedContext || {}),
+          ...(turnBaseContext || {}),
           ...(context || {}),
           market_id,
           focus_variant_id,
           focus_variant_label,
           advisor_profile,
           pending_question_key: nextRequiredQuestion.key,
-          pending_flow: buildPendingFlow({
-            id: activeFlowId,
-            intent: "recommend_car",
-            missing_fields: [nextRequiredQuestion.key],
-            context_snapshot: {
-              market_id,
-              focus_variant_id,
-              focus_variant_label,
-              advisor_profile,
-            },
-            source: "recommendation_profile",
-          }),
+          pending_flow: recommendationPendingFlow,
+          active_topic: recommendationConversationState.active_topic,
+          conversation_state: recommendationConversationState,
         },
         responsePayload: {
           session_id: session.session_id,
@@ -1355,6 +1828,7 @@ export async function chatAdvisor(ctx, input) {
             latency_ms: 0,
             route_service: "RecommendationClarification",
             missing_fields: [nextRequiredQuestion.key],
+            turn_type: turn.turn_type,
           },
         },
       });
@@ -1374,20 +1848,41 @@ export async function chatAdvisor(ctx, input) {
         advisor_profile,
         budget: advisor_profile.budget_max ?? null,
         country: baseFlowContext.country ?? persistedContext.country ?? null,
+        comparison_focus: turn.follow_up_dimension ?? null,
       },
       advisor_profile,
       forced_intent,
       flow_id: activeFlowId,
+      turn_context: {
+        turn_type: turn.turn_type,
+        follow_up_dimension: turn.follow_up_dimension ?? null,
+        active_intent: activeTopic?.intent ?? null,
+      },
     });
 
+    const recommendationFocus =
+      envelope.intent === "recommend_car" && !envelope.needs_clarification
+        ? extractRecommendationFocus(envelope.structured_result)
+        : { focus_variant_id: null, focus_variant_label: null };
     const resolvedMarketId = envelope.context_updates?.market_id ?? market_id ?? baseFlowContext.market_id ?? 1;
     const resolvedFocusVariantId =
-      envelope.context_updates?.focus_variant_id ?? focus_variant_id ?? baseFlowContext.focus_variant_id ?? null;
+      envelope.context_updates?.focus_variant_id ??
+      focus_variant_id ??
+      baseFlowContext.focus_variant_id ??
+      recommendationFocus.focus_variant_id ??
+      null;
     const resolvedFocusVariantLabel =
       envelope.context_updates?.focus_variant_label ??
       focus_variant_label ??
       baseFlowContext.focus_variant_label ??
+      recommendationFocus.focus_variant_label ??
       null;
+    const resolvedCompareVariantIds = collectCompareVariantIds(
+      envelope.intent,
+      envelope.structured_result,
+      envelope.context_updates,
+      baseFlowContext.compare_variant_ids ?? turnBaseContext.compare_variant_ids ?? []
+    );
 
     const nextOptionalQuestion =
       envelope.intent === "recommend_car" && !envelope.needs_clarification
@@ -1406,7 +1901,7 @@ export async function chatAdvisor(ctx, input) {
             country: envelope.context_updates?.country ?? persistedContext.country ?? null,
             focus_variant_id: resolvedFocusVariantId,
             focus_variant_label: resolvedFocusVariantLabel,
-            compare_variant_ids: envelope.context_updates?.compare_variant_ids ?? baseFlowContext.compare_variant_ids ?? [],
+            compare_variant_ids: resolvedCompareVariantIds,
             advisor_profile,
           },
         })
@@ -1424,21 +1919,40 @@ export async function chatAdvisor(ctx, input) {
             source: "recommendation_profile",
           })
         : null;
+    const nextConversationState = buildConversationState({
+      previousState: persistedConversationState,
+      turn,
+      intent: envelope.intent,
+      market_id: resolvedMarketId,
+      market_name: envelope.context_updates?.market_name ?? persistedContext.market_name ?? null,
+      country: envelope.context_updates?.country ?? persistedContext.country ?? null,
+      focus_variant_id: resolvedFocusVariantId,
+      focus_variant_label: resolvedFocusVariantLabel,
+      compare_variant_ids: resolvedCompareVariantIds,
+      pending_flow,
+      pending_question_key: next_pending_question_key,
+      structured_result: envelope.structured_result,
+      needs_clarification: envelope.needs_clarification,
+      flow_id: activeFlowId,
+    });
 
     return finalizeTurn({
       session,
       AiChatMessages,
       updatedContext: {
-        ...(persistedContext || {}),
+        ...(turnBaseContext || {}),
         ...baseFlowContext,
         ...(context || {}),
         ...(envelope.context_updates ?? {}),
         market_id: resolvedMarketId,
         focus_variant_id: resolvedFocusVariantId,
         focus_variant_label: resolvedFocusVariantLabel,
+        compare_variant_ids: resolvedCompareVariantIds,
         advisor_profile,
         pending_question_key: next_pending_question_key,
         pending_flow,
+        active_topic: nextConversationState.active_topic,
+        conversation_state: nextConversationState,
       },
       responsePayload: {
         session_id: session.session_id,
@@ -1471,6 +1985,12 @@ export async function chatAdvisor(ctx, input) {
         meta: {
           ...envelope.meta,
           flow_id: activeFlowId,
+          turn_type: turn.turn_type,
+          context_transition: {
+            preserve_topic: turn.should_preserve_topic,
+            replace_task: turn.should_replace_active_task,
+            clear_stale_result: turn.should_clear_stale_result,
+          },
         },
       },
       tool_name: envelope.intent,
@@ -1478,11 +1998,38 @@ export async function chatAdvisor(ctx, input) {
     });
   } catch (error) {
     const fallbackIntent = forced_intent ?? classifierPreview.intent ?? freshClassifierPreview.intent ?? "unknown";
+    const fallbackPendingFlow = buildPendingFlow({
+      id: activeFlowId,
+      intent: fallbackIntent,
+      missing_fields: [],
+      context_snapshot: {
+        market_id: market_id ?? baseFlowContext.market_id ?? 1,
+        focus_variant_id: focus_variant_id ?? baseFlowContext.focus_variant_id ?? null,
+        focus_variant_label: focus_variant_label ?? baseFlowContext.focus_variant_label ?? null,
+        compare_variant_ids: baseFlowContext.compare_variant_ids ?? turnBaseContext.compare_variant_ids ?? [],
+        advisor_profile,
+      },
+      source: "error_recovery",
+    });
+    const fallbackConversationState = buildConversationState({
+      previousState: persistedConversationState,
+      turn,
+      intent: fallbackIntent,
+      market_id: market_id ?? baseFlowContext.market_id ?? 1,
+      focus_variant_id: focus_variant_id ?? baseFlowContext.focus_variant_id ?? null,
+      focus_variant_label: focus_variant_label ?? baseFlowContext.focus_variant_label ?? null,
+      compare_variant_ids: baseFlowContext.compare_variant_ids ?? turnBaseContext.compare_variant_ids ?? [],
+      pending_flow: fallbackPendingFlow,
+      pending_question_key: pending_question_key ?? null,
+      structured_result: null,
+      needs_clarification: true,
+      flow_id: activeFlowId,
+    });
     return finalizeTurn({
       session,
       AiChatMessages,
       updatedContext: {
-        ...(persistedContext || {}),
+        ...(turnBaseContext || {}),
         ...baseFlowContext,
         ...(context || {}),
         market_id: market_id ?? baseFlowContext.market_id ?? 1,
@@ -1490,27 +2037,29 @@ export async function chatAdvisor(ctx, input) {
         focus_variant_label: focus_variant_label ?? baseFlowContext.focus_variant_label ?? null,
         advisor_profile,
         pending_question_key: pending_question_key ?? null,
-        pending_flow: buildPendingFlow({
-          id: activeFlowId,
-          intent: fallbackIntent,
-          missing_fields: [],
-          context_snapshot: {
-            market_id: market_id ?? baseFlowContext.market_id ?? 1,
-            focus_variant_id: focus_variant_id ?? baseFlowContext.focus_variant_id ?? null,
-            focus_variant_label: focus_variant_label ?? baseFlowContext.focus_variant_label ?? null,
-            advisor_profile,
-          },
-          source: "error_recovery",
-        }),
+        pending_flow: fallbackPendingFlow,
+        active_topic: fallbackConversationState.active_topic,
+        conversation_state: fallbackConversationState,
       },
-      responsePayload: mapAiChatErrorToResponse({
-        error,
-        intent: fallbackIntent,
-        session_id: session.session_id,
-        advisor_profile,
-        market_id: market_id ?? baseFlowContext.market_id ?? 1,
-        flow_id: activeFlowId,
-      }),
+      responsePayload: {
+        ...mapAiChatErrorToResponse({
+          error,
+          intent: fallbackIntent,
+          session_id: session.session_id,
+          advisor_profile,
+          market_id: market_id ?? baseFlowContext.market_id ?? 1,
+          flow_id: activeFlowId,
+        }),
+        meta: {
+          services_used: ["ConversationStateService", "ErrorMapper"],
+          sources_used: [],
+          fallback_used: true,
+          latency_ms: 0,
+          route_service: "ErrorRecovery",
+          missing_fields: [],
+          turn_type: turn.turn_type,
+        },
+      },
     });
   }
 }

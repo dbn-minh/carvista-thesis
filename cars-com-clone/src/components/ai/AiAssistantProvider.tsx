@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Loader2, MessageCircleMore, Scale, SendHorizonal, Sparkles, X } from "lucide-react";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import {
@@ -18,12 +18,14 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { setStoredAdvisorProfile } from "@/lib/advisor-profile";
 import { aiApi, catalogApi } from "@/lib/carvista-api";
 import { hasToken, toCurrency } from "@/lib/api-client";
 import type {
   AiCompareResponse,
   AiConfidence,
   AiInsightCard,
+  AiSuggestedAction,
   AiSource,
   VariantListItem,
 } from "@/lib/types";
@@ -56,6 +58,7 @@ type ChatBubble = {
   sources?: AiSource[];
   caveats?: string[];
   freshnessNote?: string | null;
+  suggestedActions?: AiSuggestedAction[];
 };
 
 type CompareState = {
@@ -192,8 +195,31 @@ function CaveatList({ caveats }: { caveats?: string[] }) {
   );
 }
 
+function getActionLabel(action: AiSuggestedAction) {
+  const payloadLabel = action.payload?.label;
+  if (typeof payloadLabel === "string" && payloadLabel.trim()) return payloadLabel;
+
+  switch (action.type) {
+    case "open_vehicle_detail":
+      return "Open vehicle detail";
+    case "open_related_listings":
+      return "Browse related listings";
+    case "open_compare_modal":
+      return "Open compare";
+    default:
+      return null;
+  }
+}
+
+function getRenderableActions(actions?: AiSuggestedAction[]) {
+  return (actions ?? []).filter((action) =>
+    ["open_vehicle_detail", "open_related_listings", "open_compare_modal"].includes(action.type)
+  );
+}
+
 export function AiAssistantProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { authenticated, openAuth } = useAuthModal();
   const [open, setOpen] = useState(false);
   const [marketId, setMarketId] = useState("1");
@@ -252,6 +278,28 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
     if (open) return;
     setQueuedPrompt("");
   }, [open]);
+
+  function handleSuggestedAction(action: AiSuggestedAction) {
+    const payload = action.payload ?? {};
+    const payloadUrl = typeof payload.url === "string" && payload.url.trim() ? payload.url : null;
+
+    if (action.type === "open_vehicle_detail" || action.type === "open_related_listings") {
+      if (!payloadUrl) return;
+      setOpen(false);
+      router.push(payloadUrl);
+      return;
+    }
+
+    if (action.type === "open_compare_modal") {
+      const variantId = Number(payload.variant_id ?? focusVariantId);
+      if (!Number.isFinite(variantId)) return;
+      launchCompare({
+        variantId,
+        variantLabel: focusVariantLabel || `Variant #${variantId}`,
+        marketId: Number(marketId) || 1,
+      });
+    }
+  }
 
   function ensureAccess(nextPath?: string) {
     const target = nextPath || pathname || "/";
@@ -342,6 +390,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
       });
 
       setSessionId(response.session_id);
+      setStoredAdvisorProfile(response.advisor_profile ?? {});
       setMessages((prev) => [
         ...prev,
         {
@@ -354,6 +403,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
           sources: response.sources ?? [],
           caveats: response.caveats ?? [],
           freshnessNote: response.freshness_note ?? null,
+          suggestedActions: response.suggested_actions ?? [],
         },
       ]);
     } catch (error) {
@@ -507,6 +557,24 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                     <InsightCards cards={message.cards} />
                     <SourceList sources={message.sources} freshnessNote={message.freshnessNote} />
                     <CaveatList caveats={message.caveats} />
+                    {message.role === "assistant" && getRenderableActions(message.suggestedActions).length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {getRenderableActions(message.suggestedActions).map((action, index) => {
+                          const label = getActionLabel(action);
+                          if (!label) return null;
+                          return (
+                            <button
+                              key={`${action.type}-${index}`}
+                              type="button"
+                              onClick={() => handleSuggestedAction(action)}
+                              className="rounded-full border border-cars-primary/15 px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ))}

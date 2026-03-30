@@ -195,6 +195,8 @@ export async function calculateTco(ctx, input) {
   const officialSignals =
     variantContext != null
       ? await fetchOfficialVehicleSignals({
+          ctx,
+          variant_id,
           year: variantContext.variant.model_year,
           make: variantContext.variant.make_name,
           model: variantContext.variant.model_name,

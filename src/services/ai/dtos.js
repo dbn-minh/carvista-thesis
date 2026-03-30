@@ -38,6 +38,18 @@ const assumptionSchema = z.object({
   type: z.enum(["verified", "estimated", "inferred"]),
 });
 
+const recommendationLinkSchema = z.object({
+  vehicle_id: z.number().int().nullable(),
+  display_name: z.string(),
+  detail_page_url: z.string().nullable(),
+  related_listings_url: z.string().nullable(),
+  related_listing_ids: z.array(z.number().int()).default([]),
+  fallback_search_url: z.string().nullable(),
+  match_confidence: z.number().min(0).max(1),
+  match_label: z.string(),
+  related_listings_count: z.number().int().nonnegative(),
+});
+
 export const compareResultSchema = z.object({
   intent: z.literal("compare_car"),
   summary: z.object({
@@ -132,7 +144,11 @@ export const recommendationResultSchema = z.object({
       variant_id: z.number().int().nullable().optional(),
       name: z.string(),
       score: z.number(),
+      fit_label: z.string().nullable().optional(),
       reasons: z.array(z.string()).default([]),
+      caveats: z.array(z.string()).default([]),
+      market_summary: z.string().nullable().optional(),
+      links: recommendationLinkSchema.nullable().optional(),
     })
   ),
   profile_summary: z.string(),

@@ -76,6 +76,19 @@ export type VariantDetail = {
   images: Array<Record<string, unknown>>;
 };
 
+export type AdvisorProfile = {
+  budget_max?: number | null;
+  environment?: string | null;
+  long_trip_habit?: string | null;
+  passenger_count?: number | null;
+  preferred_body_type?: string | null;
+  preferred_fuel_type?: string | null;
+  maintenance_sensitivity?: string | null;
+  personality?: string | null;
+  brand_openness?: string | null;
+  new_vs_used?: string | null;
+};
+
 export type AiInsightCard = {
   title: string;
   value?: string | number | null;
@@ -114,6 +127,58 @@ export type AiNarrative = {
   sources: AiSource[];
   caveats: string[];
   freshness_note?: string | null;
+};
+
+export type AiRecommendationLink = {
+  vehicle_id?: number | null;
+  display_name: string;
+  detail_page_url?: string | null;
+  related_listings_url?: string | null;
+  related_listing_ids?: number[];
+  related_listings_count?: number;
+  fallback_search_url?: string | null;
+  match_confidence?: number | null;
+  match_label?: string | null;
+};
+
+export type AiActionPath = {
+  type: string;
+  label: string;
+  url: string;
+  note?: string | null;
+  match_confidence?: number | null;
+  related_listing_ids?: number[];
+};
+
+export type AiSuggestedAction = {
+  type: string;
+  payload?: Record<string, unknown>;
+};
+
+export type AiPageIntelligenceSection = {
+  key: string;
+  title: string;
+  assistant_message: string;
+  highlights: string[];
+  insight_cards: AiInsightCard[];
+  confidence?: AiConfidence | null;
+  caveats?: string[];
+  sources?: AiSource[];
+  freshness_note?: string | null;
+  action_paths?: AiActionPath[];
+};
+
+export type AiPageIntelligenceResponse = {
+  subject: {
+    kind: "variant" | "listing";
+    variant_id?: number;
+    listing_id?: number;
+    market_id: number;
+    label: string;
+    profile_snapshot?: string | null;
+  };
+  sections: AiPageIntelligenceSection[];
+  recommendation_paths: AiRecommendationLink[];
 };
 
 export type AiCompareItem = {
@@ -315,8 +380,8 @@ export type ChatResponse = {
   sources?: AiSource[];
   caveats?: string[];
   freshness_note?: string | null;
-  advisor_profile: Record<string, unknown>;
-  suggested_actions: Array<Record<string, unknown>>;
+  advisor_profile: AdvisorProfile;
+  suggested_actions: AiSuggestedAction[];
   follow_up_questions: string[];
   facts_used: Array<Record<string, unknown>>;
   market_id: number;

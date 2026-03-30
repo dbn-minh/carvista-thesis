@@ -37,7 +37,59 @@ function pickScoreLeader(vehicles, scoreKey) {
   return candidates.slice().sort((left, right) => right.scores[scoreKey] - left.scores[scoreKey])[0];
 }
 
-function formatComparison(structuredResult) {
+function formatFocusedComparison(structuredResult, turnContext = {}) {
+  const vehicles = structuredResult.vehicles ?? [];
+  const dimension = turnContext.follow_up_dimension;
+  if (!dimension) return null;
+
+  const leaders = {
+    resale_value: pickScoreLeader(vehicles, "resale_score"),
+    ownership_cost: pickScoreLeader(vehicles, "maintenance_score"),
+    safety: pickScoreLeader(vehicles, "safety_score"),
+    comfort: pickScoreLeader(vehicles, "comfort_score"),
+    technology: pickScoreLeader(vehicles, "technology_score"),
+    performance: pickScoreLeader(vehicles, "performance_score"),
+    practicality: pickScoreLeader(vehicles, "practicality_score"),
+    efficiency: pickScoreLeader(vehicles, "efficiency_score"),
+  };
+
+  const leader = leaders[dimension] ?? null;
+  const runnerUp = leader ? vehicles.find((item) => item.name !== leader.name) ?? null : null;
+  const reasonMap = {
+    resale_value: "resale outlook",
+    ownership_cost: "ownership cost and maintenance burden",
+    safety: "safety confidence",
+    comfort: "comfort and day-to-day refinement",
+    technology: "technology and cabin features",
+    performance: "performance and response",
+    practicality: "space and practical usability",
+    efficiency: "fuel or energy efficiency",
+  };
+  const reasonLabel = reasonMap[dimension] ?? "this dimension";
+
+  if (!leader) return null;
+
+  return {
+    final_answer: [
+      `On ${reasonLabel} specifically, ${leader.name} has the clearer edge in this pair.`,
+      leader.pros?.[0] ? `The strongest reason is that it offers ${leader.pros[0].charAt(0).toLowerCase() + leader.pros[0].slice(1)}.` : null,
+      runnerUp?.name
+        ? `${runnerUp.name} is still defensible if you value ${runnerUp.pros?.[0] || "its other strengths"} more, but it gives up ground on ${reasonLabel}.`
+        : null,
+      structuredResult.recommendation?.winner && structuredResult.recommendation?.winner !== leader.name
+        ? `So even if ${structuredResult.recommendation.winner} was the broader overall winner, ${leader.name} is the better answer for this specific concern.`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" "),
+    concise_summary: `${reasonLabel}: ${leader.name}`,
+  };
+}
+
+function formatComparison(structuredResult, turnContext = {}) {
+  const focused = formatFocusedComparison(structuredResult, turnContext);
+  if (focused) return focused;
+
   const winner = structuredResult.recommendation?.winner;
   const reason = structuredResult.recommendation?.reason;
   const vehicles = structuredResult.vehicles ?? [];
@@ -45,8 +97,11 @@ function formatComparison(structuredResult) {
   const practicalityLeader = pickScoreLeader(vehicles, "practicality_score")?.name;
   const comfortLeader = pickScoreLeader(vehicles, "comfort_score")?.name;
   const resaleLeader = pickScoreLeader(vehicles, "resale_score")?.name;
+  const efficiencyLeader = pickScoreLeader(vehicles, "efficiency_score")?.name;
   const winnerPros = pickHighlights(vehicles.find((item) => item.name === winner)?.pros);
+  const winnerCons = pickHighlights(vehicles.find((item) => item.name === winner)?.cons, 1);
   const runnerUpPros = pickHighlights(runnerUp?.pros, 1);
+  const runnerUpCons = pickHighlights(runnerUp?.cons, 1);
 
   const sentences = [];
   if (winner) {
@@ -60,16 +115,23 @@ function formatComparison(structuredResult) {
   if (winnerPros.length > 0) {
     sentences.push(`Its biggest strengths in this comparison are ${winnerPros.join(" and ")}.`);
   }
+  if (winnerCons.length > 0) {
+    sentences.push(`The main trade-off is ${winnerCons[0].charAt(0).toLowerCase() + winnerCons[0].slice(1)}`);
+  }
   if (runnerUp?.name) {
     sentences.push(
       `${runnerUp.name} still makes sense if you care more about ${runnerUpPros[0] || "its specific strengths"}.`
     );
+    if (runnerUpCons[0]) {
+      sentences.push(`It ranks second mainly because of ${runnerUpCons[0].charAt(0).toLowerCase() + runnerUpCons[0].slice(1)}`);
+    }
   }
 
   const tradeOffs = [
     practicalityLeader ? `Practicality edge: ${practicalityLeader}` : null,
     comfortLeader ? `Comfort edge: ${comfortLeader}` : null,
     resaleLeader ? `Resale edge: ${resaleLeader}` : null,
+    efficiencyLeader ? `Efficiency edge: ${efficiencyLeader}` : null,
   ]
     .filter(Boolean)
     .join(" | ");
@@ -198,6 +260,7 @@ function formatKnowledge(structuredResult) {
 function formatRecommendation(structuredResult) {
   const top = structuredResult.ranked_vehicles?.[0];
   const second = structuredResult.ranked_vehicles?.[1];
+  const topLinks = top?.links;
 
   if (!top) {
     return {
@@ -208,9 +271,19 @@ function formatRecommendation(structuredResult) {
 
   return {
     final_answer: [
-      `${top.name} looks like the strongest fit for the profile you shared.`,
-      top.reasons.length > 0 ? `The main reasons are that it ${top.reasons.join(", ")}.` : null,
-      second ? `A close alternative is ${second.name} if you want a slightly different balance.` : null,
+      `${top.name} looks like the strongest fit for the profile you shared${top.fit_label ? `, and I would call it a ${top.fit_label.toLowerCase()}` : ""}.`,
+      top.reasons.length > 0 ? `It stands out because it ${top.reasons.join(", ")}.` : null,
+      top.market_summary ? `Current market context: ${top.market_summary}.` : null,
+      top.caveats?.length > 0 ? `The main watch-out is that it ${top.caveats[0]}.` : null,
+      second
+        ? `${second.name} is the closest alternative${second.reasons?.[0] ? ` because it ${second.reasons[0]}` : ""}, but it does not rank first${second.caveats?.[0] ? ` because it ${second.caveats[0]}` : " for the overall profile fit"}.`
+        : null,
+      topLinks?.detail_page_url ? `You can open its vehicle detail page next to review specs and ownership signals.` : null,
+      topLinks?.related_listings_url
+        ? topLinks.related_listings_count > 0
+          ? `There are already ${topLinks.related_listings_count} related listing(s) available to browse.`
+          : "If there is no exact active listing yet, I can still send you to the closest browse path."
+        : null,
       structuredResult.profile_summary ? `Current profile used: ${structuredResult.profile_summary}.` : null,
     ]
       .filter(Boolean)
@@ -219,7 +292,7 @@ function formatRecommendation(structuredResult) {
   };
 }
 
-export function formatFinalAnswer({ intent, structured_result, policy_response }) {
+export function formatFinalAnswer({ intent, structured_result, policy_response, turn_context = {} }) {
   if (policy_response?.final_answer) {
     return {
       final_answer: policy_response.final_answer,
@@ -234,7 +307,7 @@ export function formatFinalAnswer({ intent, structured_result, policy_response }
     };
   }
 
-  if (intent === "compare_car") return formatComparison(structured_result);
+  if (intent === "compare_car") return formatComparison(structured_result, turn_context);
   if (intent === "predict_vehicle_value") return formatValuation(structured_result);
   if (intent === "market_trend_analysis") return formatForecast(structured_result);
   if (intent === "calculate_tco") return formatTco(structured_result);

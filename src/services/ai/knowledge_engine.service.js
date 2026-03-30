@@ -1,5 +1,6 @@
 import { buildConfidence, buildEvidence, buildNarrativeEnvelope } from "./contracts.js";
 import {
+  buildInternalSource,
   combineKnowledgeSources,
   fetchOfficialVehicleSignals,
   loadVariantContext,
@@ -8,6 +9,8 @@ import {
 
 function detectKnowledgeTopic(message) {
   const normalized = String(message || "").toLowerCase();
+  if (/\b(hybrid)\b/i.test(normalized) && /\b(plug[- ]?in hybrid|phev)\b/i.test(normalized)) return "hybrid_vs_phev";
+  if (/\b(hybrid)\b/i.test(normalized) && /\b(ev|electric vehicle|bev)\b/i.test(normalized)) return "hybrid_vs_ev";
   if (/\b(safe|safety|recall)\b/i.test(normalized)) return "safety";
   if (/\b(reliable|reliability|maintenance|repair|bao duong|ben)\b/i.test(normalized)) return "reliability";
   if (/\b(city|urban|commute|daily)\b/i.test(normalized)) return "city_fit";
@@ -15,6 +18,98 @@ function detectKnowledgeTopic(message) {
   if (/\b(fuel economy|mpg|range|efficiency|tiet kiem)\b/i.test(normalized)) return "efficiency";
   if (/\b(feature|technology|comfort|space|practical)\b/i.test(normalized)) return "practicality";
   return "overview";
+}
+
+function buildGenericKnowledgeEnvelope(topic) {
+  if (topic === "hybrid_vs_phev") {
+    return buildNarrativeEnvelope({
+      title: "Hybrid vs plug-in hybrid",
+      assistant_message:
+        "A regular hybrid is usually the easier ownership choice if you want better fuel economy without changing your routine, because it charges itself and does not depend on plugging in. A plug-in hybrid adds a larger battery and short electric-only driving, but it only really pays off if you can charge often and your daily trips are short enough to use that electric range.",
+      highlights: [
+        "Hybrid: simpler ownership, no external charging required, usually lighter and cheaper.",
+        "Plug-in hybrid: better short-trip efficiency, but more expensive and less rewarding if you rarely charge.",
+        "For city commuting with home charging, a PHEV can make sense. For mixed use without charging discipline, a regular hybrid is usually the safer buy.",
+      ],
+      insight_cards: [
+        {
+          title: "Best for convenience",
+          value: "Regular hybrid",
+          description: "Easier to recommend when you want efficiency without changing how you refuel.",
+        },
+        {
+          title: "Best for short electric driving",
+          value: "Plug-in hybrid",
+          description: "More compelling if you can charge regularly and most trips are short.",
+        },
+      ],
+      confidence: buildConfidence(0.74, ["This answer uses general automotive ownership principles rather than trim-specific claims."]),
+      evidence: buildEvidence({
+        verified: ["The answer intentionally stays at the powertrain-concept level and avoids trim-specific claims."],
+        inferred: ["Real ownership fit depends heavily on charging access and daily driving pattern."],
+        estimated: [],
+      }),
+      sources: [buildInternalSource("General automotive guidance synthesized from CarVista domain policy")],
+      caveats: ["Exact electric-only range, performance, and tax incentives vary by model and market."],
+    });
+  }
+
+  if (topic === "hybrid_vs_ev") {
+    return buildNarrativeEnvelope({
+      title: "Hybrid vs EV",
+      assistant_message:
+        "A hybrid is usually the easier step if you want lower fuel use without depending on charging infrastructure. A full EV can cut running costs more dramatically and feels quieter and smoother in city use, but it asks more from you on charging access, trip planning, and battery-related market considerations.",
+      highlights: [
+        "Hybrid: easier long-distance flexibility and less charging dependency.",
+        "EV: stronger running-cost upside in the right charging setup, especially in city-heavy use.",
+        "The right answer depends more on your charging reality than on marketing claims.",
+      ],
+      insight_cards: [
+        {
+          title: "Best for easy transition",
+          value: "Hybrid",
+          description: "Better if you want lower fuel spend without changing refueling habits.",
+        },
+        {
+          title: "Best for low running cost potential",
+          value: "EV",
+          description: "Most compelling when charging is convenient and your usage pattern fits it.",
+        },
+      ],
+      confidence: buildConfidence(0.72, ["This answer is grounded to general ownership trade-offs rather than a specific vehicle."]),
+      evidence: buildEvidence({
+        verified: ["The answer avoids claiming model-specific charging, efficiency, or battery figures."],
+        inferred: ["Charging access and travel pattern are the main decision drivers."],
+        estimated: [],
+      }),
+      sources: [buildInternalSource("General automotive guidance synthesized from CarVista domain policy")],
+      caveats: ["Actual savings depend on electricity pricing, charging convenience, battery warranty, and the specific model."],
+    });
+  }
+
+  if (topic === "reliability") {
+    return buildNarrativeEnvelope({
+      title: "Reliability guidance",
+      assistant_message:
+        "For reliability questions without a specific car, I would look first at the exact engine and transmission, then the model year, and only after that the brand reputation. In real ownership, maintenance history and powertrain complexity usually matter more than a broad badge-level reputation.",
+      highlights: [
+        "Model year and powertrain matter more than brand stereotypes.",
+        "Service history is one of the strongest practical reliability signals in the used-car market.",
+        "Turbocharged, luxury, and highly complex drivetrains can raise ownership risk if maintenance quality is poor.",
+      ],
+      insight_cards: [],
+      confidence: buildConfidence(0.68, ["The answer is intentionally general because no exact vehicle was specified."]),
+      evidence: buildEvidence({
+        verified: ["The answer avoids model-specific durability claims without grounded data."],
+        inferred: ["Reliability risk rises when powertrain complexity and maintenance neglect stack together."],
+        estimated: [],
+      }),
+      sources: [buildInternalSource("General automotive guidance synthesized from CarVista domain policy")],
+      caveats: ["If you name a specific make, model, year, and engine, I can give a much sharper answer."],
+    });
+  }
+
+  return null;
 }
 
 function parseReliabilitySignal(context) {
@@ -108,8 +203,13 @@ function buildKnowledgeCards(context, official) {
 export async function answerVehicleQuestion(ctx, input) {
   const focusVariantId = Number.isInteger(Number(input?.focus_variant_id)) ? Number(input.focus_variant_id) : null;
   let context = focusVariantId ? await loadVariantContext(ctx, { variant_id: focusVariantId, market_id: input.market_id ?? 1 }) : null;
+  const topic = detectKnowledgeTopic(input.message);
 
   if (!context) {
+    const genericAnswer = buildGenericKnowledgeEnvelope(topic);
+    if (genericAnswer) {
+      return genericAnswer;
+    }
     const matches = await searchVariantsByText(ctx, input.message, 3);
     const suggestionText = matches.length
       ? matches
@@ -141,7 +241,6 @@ export async function answerVehicleQuestion(ctx, input) {
     model: context.variant.model_name,
   });
 
-  const topic = detectKnowledgeTopic(input.message);
   const assistantMessage = buildDirectAnswer(topic, context, official);
   const verified = [
     `${context.variant.label} is grounded to a local catalog record.`,

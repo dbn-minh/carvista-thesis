@@ -1,7 +1,15 @@
 import { Router } from "express";
 import { calculateTco } from "../services/ai/tco.service.js";
+import { buildVariantPageIntelligence } from "../services/ai/page_intelligence.service.js";
+import { parsePreferenceProfileQuery } from "../services/ai/user_preference_profile.service.js";
 
 export const catalogRoutes = Router();
+
+function parseNumber(value, fallback = null) {
+  if (value == null || value === "") return fallback;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
 
 catalogRoutes.get("/catalog/makes", async (req, res, next) => {
   try {
@@ -79,6 +87,30 @@ catalogRoutes.get("/catalog/variants/:id", async (req, res, next) => {
     const images = await VariantImages.findAll({ where: { variant_id: id }, order: [["sort_order","ASC"]] });
 
     res.json({ variant, spec, kv, images });
+  } catch (e) { next(e); }
+});
+
+catalogRoutes.get("/catalog/variants/:id/ai-insights", async (req, res, next) => {
+  try {
+    const variantId = Number(req.params.id);
+    if (!Number.isFinite(variantId)) {
+      return next({ status: 400, safe: true, message: "Invalid variant id." });
+    }
+
+    const marketId = parseNumber(req.query.marketId, 1);
+    const ownershipYears = parseNumber(req.query.ownershipYears, 5);
+    const kmPerYear = parseNumber(req.query.kmPerYear, null);
+    const profile = parsePreferenceProfileQuery(req.query);
+
+    const intelligence = await buildVariantPageIntelligence(req.ctx, {
+      variantId,
+      marketId,
+      ownershipYears,
+      kmPerYear,
+      profile,
+    });
+
+    res.json(intelligence);
   } catch (e) { next(e); }
 });
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
+import PageIntelligencePanel from "@/components/ai/PageIntelligencePanel";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import Header from "@/components/layout/Header";
 import StatusBanner from "@/components/common/StatusBanner";
@@ -281,6 +282,17 @@ export default function CatalogDetailPage() {
               </div>
             </div>
           </section>
+        ) : null}
+
+        {detail?.variant ? (
+          <PageIntelligencePanel
+            subjectType="variant"
+            subjectId={id}
+            marketId={Number(marketId) || 1}
+            ownershipYears={Number(ownershipYears) || 5}
+            title="AI ownership, fit, and market preview"
+            className="mb-8"
+          />
         ) : null}
 
         <section className="mb-8 grid gap-6 xl:grid-cols-2">

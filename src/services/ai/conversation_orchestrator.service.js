@@ -15,6 +15,12 @@ const VEHICLE_QUESTION_PATTERNS = [
   /\b(co nen mua|co dang tien|an toan|ben|bao duong|tiet kiem xang|phu hop)\b/i,
 ];
 
+const GENERAL_AUTOMOTIVE_QA_PATTERNS = [
+  /\b(what is|what's|difference between|explain|how does|how do|why does|why is)\b/i,
+  /\b(plug-in hybrid|phev|hybrid|bev|ev battery|awd|fwd|rwd|turbo|naturally aspirated)\b/i,
+  /\b(bao gio|khac nhau|giai thich|tai sao|la gi)\b/i,
+];
+
 const AUTOMOTIVE_SIGNAL_PATTERNS = [
   /\b(car|vehicle|suv|sedan|truck|ev|hybrid|mileage|trim|model|variant|drivetrain|horsepower)\b/i,
   /\b(xe|oto|o to|mau xe|dong xe|dong co|hop so|gia xe|lan banh)\b/i,
@@ -36,6 +42,7 @@ export function isAutomotiveMessage(message) {
 export function classifyConversationRoute(message, options = {}) {
   const normalized = normalizeConversationText(message);
   const hasFocusVehicle = Number.isInteger(options.focus_variant_id);
+  const hasQuestionShape = /\?/.test(message) || /\b(what|why|how|should|can|difference|explain|which|is|are|co|tai sao|khac nhau|la gi)\b/i.test(normalized);
 
   if (/\b(compare|versus| vs |so sanh)\b/i.test(normalized)) return "compare";
   if (/\b(predict|forecast|future value|resale|depreciation|du doan|gia tuong lai)\b/i.test(normalized)) {
@@ -48,6 +55,9 @@ export function classifyConversationRoute(message, options = {}) {
   if (SMALL_TALK_PATTERNS.some((pattern) => pattern.test(normalized)) && !hasFocusVehicle) return "small_talk";
   if (OFF_TOPIC_PATTERNS.some((pattern) => pattern.test(normalized)) && !isAutomotiveMessage(normalized)) {
     return "off_topic";
+  }
+  if (hasQuestionShape && GENERAL_AUTOMOTIVE_QA_PATTERNS.some((pattern) => pattern.test(normalized)) && isAutomotiveMessage(normalized)) {
+    return "vehicle_question";
   }
   if (hasFocusVehicle && /\?/.test(message)) return "vehicle_question";
   if (VEHICLE_QUESTION_PATTERNS.some((pattern) => pattern.test(normalized))) return "vehicle_question";

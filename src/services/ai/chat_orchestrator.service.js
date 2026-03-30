@@ -196,7 +196,10 @@ function toKnowledgeResult(payload) {
   });
 }
 
-export async function orchestrateChatRequest(ctx, { message, context = {}, advisor_profile = {}, forced_intent = null, flow_id = null }) {
+export async function orchestrateChatRequest(
+  ctx,
+  { message, context = {}, advisor_profile = {}, forced_intent = null, flow_id = null, turn_context = {} }
+) {
   const startedAt = Date.now();
   const classifiedIntent = classifyIntent(message, {
     ...context,
@@ -378,6 +381,7 @@ export async function orchestrateChatRequest(ctx, { message, context = {}, advis
   const formatted = formatFinalAnswer({
     intent: intentResult.intent,
     structured_result: structuredResult,
+    turn_context,
   });
   const shared = extractSharedEnvelopeFields(rawPayload, structuredResult);
   servicesUsed.push("AiFormatter");
@@ -386,6 +390,7 @@ export async function orchestrateChatRequest(ctx, { message, context = {}, advis
     intent: intentResult.intent,
     services_used: servicesUsed,
     source_count: shared.sources.length,
+    turn_type: turn_context?.turn_type ?? null,
   });
 
   return chatEnvelopeSchema.parse({

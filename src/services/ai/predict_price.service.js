@@ -5,6 +5,7 @@ import {
   buildInternalSource,
   fetchOfficialVehicleSignals,
   loadComparableMarketContext,
+  loadListingMarketSignals,
   loadVariantContext,
 } from "./source_retrieval.service.js";
 
@@ -103,7 +104,14 @@ export async function predictPrice(ctx, input) {
     market_id,
     limit: 10,
   });
+  const listingSignals = await loadListingMarketSignals(ctx, {
+    variant_id,
+    market_id,
+    limit: 20,
+  });
   const officialSignals = await fetchOfficialVehicleSignals({
+    ctx,
+    variant_id,
     year: context.variant.model_year,
     make: context.variant.make_name,
     model: context.variant.model_name,
@@ -117,6 +125,7 @@ export async function predictPrice(ctx, input) {
     .map((item) => Number(item.latest_price ?? item.msrp_base))
     .filter((value) => Number.isFinite(value));
   const comparableAverage = average(comparablePrices);
+  const liveListingAverage = Number(listingSignals.average_asking_price);
   const comparableRatios = comparableContext.items
     .map((item) => {
       const latestPrice = Number(item.latest_price);
@@ -130,11 +139,19 @@ export async function predictPrice(ctx, input) {
   const annualRate = computeAnnualDepreciationRate(context.variant);
   const monthlyRate = annualRate / 12;
   const volatility = computeVolatility(priceSeries) ?? 0.08;
+  const anchorCandidates = [
+    Number.isFinite(last_price) ? { weight: history_points >= 4 ? 0.48 : 0.24, value: last_price } : null,
+    Number.isFinite(liveListingAverage) ? { weight: 0.28, value: liveListingAverage } : null,
+    Number.isFinite(comparableAverage) ? { weight: 0.18, value: comparableAverage } : null,
+    Number.isFinite(comparableRetention) && Number(context.variant.msrp_base) > 0
+      ? { weight: 0.16, value: Number(context.variant.msrp_base) * comparableRetention }
+      : null,
+  ].filter(Boolean);
   const priceAnchor =
-    last_price ??
-    (Number.isFinite(comparableRetention) && Number(context.variant.msrp_base) > 0
-      ? Number(context.variant.msrp_base) * comparableRetention
-      : comparableAverage);
+    anchorCandidates.length > 0
+      ? anchorCandidates.reduce((sum, candidate) => sum + candidate.value * candidate.weight, 0) /
+        anchorCandidates.reduce((sum, candidate) => sum + candidate.weight, 0)
+      : null;
 
   let predictedRaw = priceAnchor;
   let trendSlope = null;
@@ -160,6 +177,8 @@ export async function predictPrice(ctx, input) {
   if (history_points >= 8) confidenceScore += 0.28;
   else if (history_points >= 4) confidenceScore += 0.16;
   if (comparablePrices.length >= 3) confidenceScore += 0.18;
+  if (listingSignals.item_count >= 3) confidenceScore += 0.14;
+  else if (listingSignals.item_count >= 1) confidenceScore += 0.08;
   if (officialSignals.sources.length > 0) confidenceScore += 0.08;
   if (context.variant.latest_price != null) confidenceScore += 0.1;
   confidenceScore = clamp(confidenceScore, 0.2, 0.9);
@@ -168,6 +187,8 @@ export async function predictPrice(ctx, input) {
   const primaryDriver =
     history_points >= 8
       ? "Strongest signal comes from the vehicle's own local market history."
+      : listingSignals.item_count >= 3
+        ? "Strongest signal comes from live marketplace asking prices blended with local retention signals."
       : comparablePrices.length >= 3
         ? "Strongest signal comes from comparable local variants plus retention heuristics."
         : "Strongest signal comes from MSRP anchoring and age-based depreciation heuristics.";
@@ -203,6 +224,7 @@ export async function predictPrice(ctx, input) {
     key_factors: [
       history_points >= 8 ? "Own-market history" : null,
       comparablePrices.length >= 3 ? "Comparable local variants" : null,
+      listingSignals.item_count >= 1 ? "Live marketplace asking prices" : null,
       officialSignals.fuel_economy?.combined_mpg != null ? "Official efficiency context" : null,
       officialSignals.recalls.length > 0 ? "Official recall context" : null,
     ].filter(Boolean),
@@ -210,6 +232,7 @@ export async function predictPrice(ctx, input) {
       verified: [
         "The vehicle identity and price history are grounded to the local database.",
         comparablePrices.length ? "Comparable local market signals were found." : null,
+        listingSignals.item_count ? "Active marketplace listing prices were folded into the estimate." : null,
         officialSignals.sources.length ? "Official external automotive data was used for enrichment." : null,
       ].filter(Boolean),
       inferred: [
@@ -223,13 +246,21 @@ export async function predictPrice(ctx, input) {
     }),
     sources: [
       buildInternalSource("Local market history and catalog valuation inputs"),
+      ...listingSignals.sources,
       ...comparableContext.sources,
       ...officialSignals.sources,
     ],
     caveats: [
       "Mileage, condition, accident history, and ownership count were not modeled because those fields are not currently available in the local dataset.",
+      listingSignals.item_count === 0 ? "No live marketplace listing prices were available for this exact variant in the selected market." : null,
       ...officialSignals.caveats,
-    ],
+    ].filter(Boolean),
+    live_market_snapshot: {
+      active_listing_count: listingSignals.item_count,
+      average_asking_price: roundMoney(liveListingAverage, currency),
+      min_asking_price: roundMoney(listingSignals.min_asking_price, currency),
+      max_asking_price: roundMoney(listingSignals.max_asking_price, currency),
+    },
   };
 
   return {

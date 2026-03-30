@@ -21,23 +21,37 @@ const SPEC_WHITELIST = [
   "charging_dc_kw",
 ];
 
+function toNumberOrNull(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
 function buildProsCons(item) {
   const pros = [];
   const cons = [];
   const specs = item.specs ?? {};
   const fuelEconomy = item.official_signals?.fuel_economy;
   const recallCount = item.official_signals?.recalls?.length ?? 0;
+  const scores = item._scores ?? {};
 
   if (specs.power_hp != null && Number(specs.power_hp) >= 250) pros.push("Strong performance output for its class.");
   if (item.avg_rating != null && item.avg_rating >= 4.0) pros.push("Strong owner sentiment in local review data.");
   if (item.latest_price != null) pros.push("Backed by recent market pricing in the local dataset.");
   if (fuelEconomy?.combined_mpg != null) pros.push(`Official fuel economy fallback available at about ${fuelEconomy.combined_mpg} mpg combined.`);
   if (item.body_type && ["suv", "mpv", "cuv"].includes(item.body_type)) pros.push("Good everyday practicality for mixed family use.");
+  if ((scores.comfort_score ?? 0) >= 8.5) pros.push("Feels like the more comfortable day-to-day ownership choice.");
+  if ((scores.resale_score ?? 0) >= 8.5) pros.push("Looks more resilient on resale and market stability.");
+  if ((scores.efficiency_score ?? 0) >= 8.5) pros.push("Has the stronger running-cost and efficiency case.");
+  if ((scores.technology_score ?? 0) >= 5.5) pros.push("Carries a more complete modern driver-assistance and tech story.");
 
   if (specs.curb_weight_kg != null && Number(specs.curb_weight_kg) >= 2200) cons.push("Higher curb weight may blunt efficiency and agility.");
   if (item.avg_rating != null && item.avg_rating < 3.0) cons.push("Local review sentiment is weaker than ideal.");
   if (recallCount > 0) cons.push(`Official recall lookup returned ${recallCount} item(s), so safety diligence matters.`);
   if (item.latest_price == null && item.msrp_base == null) cons.push("Market value is less grounded because pricing data is limited.");
+  if ((scores.price_score ?? 0) <= 10) cons.push("Price positioning is less convincing in this comparison.");
+  if ((scores.comfort_score ?? 0) <= 5.5) cons.push("Cabin comfort or everyday refinement does not look like a standout strength.");
+  if ((scores.resale_score ?? 0) <= 5) cons.push("Resale strength is less convincing from the current market signal.");
+  if ((scores.maintenance_score ?? 0) <= 4.5) cons.push("Ownership complexity looks a bit less reassuring on the current evidence.");
 
   return {
     pros: pros.slice(0, 4),
@@ -75,17 +89,85 @@ function computeUseCaseFit(item, buyerProfile) {
   return clamp(score, 0, 24);
 }
 
+function countTechnologySignals(item) {
+  const specs = item.specs ?? {};
+  const kv = item.specs_kv_selected ?? {};
+  let signals = 0;
+  if (specs.adas_level != null && Number(specs.adas_level) >= 2) signals += 2;
+  if (kv.lane_keep_assist?.value != null || specs.lane_keep_assist != null) signals += 1;
+  if (kv.adaptive_cruise_control?.value != null || specs.adaptive_cruise_control != null) signals += 1;
+  if (kv.blind_spot_monitor?.value != null || specs.blind_spot_monitor != null) signals += 1;
+  if (kv.charging_dc_kw?.value != null || specs.charging_dc_kw != null) signals += 1;
+  return signals;
+}
+
+function computeEfficiencyScore(item) {
+  const mpg = toNumberOrNull(item.official_signals?.fuel_economy?.combined_mpg);
+  const lPer100 = toNumberOrNull(item.specs?.fuel_consumption_l_100km ?? item.specs_kv_selected?.fuel_consumption_l_100km?.value);
+  const kwhPer100 = toNumberOrNull(item.specs?.energy_consumption_kwh_100km ?? item.specs_kv_selected?.energy_consumption_kwh_100km?.value);
+
+  let score = 0;
+  if (mpg != null) score += clamp(mpg / 4, 0, 10);
+  else if (lPer100 != null) score += clamp(11 - lPer100, 0, 9);
+  else if (kwhPer100 != null) score += clamp(12 - kwhPer100 / 2, 0, 9);
+  if (["hybrid", "ev"].includes(item.fuel_type)) score += 2;
+  return clamp(score, 0, 12);
+}
+
+function computeComfortScore(item) {
+  const wheelbase = toNumberOrNull(item.specs?.wheelbase_mm);
+  const avgRating = toNumberOrNull(item.avg_rating);
+  const transmission = String(item.transmission || "").toLowerCase();
+  let score = 0;
+  if (["suv", "cuv", "mpv"].includes(item.body_type)) score += 4;
+  else if (["sedan", "wagon"].includes(item.body_type)) score += 3;
+  if (wheelbase != null) score += wheelbase >= 2800 ? 4 : wheelbase >= 2700 ? 3 : wheelbase >= 2600 ? 2 : 0;
+  if (["at", "cvt", "e-cvt", "dct"].some((value) => transmission.includes(value))) score += 2;
+  if ((Number(item.seats) || 0) >= 5) score += 1;
+  if (avgRating != null && avgRating >= 4.2) score += 1.5;
+  return clamp(score, 0, 12);
+}
+
+function computeResaleScore(item) {
+  const avgRating = toNumberOrNull(item.avg_rating);
+  const activeListingCount = toNumberOrNull(item.market_signal?.active_listing_count) ?? 0;
+  const priceSpreadPct = toNumberOrNull(item.market_signal?.price_spread_pct);
+  const scarcityScore = toNumberOrNull(item.market_signal?.scarcity_score);
+  let score = 0;
+  if (item.latest_price != null) score += 3;
+  score += clamp(activeListingCount / 6, 0, 1) * 3;
+  if (priceSpreadPct != null) score += clamp(1 - priceSpreadPct * 4, 0, 1) * 3;
+  if (scarcityScore != null) score += clamp(scarcityScore, 0, 1) * 3;
+  if (avgRating != null) score += clamp(avgRating / 5, 0, 1) * 2;
+  return clamp(score, 0, 12);
+}
+
+function computeTechnologyScore(item) {
+  return clamp(countTechnologySignals(item), 0, 8);
+}
+
+function computeMaintenanceScore(item) {
+  const avgRating = toNumberOrNull(item.avg_rating);
+  const recallCount = item.official_signals?.recalls?.length ?? 0;
+  let score = 0;
+  if (avgRating != null) score += clamp(avgRating / 5, 0, 1) * 6;
+  if (recallCount === 0) score += 2;
+  if (["gasoline", "hybrid"].includes(item.fuel_type)) score += 2;
+  if (["diesel", "phev"].includes(item.fuel_type)) score -= 1;
+  return clamp(score, 0, 10);
+}
+
 function computeScores(items, buyerProfile) {
   const priced = items.filter((item) => item.latest_price != null).map((item) => Number(item.latest_price));
   const minPrice = priced.length ? Math.min(...priced) : null;
   const maxPrice = priced.length ? Math.max(...priced) : null;
 
   for (const item of items) {
-    const ratingScore = item.avg_rating != null ? clamp(Number(item.avg_rating), 0, 5) * 10 : 0;
+    const ratingScore = item.avg_rating != null ? clamp(Number(item.avg_rating), 0, 5) * 8 : 0;
 
     let priceScore = 0;
     if (minPrice != null && maxPrice != null && item.latest_price != null) {
-      priceScore = minPrice === maxPrice ? 15 : 30 * (1 - (Number(item.latest_price) - minPrice) / (maxPrice - minPrice));
+      priceScore = minPrice === maxPrice ? 14 : 26 * (1 - (Number(item.latest_price) - minPrice) / (maxPrice - minPrice));
     } else if (item.msrp_base != null) {
       priceScore = 12;
     }
@@ -102,14 +184,34 @@ function computeScores(items, buyerProfile) {
     safetyScore = clamp(safetyScore, 0, 12);
 
     const useCaseFitScore = computeUseCaseFit(item, buyerProfile);
+    const comfortScore = computeComfortScore(item);
+    const efficiencyScore = computeEfficiencyScore(item);
+    const resaleScore = computeResaleScore(item);
+    const technologyScore = computeTechnologyScore(item);
+    const maintenanceScore = computeMaintenanceScore(item);
 
     item._scores = {
       rating_score: ratingScore,
-      price_score: clamp(priceScore, 0, 30),
+      price_score: clamp(priceScore, 0, 26),
       practicality_score: practicalityScore,
       safety_score: safetyScore,
+      comfort_score: comfortScore,
+      efficiency_score: efficiencyScore,
+      resale_score: resaleScore,
+      technology_score: technologyScore,
+      maintenance_score: maintenanceScore,
       use_case_fit_score: useCaseFitScore,
-      final_score: ratingScore + clamp(priceScore, 0, 30) + practicalityScore + safetyScore + useCaseFitScore,
+      final_score:
+        ratingScore +
+        clamp(priceScore, 0, 26) +
+        practicalityScore +
+        safetyScore +
+        comfortScore +
+        efficiencyScore +
+        resaleScore +
+        technologyScore +
+        maintenanceScore +
+        useCaseFitScore,
     };
   }
 }
@@ -185,6 +287,7 @@ export async function compareVariants(ctx, input) {
   ]);
 
   let priceMap = new Map();
+  let marketSignalMap = new Map();
   if (market_id != null) {
     const [priceRows] = await sequelize.query(
       `
@@ -201,6 +304,38 @@ export async function compareVariants(ctx, input) {
       { replacements: { market_id, price_type, ids } }
     );
     priceMap = new Map(priceRows.map((row) => [Number(row.variant_id), Number(row.price)]));
+    try {
+      const [marketSignalRows] = await sequelize.query(
+        `
+          SELECT vms.variant_id, vms.active_listing_count, vms.avg_asking_price, vms.price_spread_pct, vms.scarcity_score, vms.data_confidence
+          FROM vehicle_market_signals vms
+          JOIN (
+            SELECT variant_id, MAX(snapshot_date) AS latest_snapshot
+            FROM vehicle_market_signals
+            WHERE market_id = :market_id AND variant_id IN (:ids)
+            GROUP BY variant_id
+          ) latest_signal
+            ON latest_signal.variant_id = vms.variant_id
+           AND latest_signal.latest_snapshot = vms.snapshot_date
+          WHERE vms.market_id = :market_id
+        `,
+        { replacements: { market_id, ids } }
+      );
+      marketSignalMap = new Map(
+        marketSignalRows.map((row) => [
+          Number(row.variant_id),
+          {
+            active_listing_count: Number(row.active_listing_count || 0),
+            avg_asking_price: toNumberOrNull(row.avg_asking_price),
+            price_spread_pct: toNumberOrNull(row.price_spread_pct),
+            scarcity_score: toNumberOrNull(row.scarcity_score),
+            data_confidence: toNumberOrNull(row.data_confidence),
+          },
+        ])
+      );
+    } catch {
+      marketSignalMap = new Map();
+    }
   }
 
   const specsMap = new Map(specsRows.map((row) => [Number(row.variant_id), row.toJSON()]));
@@ -262,16 +397,18 @@ export async function compareVariants(ctx, input) {
       latest_price: priceMap.get(variantId) ?? null,
       avg_rating: rating.avg_rating,
       review_count: rating.review_count,
+      market_signal: marketSignalMap.get(variantId) ?? null,
       official_signals: official,
     };
-
-    const prosCons = buildProsCons(item);
-    item.pros = prosCons.pros;
-    item.cons = prosCons.cons;
     return item;
   });
 
   computeScores(items, buyerProfile);
+  for (const item of items) {
+    const prosCons = buildProsCons(item);
+    item.pros = prosCons.pros;
+    item.cons = prosCons.cons;
+  }
 
   const comparisonTable = {};
   const tableKeys = [
@@ -302,11 +439,21 @@ export async function compareVariants(ctx, input) {
   const best = sorted[0] ?? null;
   const officialCoverage = items.filter((item) => item.official_signals.sources.length > 0).length;
   const priceCoverage = items.filter((item) => item.latest_price != null).length;
+  const marketSignalCoverage = items.filter((item) => item.market_signal != null).length;
   const confidence = buildConfidence(
-    clamp(0.45 + (officialCoverage / items.length) * 0.2 + (priceCoverage / items.length) * 0.2 + (buyerProfile ? 0.1 : 0), 0, 0.92),
+    clamp(
+      0.45 +
+        (officialCoverage / items.length) * 0.16 +
+        (priceCoverage / items.length) * 0.18 +
+        (marketSignalCoverage / items.length) * 0.12 +
+        (buyerProfile ? 0.08 : 0),
+      0,
+      0.94
+    ),
     [
       officialCoverage === items.length ? "All compared vehicles were enriched with official external data." : "Only part of the comparison had official external enrichment.",
       priceCoverage >= 2 ? "Local price history was available for multiple vehicles." : "Price coverage is still limited for some vehicles.",
+      marketSignalCoverage >= 2 ? "Persisted marketplace signal coverage improved the resale and liquidity view." : "Marketplace signal coverage is still partial for some vehicles.",
       buyerProfile ? "The verdict was tailored to the stated buyer profile." : "The verdict is an all-round recommendation rather than a user-specific one.",
     ]
   );
@@ -360,7 +507,10 @@ function describeWinnerReason(item) {
   const reasons = [];
   if (item._scores.use_case_fit_score >= 10) reasons.push("use-case fit");
   if (item._scores.price_score >= 18) reasons.push("value");
-  if (item._scores.rating_score >= 35) reasons.push("owner sentiment");
+  if (item._scores.rating_score >= 28) reasons.push("owner sentiment");
   if (item._scores.safety_score >= 8) reasons.push("safety context");
+  if (item._scores.resale_score >= 8) reasons.push("resale outlook");
+  if (item._scores.comfort_score >= 8) reasons.push("comfort");
+  if (item._scores.efficiency_score >= 8) reasons.push("running-cost efficiency");
   return reasons.slice(0, 3).join(", ") || "balanced scoring";
 }

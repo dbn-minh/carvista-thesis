@@ -10,6 +10,8 @@ const KNOWN_COUNTRIES = [
   ["uk", "United Kingdom"],
 ];
 
+const FOCUS_REFERENCE_PATTERN = /\b(this car|this vehicle|this one|that car|that vehicle|that one|current car|current vehicle|xe nay|xe do|mau nay|mau do)\b/i;
+
 function extractBudget(message) {
   const normalized = normalizeConversationText(message);
   const match = normalized.match(/(\d+(?:[.,]\d+)?)\s*(billion|million|thousand|k|m|ty|ti|trieu|usd|vnd)?/i);
@@ -50,18 +52,22 @@ function extractCountry(message) {
 
 function extractVehicleMentions(message, context = {}) {
   const mentions = new Set();
-  if (typeof context.focus_variant_label === "string" && context.focus_variant_label.trim()) {
+  if (
+    typeof context.focus_variant_label === "string" &&
+    context.focus_variant_label.trim() &&
+    FOCUS_REFERENCE_PATTERN.test(String(message || ""))
+  ) {
     mentions.add(context.focus_variant_label.trim());
   }
 
   const compareParts = String(message || "")
-    .split(/\b(?:vs|versus|compare|and)\b/i)
+    .split(/\b(?:vs|versus|compare|and|instead of|instead)\b/i)
     .map((part) => part.trim())
     .filter(Boolean);
 
   const genericPhrase = /\b(this|that|it|car|vehicle|xe nay|xe do|estimate|predict|forecast|tco|compare|help|can you|could you|please)\b/i;
   const vehicleSignal =
-    /\b(19\d{2}|20\d{2}|toyota|honda|mazda|ford|bmw|mercedes|benz|audi|vinfast|hyundai|kia|lexus|nissan|tesla|porsche|mitsubishi|suzuki|subaru|volvo|peugeot|byd|isuzu|chevrolet|chevy|land rover|range rover|camry|civic|mazda3|corolla|cx-5|cr-v|accord|model 3|mustang|fortuner|everest)\b/i;
+    /\b(19\d{2}|20\d{2}|toyota|honda|mazda|ford|bmw|mercedes|benz|audi|vinfast|hyundai|kia|lexus|nissan|tesla|porsche|mitsubishi|suzuki|subaru|volvo|peugeot|byd|isuzu|chevrolet|chevy|land rover|range rover|camry|civic|mazda3|corolla|cx-5|cr-v|accord|model 3|model y|mustang|fortuner|everest|corolla cross|tucson|santa fe|seltos|carnival|x5|320i|c300|glc|q5|a4|nx|es|vf 6|vf 8|seal|atto 3|xpander|terra|forester)\b/i;
   for (const part of compareParts) {
     if (part.length < 4 || !/[a-z]/i.test(part)) continue;
     if (!vehicleSignal.test(part)) continue;

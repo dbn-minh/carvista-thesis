@@ -4,6 +4,8 @@ import { z } from "zod";
 import { requireAuth } from "../middlewares/auth.js";
 import { listingImageUpload } from "../middlewares/listing-image-upload.js";
 import { validate } from "../middlewares/validate.js";
+import { buildListingPageIntelligence } from "../services/ai/page_intelligence.service.js";
+import { parsePreferenceProfileQuery } from "../services/ai/user_preference_profile.service.js";
 import { LISTING_IMAGE_LIMITS } from "../services/listing-images/image-validation.service.js";
 import { createListingImageService } from "../services/listing-images/listing-image.service.js";
 
@@ -61,6 +63,12 @@ function coerceNumber(value) {
   if (value == null || value === "") return undefined;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : value;
+}
+
+function parseNumber(value, fallback = null) {
+  if (value == null || value === "") return fallback;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
 }
 
 const OptionalTrimmedString = z.preprocess((value) => {
@@ -406,6 +414,30 @@ listingsRoutes.get("/listings/:id/images/:imageId", async (req, res, next) => {
     res.set("Cache-Control", "public, max-age=86400");
     res.type(imageContent.mimeType);
     return res.send(imageContent.buffer);
+  } catch (e) { next(e); }
+});
+
+listingsRoutes.get("/listings/:id/ai-insights", async (req, res, next) => {
+  try {
+    const listingId = Number(req.params.id);
+    if (!Number.isFinite(listingId)) {
+      return next({ status: 400, safe: true, message: "Invalid listing id." });
+    }
+
+    const marketId = parseNumber(req.query.marketId, 1);
+    const ownershipYears = parseNumber(req.query.ownershipYears, 5);
+    const kmPerYear = parseNumber(req.query.kmPerYear, null);
+    const profile = parsePreferenceProfileQuery(req.query);
+
+    const intelligence = await buildListingPageIntelligence(req.ctx, {
+      listingId,
+      marketId,
+      ownershipYears,
+      kmPerYear,
+      profile,
+    });
+
+    res.json(intelligence);
   } catch (e) { next(e); }
 });
 

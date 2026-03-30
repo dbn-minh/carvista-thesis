@@ -70,6 +70,15 @@ async function fetchJson(url) {
   return JSON.parse(text);
 }
 
+async function safeQuery(ctx, sql, replacements = {}) {
+  try {
+    const [rows] = await ctx.sequelize.query(sql, { replacements });
+    return rows;
+  } catch {
+    return [];
+  }
+}
+
 export function buildInternalSource(title, note = null) {
   return buildSource({
     provider: "CarVista DB",
@@ -109,7 +118,37 @@ export async function searchVariantsByText(ctx, query, limit = 5) {
     },
   });
 
-  return rows;
+  const aliasRows = await safeQuery(
+    ctx,
+    `
+      SELECT
+        cv.variant_id,
+        cv.model_year,
+        cv.trim_name,
+        cv.body_type,
+        cv.fuel_type,
+        cv.msrp_base,
+        cm.name AS model_name,
+        mk.name AS make_name
+      FROM vehicle_market_aliases vma
+      JOIN car_variants cv ON cv.variant_id = vma.variant_id
+      JOIN car_models cm ON cm.model_id = cv.model_id
+      JOIN car_makes mk ON mk.make_id = cm.make_id
+      WHERE vma.alias_name LIKE :query
+      ORDER BY cv.model_year DESC, mk.name, cm.name
+      LIMIT :limit
+    `,
+    {
+      query: `%${normalized}%`,
+      limit: Number(limit),
+    }
+  );
+
+  const merged = new Map();
+  [...rows, ...aliasRows].forEach((row) => {
+    if (!merged.has(row.variant_id)) merged.set(row.variant_id, row);
+  });
+  return [...merged.values()].slice(0, limit);
 }
 
 const MARKET_ALIASES = new Map([
@@ -302,7 +341,189 @@ export async function loadComparableMarketContext(ctx, { variant, market_id = 1,
   };
 }
 
-export async function fetchOfficialVehicleSignals({ year, make, model }) {
+function average(values) {
+  const numeric = values.filter((value) => Number.isFinite(Number(value))).map((value) => Number(value));
+  if (!numeric.length) return null;
+  return numeric.reduce((sum, value) => sum + value, 0) / numeric.length;
+}
+
+function normalizeSourceType(value) {
+  if (value === "internal_marketplace" || value === "seed") return "internal_db";
+  if (value === "manual") return "configured_feed";
+  return value ?? "configured_feed";
+}
+
+function buildStoredSource(row, fallbackTitle) {
+  return buildSource({
+    provider: row?.provider_key ?? "CarVista ingestion",
+    type: normalizeSourceType(row?.source_type),
+    title: row?.title ?? fallbackTitle,
+    url: row?.url ?? null,
+    trust: row?.trust_level ?? "high",
+    retrieved_at: row?.retrieved_at ?? new Date().toISOString(),
+    note: row?.notes ?? null,
+  });
+}
+
+async function loadStoredMarketSignal(ctx, { variant_id, market_id }) {
+  const rows = await safeQuery(
+    ctx,
+    `
+      SELECT
+        vms.*,
+        sr.provider_key,
+        sr.source_type,
+        sr.title,
+        sr.url,
+        sr.trust_level,
+        sr.retrieved_at,
+        sr.notes
+      FROM vehicle_market_signals vms
+      LEFT JOIN source_references sr ON sr.source_reference_id = vms.source_reference_id
+      WHERE vms.variant_id = :variant_id
+        AND vms.market_id = :market_id
+      ORDER BY vms.snapshot_date DESC, vms.created_at DESC
+      LIMIT 1
+    `,
+    { variant_id, market_id }
+  );
+
+  return rows[0] ?? null;
+}
+
+export async function loadListingMarketSignals(ctx, { variant_id, market_id = 1, limit = 20 }) {
+  const storedSignal = await loadStoredMarketSignal(ctx, { variant_id, market_id });
+  if (storedSignal) {
+    return {
+      item_count: Number(storedSignal.active_listing_count ?? 0),
+      average_asking_price: toNumberOrNull(storedSignal.avg_asking_price),
+      median_asking_price: toNumberOrNull(storedSignal.median_asking_price),
+      min_asking_price: toNumberOrNull(storedSignal.min_asking_price),
+      max_asking_price: toNumberOrNull(storedSignal.max_asking_price),
+      avg_mileage_km: toNumberOrNull(storedSignal.avg_mileage_km),
+      price_spread_pct: toNumberOrNull(storedSignal.price_spread_pct),
+      data_confidence: toNumberOrNull(storedSignal.data_confidence),
+      items: [],
+      sources: [buildStoredSource(storedSignal, "Persisted marketplace signal snapshot")],
+    };
+  }
+
+  const market = await ctx.models.Markets.findByPk(market_id).catch(() => null);
+  const countryCode = market?.country_code ?? null;
+
+  const { Listings } = ctx.models;
+  const where = {
+    variant_id,
+    status: "active",
+  };
+  if (countryCode) {
+    where.location_country_code = countryCode;
+  }
+
+  const listings = await Listings.findAll({
+    where,
+    attributes: ["listing_id", "asking_price", "mileage_km", "location_city", "created_at"],
+    order: [["created_at", "DESC"]],
+    limit,
+  });
+
+  const items = listings.map((row) => row.toJSON());
+  const askingPrices = items.map((item) => Number(item.asking_price));
+
+  return {
+    item_count: items.length,
+    average_asking_price: average(askingPrices),
+    median_asking_price: askingPrices.length ? askingPrices.slice().sort((a, b) => a - b)[Math.floor(askingPrices.length / 2)] : null,
+    min_asking_price: askingPrices.length ? Math.min(...askingPrices) : null,
+    max_asking_price: askingPrices.length ? Math.max(...askingPrices) : null,
+    avg_mileage_km: average(items.map((item) => Number(item.mileage_km)).filter((value) => Number.isFinite(value))),
+    price_spread_pct:
+      askingPrices.length > 1
+        ? (Math.max(...askingPrices) - Math.min(...askingPrices)) / average(askingPrices)
+        : null,
+    data_confidence: items.length >= 6 ? 0.82 : items.length >= 3 ? 0.66 : items.length >= 1 ? 0.48 : 0.22,
+    items,
+    sources:
+      items.length > 0
+        ? [buildInternalSource("Live marketplace listing signals for this variant")]
+        : [],
+  };
+}
+
+async function loadStoredOfficialSignals(ctx, { variant_id }) {
+  const [fuelRows, recallRows] = await Promise.all([
+    safeQuery(
+      ctx,
+      `
+        SELECT
+          vfes.*,
+          sr.provider_key,
+          sr.source_type,
+          sr.title,
+          sr.url,
+          sr.trust_level,
+          sr.retrieved_at,
+          sr.notes
+        FROM vehicle_fuel_economy_snapshots vfes
+        LEFT JOIN source_references sr ON sr.source_reference_id = vfes.source_reference_id
+        WHERE vfes.variant_id = :variant_id
+        ORDER BY vfes.created_at DESC
+        LIMIT 1
+      `,
+      { variant_id }
+    ),
+    safeQuery(
+      ctx,
+      `
+        SELECT
+          vrs.*,
+          sr.provider_key,
+          sr.source_type,
+          sr.title,
+          sr.url,
+          sr.trust_level,
+          sr.retrieved_at,
+          sr.notes
+        FROM vehicle_recall_snapshots vrs
+        LEFT JOIN source_references sr ON sr.source_reference_id = vrs.source_reference_id
+        WHERE vrs.variant_id = :variant_id
+        ORDER BY vrs.created_at DESC
+        LIMIT 20
+      `,
+      { variant_id }
+    ),
+  ]);
+
+  const fuelRow = fuelRows[0] ?? null;
+  const fuelEconomy = fuelRow
+    ? {
+        combined_mpg: toNumberOrNull(fuelRow.combined_mpg),
+        city_mpg: toNumberOrNull(fuelRow.city_mpg),
+        highway_mpg: toNumberOrNull(fuelRow.highway_mpg),
+        annual_fuel_cost_usd: toNumberOrNull(fuelRow.annual_fuel_cost_usd),
+        fuel_type: fuelRow.fuel_type ?? null,
+        drive: fuelRow.drive ?? null,
+        class_name: fuelRow.class_name ?? null,
+      }
+    : null;
+
+  return {
+    fuel_economy: fuelEconomy,
+    recalls: recallRows.map((row) => ({
+      campaign_number: row.campaign_number,
+      component: row.component,
+      summary: row.summary,
+      consequence: row.consequence,
+      remedy: row.remedy,
+    })),
+    sources: [
+      ...(fuelRow ? [buildStoredSource(fuelRow, "Persisted fuel-economy snapshot")] : []),
+      ...(recallRows[0] ? [buildStoredSource(recallRows[0], "Persisted recall snapshot")] : []),
+    ],
+  };
+}
+
+export async function fetchOfficialVehicleSignals({ ctx = null, variant_id = null, year, make, model }) {
   if (!year || !make || !model) {
     return {
       fuel_economy: null,
@@ -312,13 +533,18 @@ export async function fetchOfficialVehicleSignals({ year, make, model }) {
     };
   }
 
-  return withCache("official_vehicle_signals", { year, make, model }, async () => {
-    const sources = [];
-    const caveats = [];
-    let fuelEconomy = null;
-    let recalls = [];
+  return withCache("official_vehicle_signals", { variant_id, year, make, model }, async () => {
+    const storedSignals =
+      ctx && Number.isInteger(variant_id)
+        ? await loadStoredOfficialSignals(ctx, { variant_id })
+        : { fuel_economy: null, recalls: [], sources: [] };
 
-    try {
+    const sources = [...(storedSignals.sources ?? [])];
+    const caveats = [];
+    let fuelEconomy = storedSignals.fuel_economy ?? null;
+    let recalls = storedSignals.recalls ?? [];
+
+    if (!fuelEconomy) try {
       const menuUrl = `https://www.fueleconomy.gov/ws/rest/vehicle/menu/options?year=${encodeURIComponent(
         year
       )}&make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}`;
@@ -352,7 +578,7 @@ export async function fetchOfficialVehicleSignals({ year, make, model }) {
       caveats.push("Official FuelEconomy.gov data was unavailable for this lookup.");
     }
 
-    try {
+    if (recalls.length === 0) try {
       const recallUrl = `https://api.nhtsa.gov/recalls/recallsByVehicle?make=${encodeURIComponent(
         make
       )}&model=${encodeURIComponent(model)}&modelYear=${encodeURIComponent(year)}`;

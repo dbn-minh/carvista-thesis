@@ -1,6 +1,8 @@
 import { apiFetch } from "./api-client";
 import type {
+  AdvisorProfile,
   AiCompareResponse,
+  AiPageIntelligenceResponse,
   AiPredictResponse,
   AiTcoResponse,
   AuthProvidersResponse,
@@ -26,6 +28,28 @@ import type {
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000/api";
+
+function appendAdvisorProfileParams(qs: URLSearchParams, profile?: AdvisorProfile) {
+  if (!profile) return;
+
+  const entries: Array<[string, string | number | null | undefined]> = [
+    ["budget_max", profile.budget_max],
+    ["environment", profile.environment],
+    ["long_trip_habit", profile.long_trip_habit],
+    ["passenger_count", profile.passenger_count],
+    ["preferred_body_type", profile.preferred_body_type],
+    ["preferred_fuel_type", profile.preferred_fuel_type],
+    ["maintenance_sensitivity", profile.maintenance_sensitivity],
+    ["personality", profile.personality],
+    ["brand_openness", profile.brand_openness],
+    ["new_vs_used", profile.new_vs_used],
+  ];
+
+  entries.forEach(([key, value]) => {
+    if (value == null || value === "") return;
+    qs.set(key, String(value));
+  });
+}
 
 export const authApi = {
   register(payload: {
@@ -142,6 +166,24 @@ export const catalogApi = {
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return apiFetch<CatalogOwnershipSummary>(`/catalog/variants/${id}/ownership-summary${suffix}`);
   },
+
+  variantInsights(
+    id: number,
+    params?: {
+      marketId?: number;
+      ownershipYears?: number;
+      kmPerYear?: number;
+      profile?: AdvisorProfile;
+    }
+  ) {
+    const qs = new URLSearchParams();
+    if (params?.marketId) qs.set("marketId", String(params.marketId));
+    if (params?.ownershipYears) qs.set("ownershipYears", String(params.ownershipYears));
+    if (params?.kmPerYear) qs.set("kmPerYear", String(params.kmPerYear));
+    appendAdvisorProfileParams(qs, params?.profile);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return apiFetch<AiPageIntelligenceResponse>(`/catalog/variants/${id}/ai-insights${suffix}`);
+  },
 };
 
 export const listingsApi = {
@@ -160,6 +202,24 @@ export const listingsApi = {
 
   detail(id: number) {
     return apiFetch<ListingDetail>(`/listings/${id}`);
+  },
+
+  insights(
+    id: number,
+    params?: {
+      marketId?: number;
+      ownershipYears?: number;
+      kmPerYear?: number;
+      profile?: AdvisorProfile;
+    }
+  ) {
+    const qs = new URLSearchParams();
+    if (params?.marketId) qs.set("marketId", String(params.marketId));
+    if (params?.ownershipYears) qs.set("ownershipYears", String(params.ownershipYears));
+    if (params?.kmPerYear) qs.set("kmPerYear", String(params.kmPerYear));
+    appendAdvisorProfileParams(qs, params?.profile);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return apiFetch<AiPageIntelligenceResponse>(`/listings/${id}/ai-insights${suffix}`);
   },
 
   create(

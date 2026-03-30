@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
+import PageIntelligencePanel from "@/components/ai/PageIntelligencePanel";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import Header from "@/components/layout/Header";
 import StatusBanner from "@/components/common/StatusBanner";
@@ -17,6 +19,7 @@ function getImageUrl(image: Record<string, unknown>): string | null {
 
 export default function ListingDetailPage() {
   const params = useParams<{ id: string }>();
+  const { openAssistant, openCompare } = useAiAssistant();
   const { openAuth } = useAuthModal();
   const id = Number(params.id);
 
@@ -159,6 +162,35 @@ export default function ListingDetailPage() {
               >
                 Back to listings
               </Link>
+              {detail?.listing?.variant_id ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    openCompare({
+                      variantId: detail.listing.variant_id,
+                      variantLabel: `Listing ${id}`,
+                      marketId: 1,
+                    })
+                  }
+                  className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-white"
+                >
+                  Compare alternatives
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() =>
+                  openAssistant({
+                    prompt: `Help me evaluate listing ${id}, including ownership cost, market outlook, and whether it fits my needs.`,
+                    marketId: 1,
+                    variantId: detail?.listing?.variant_id,
+                    variantLabel: `Listing ${id}`,
+                  })
+                }
+                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-white"
+              >
+                Ask AI advisor
+              </button>
               {!hasToken() ? (
                 <button
                   type="button"
@@ -266,6 +298,16 @@ export default function ListingDetailPage() {
               </div>
             </div>
           </section>
+        ) : null}
+
+        {detail?.listing ? (
+          <PageIntelligencePanel
+            subjectType="listing"
+            subjectId={id}
+            marketId={1}
+            title="AI price, ownership, and buyer-fit preview"
+            className="mb-8"
+          />
         ) : null}
 
         <section className="mb-8 grid gap-6 xl:grid-cols-2">

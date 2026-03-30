@@ -43,8 +43,9 @@ export default function ListingsPage() {
   const [requestMessage, setRequestMessage] = useState("Hi, I'd like to schedule a viewing for this car.");
   const [savedListingIds, setSavedListingIds] = useState<number[]>([]);
   const [filters, setFilters] = useState<ListingFilterState>(initialFilters);
+  const [linkedVariantId, setLinkedVariantId] = useState<number | null>(null);
 
-  async function load() {
+  async function load(activeVariantId?: number | null) {
     setLoading(true);
     setMessage("");
 
@@ -54,12 +55,19 @@ export default function ListingsPage() {
         : Promise.resolve({ items: [] as Array<{ listing_id: number }> });
 
       const [listings, saved] = await Promise.allSettled([
-        listingsApi.list({ status: "active" }),
+        listingsApi.list({
+          status: "active",
+          ...(Number.isFinite(activeVariantId) ? { variantId: Number(activeVariantId) } : {}),
+        }),
         savedPromise,
       ]);
 
       if (listings.status === "fulfilled") {
         setItems(listings.value.items);
+        if (Number.isFinite(activeVariantId)) {
+          setTone("info");
+          setMessage("Showing listings related to the vehicle recommended by CarVista AI.");
+        }
       } else {
         throw listings.reason;
       }
@@ -78,8 +86,23 @@ export default function ListingsPage() {
   }
 
   useEffect(() => {
-    void load();
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const variantId = Number(params.get("variantId"));
+    const normalizedVariantId = Number.isFinite(variantId) ? variantId : null;
+    setLinkedVariantId(normalizedVariantId);
+    void load(normalizedVariantId);
   }, []);
+
+  function clearMarketplaceFilters() {
+    setFilters(initialFilters);
+
+    if (linkedVariantId != null && typeof window !== "undefined") {
+      window.history.replaceState({}, "", "/listings");
+      setLinkedVariantId(null);
+      void load(null);
+    }
+  }
 
   async function sendRequest(listingId: number) {
     if (!hasToken()) {
@@ -150,8 +173,12 @@ export default function ListingsPage() {
           <ListingToolbar
             totalCount={items.length}
             filteredCount={filteredItems.length}
-            activeFilters={activeFilters}
-            onClearFilters={() => setFilters(initialFilters)}
+            activeFilters={
+              linkedVariantId != null
+                ? [...activeFilters, `Recommended vehicle #${linkedVariantId}`]
+                : activeFilters
+            }
+            onClearFilters={clearMarketplaceFilters}
           />
         </div>
 
@@ -181,7 +208,7 @@ export default function ListingsPage() {
             <div className="mt-4">
               <button
                 type="button"
-                onClick={() => setFilters(initialFilters)}
+                onClick={clearMarketplaceFilters}
                 className="rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
               >
                 Reset marketplace filters

@@ -5,8 +5,10 @@ import { chatAdvisor } from "./car_advisor_chat.service.js";
 import { mapAiChatErrorToResponse } from "./error_mapper.service.js";
 import { classifyIntent } from "./intent_classifier.service.js";
 import { classifyConversationRoute } from "./conversation_orchestrator.service.js";
+import { classifyConversationTurn } from "./conversation_state.service.js";
 import { compareVariants } from "./compare_variants.service.js";
-import { fetchOfficialVehicleSignals } from "./source_retrieval.service.js";
+import { fetchOfficialVehicleSignals, loadListingMarketSignals } from "./source_retrieval.service.js";
+import { recommendCars } from "./recommendation.service.js";
 import { calculateTco } from "./tco.service.js";
 
 const menuXml = `<?xml version="1.0" encoding="UTF-8"?><menuItems><menuItem><text>Auto</text><value>42015</value></menuItem></menuItems>`;
@@ -53,6 +55,119 @@ test("intent classifier reuses stored advisor profile budget for recommendation 
   assert.equal(result.intent, "recommend_car");
   assert.equal(result.entities.budget, 900000000);
   assert.equal(result.needs_clarification, false);
+});
+
+test("conversation turn classifier binds pending clarification replies before treating them as new requests", () => {
+  const turn = classifyConversationTurn({
+    message: "BMW X5",
+    pendingFlow: {
+      intent: "compare_car",
+      missing_fields: ["vehicles"],
+    },
+    previewIntent: "unknown",
+    previewEntities: {
+      vehicles: ["BMW X5"],
+      country: null,
+      budget: null,
+      ownership_period_years: null,
+      annual_mileage_km: null,
+    },
+    activeTopic: {
+      intent: "compare_car",
+      focus_variant_id: 7,
+      compare_variant_ids: [7],
+    },
+    conversationState: {
+      active_intent: "compare_car",
+      referenced_vehicle_ids: [7],
+    },
+    hasVehicleMentions: true,
+  });
+
+  assert.equal(turn.turn_type, "clarification_response");
+  assert.equal(turn.bind_pending_flow, true);
+  assert.equal(turn.effective_intent, "compare_car");
+});
+
+test("conversation turn classifier keeps resale follow-ups inside the active comparison topic", () => {
+  const turn = classifyConversationTurn({
+    message: "What about resale value?",
+    previewIntent: "predict_vehicle_value",
+    previewEntities: {
+      vehicles: [],
+      country: null,
+      budget: null,
+      ownership_period_years: null,
+      annual_mileage_km: null,
+    },
+    activeTopic: {
+      intent: "compare_car",
+      focus_variant_id: 7,
+      compare_variant_ids: [7, 9],
+    },
+    conversationState: {
+      active_intent: "compare_car",
+      referenced_vehicle_ids: [7, 9],
+    },
+  });
+
+  assert.equal(turn.turn_type, "follow_up");
+  assert.equal(turn.effective_intent, "compare_car");
+  assert.equal(turn.follow_up_dimension, "resale_value");
+});
+
+test("conversation turn classifier detects skill switches that stay linked to the same vehicle topic", () => {
+  const turn = classifyConversationTurn({
+    message: "Now calculate TCO for the X5 in Vietnam",
+    previewIntent: "calculate_tco",
+    previewEntities: {
+      vehicles: ["BMW X5"],
+      country: "Vietnam",
+      budget: null,
+      ownership_period_years: null,
+      annual_mileage_km: null,
+    },
+    activeTopic: {
+      intent: "recommend_car",
+      focus_variant_id: 2,
+    },
+    conversationState: {
+      active_intent: "recommend_car",
+      referenced_vehicle_ids: [2, 3, 4],
+    },
+    hasVehicleMentions: true,
+  });
+
+  assert.equal(turn.turn_type, "skill_switch_same_topic");
+  assert.equal(turn.effective_intent, "calculate_tco");
+});
+
+test("conversation turn classifier detects task replacement for compare flows", () => {
+  const turn = classifyConversationTurn({
+    message: "Actually compare Civic and Corolla instead",
+    previewIntent: "compare_car",
+    previewEntities: {
+      vehicles: ["Honda Civic", "Toyota Corolla"],
+      country: null,
+      budget: null,
+      ownership_period_years: null,
+      annual_mileage_km: null,
+    },
+    activeTopic: {
+      intent: "compare_car",
+      focus_variant_id: 7,
+      compare_variant_ids: [7, 9],
+    },
+    conversationState: {
+      active_intent: "compare_car",
+      referenced_vehicle_ids: [7, 9],
+    },
+    hasVehicleMentions: true,
+  });
+
+  assert.equal(turn.turn_type, "task_replacement");
+  assert.equal(turn.should_replace_active_task, true);
+  assert.equal(turn.should_clear_stale_result, true);
 });
 
 test("official fallback retrieval parses FuelEconomy.gov and NHTSA payloads", async () => {
@@ -154,7 +269,7 @@ test("compare engine returns source-aware verdict with buyer-profile fit", async
   };
 
   try {
-    const result = await compareVariants(ctx, {
+     const result = await compareVariants(ctx, {
       variant_ids: [1, 2],
       market_id: 1,
       buyer_profile: {
@@ -167,12 +282,14 @@ test("compare engine returns source-aware verdict with buyer-profile fit", async
       },
     });
 
-    assert.equal(result.title, "AI comparison verdict");
-    assert.equal(result.recommended_variant_id, 1);
-    assert.ok(result.confidence.score > 0.5);
-    assert.ok(result.sources.length >= 2);
-    assert.ok(result.items[0].scores.use_case_fit_score >= 0);
-  } finally {
+     assert.equal(result.title, "AI comparison verdict");
+     assert.equal(result.recommended_variant_id, 1);
+     assert.ok(result.confidence.score > 0.5);
+     assert.ok(result.sources.length >= 2);
+     assert.ok(result.items[0].scores.use_case_fit_score >= 0);
+      assert.ok(result.items[0].scores.comfort_score >= 0);
+      assert.ok(result.items[0].scores.resale_score >= 0);
+   } finally {
     global.fetch = originalFetch;
   }
 });
@@ -205,6 +322,160 @@ test("chat orchestrator returns policy envelope for out-of-scope chat", async ()
   assert.equal(result.needs_clarification, false);
   assert.equal(result.meta.route_service, "ConversationPolicyService");
   assert.match(result.final_answer, /cars|vehicle/i);
+});
+
+test("recommendation service returns deep links into vehicle detail and related listings", async () => {
+  const ctx = {
+    sequelize: {
+      async query(sql) {
+        if (sql.includes("FROM car_variants cv")) {
+          return [[
+            {
+              variant_id: 7,
+              model_year: 2024,
+              trim_name: "Hybrid Premium",
+              body_type: "suv",
+              fuel_type: "hybrid",
+              engine: "2.0L",
+              transmission: "AT",
+              drivetrain: "FWD",
+              seats: 5,
+              msrp_base: 980000000,
+              model_name: "Corolla Cross",
+              make_name: "Toyota",
+              latest_price: 955000000,
+            },
+            {
+              variant_id: 9,
+              model_year: 2024,
+              trim_name: "Touring",
+              body_type: "sedan",
+              fuel_type: "gasoline",
+              engine: "1.5T",
+              transmission: "CVT",
+              drivetrain: "FWD",
+              seats: 5,
+              msrp_base: 910000000,
+              model_name: "Civic",
+              make_name: "Honda",
+              latest_price: 905000000,
+            },
+          ]];
+        }
+
+        if (sql.includes("FROM car_reviews")) {
+          return [[
+            { variant_id: 7, avg_rating: 4.6, review_count: 12 },
+            { variant_id: 9, avg_rating: 4.1, review_count: 7 },
+          ]];
+        }
+
+        if (sql.includes("FROM vehicle_market_signals")) {
+          return [[
+            {
+              variant_id: 7,
+              active_listing_count: 4,
+              avg_asking_price: 955000000,
+              price_spread_pct: 0.07,
+              scarcity_score: 0.62,
+              data_confidence: 0.83,
+            },
+            {
+              variant_id: 9,
+              active_listing_count: 2,
+              avg_asking_price: 910000000,
+              price_spread_pct: 0.16,
+              scarcity_score: 0.28,
+              data_confidence: 0.71,
+            },
+          ]];
+        }
+
+        throw new Error(`Unexpected SQL in recommendation link test: ${sql}`);
+      },
+    },
+    models: {
+      Listings: {
+        async findAll() {
+          return [
+            { listing_id: 101, variant_id: 7 },
+            { listing_id: 102, variant_id: 7 },
+            { listing_id: 205, variant_id: 9 },
+          ];
+        },
+      },
+    },
+  };
+
+  const result = await recommendCars(ctx, {
+    profile: {
+      budget_max: 1000000000,
+      preferred_body_type: "suv",
+      preferred_fuel_type: "hybrid",
+      environment: "city",
+    },
+    market_id: 1,
+  });
+
+  assert.equal(result.intent, "recommend_car");
+  assert.ok(result.ranked_vehicles[0].links?.detail_page_url?.includes("/catalog/7"));
+  assert.ok(result.ranked_vehicles[0].links?.related_listings_url?.includes("/listings?variantId=7"));
+  assert.deepEqual(result.ranked_vehicles[0].links?.related_listing_ids, [101, 102]);
+  assert.ok(result.ranked_vehicles[0].reasons.some((reason) => /owner sentiment|market/i.test(reason)));
+  assert.ok(result.ranked_vehicles[0].market_summary?.includes("live-style"));
+});
+
+test("listing signal loader prefers persisted market snapshots before live listing queries", async () => {
+  let liveListingReads = 0;
+  const ctx = {
+    sequelize: {
+      async query(sql) {
+        if (sql.includes("FROM vehicle_market_signals")) {
+          return [[
+            {
+              active_listing_count: 4,
+              avg_asking_price: 955000000,
+              median_asking_price: 948000000,
+              min_asking_price: 925000000,
+              max_asking_price: 989000000,
+              avg_mileage_km: 18200,
+              price_spread_pct: 0.066,
+              data_confidence: 0.81,
+              provider_key: "internal_marketplace",
+              source_type: "internal_marketplace",
+              title: "Persisted marketplace rollup",
+              url: null,
+              trust_level: "high",
+              retrieved_at: new Date().toISOString(),
+              notes: "Generated from listing aggregation",
+            },
+          ]];
+        }
+        return [[]];
+      },
+    },
+    models: {
+      Markets: {
+        async findByPk() {
+          return { market_id: 1, country_code: "VN" };
+        },
+      },
+      Listings: {
+        async findAll() {
+          liveListingReads += 1;
+          return [];
+        },
+      },
+    },
+  };
+
+  const result = await loadListingMarketSignals(ctx, { variant_id: 7, market_id: 1 });
+
+  assert.equal(result.item_count, 4);
+  assert.equal(result.average_asking_price, 955000000);
+  assert.equal(result.data_confidence, 0.81);
+  assert.equal(result.sources.length, 1);
+  assert.equal(liveListingReads, 0);
 });
 
 test("chat advisor preserves frontend contract while using layered orchestration", async () => {
@@ -409,6 +680,271 @@ test("chat advisor binds short clarification replies to the pending compare flow
   } finally {
     global.fetch = originalFetch;
   }
+});
+
+test("chat advisor keeps compare follow-ups inside the same pair and focuses the answer on resale", async () => {
+  const originalFetch = global.fetch;
+  global.fetch = mockFetchFactory();
+  const sessions = [
+    {
+      session_id: 17,
+      user_id: 5,
+      context_json: {
+        market_id: 1,
+        focus_variant_id: 1,
+        focus_variant_label: "2024 Honda Civic RS",
+        compare_variant_ids: [1, 2],
+        active_topic: {
+          intent: "compare_car",
+          focus_variant_id: 1,
+          compare_variant_ids: [1, 2],
+          market_id: 1,
+        },
+        conversation_state: {
+          active_topic: {
+            intent: "compare_car",
+            focus_variant_id: 1,
+            compare_variant_ids: [1, 2],
+            market_id: 1,
+          },
+          active_intent: "compare_car",
+          referenced_vehicle_ids: [1, 2],
+          active_entities: {
+            focus_variant_id: 1,
+            focus_variant_label: "2024 Honda Civic RS",
+            compare_variant_ids: [1, 2],
+            market_id: 1,
+          },
+          active_flow_id: "flow_compare_followup",
+        },
+      },
+      async update(next) {
+        Object.assign(this, next);
+      },
+    },
+  ];
+  const messages = [];
+
+  const ctx = {
+    sequelize: {
+      async query(sql) {
+        if (sql.includes("FROM car_variants cv") && sql.includes("WHERE cv.variant_id IN")) {
+          return [[
+            {
+              variant_id: 1,
+              model_id: 10,
+              model_year: 2024,
+              trim_name: "RS",
+              body_type: "sedan",
+              fuel_type: "gasoline",
+              engine: "1.5T",
+              transmission: "CVT",
+              drivetrain: "FWD",
+              seats: 5,
+              doors: 4,
+              msrp_base: 950000000,
+              model_name: "Civic",
+              make_name: "Honda",
+            },
+            {
+              variant_id: 2,
+              model_id: 11,
+              model_year: 2024,
+              trim_name: "Premium",
+              body_type: "sedan",
+              fuel_type: "gasoline",
+              engine: "2.0L",
+              transmission: "AT",
+              drivetrain: "FWD",
+              seats: 5,
+              doors: 4,
+              msrp_base: 980000000,
+              model_name: "Mazda3",
+              make_name: "Mazda",
+            },
+          ]];
+        }
+
+        if (sql.includes("FROM car_reviews")) {
+          return [[
+            { variant_id: 1, avg_rating: 4.5, review_count: 12 },
+            { variant_id: 2, avg_rating: 4.1, review_count: 7 },
+          ]];
+        }
+
+        if (sql.includes("FROM variant_price_history")) {
+          return [[
+            { variant_id: 1, price: 930000000 },
+            { variant_id: 2, price: 970000000 },
+          ]];
+        }
+
+        throw new Error(`Unexpected SQL in compare follow-up test: ${sql}`);
+      },
+    },
+    models: {
+      AiChatSessions: {
+        async findByPk(id) {
+          return sessions.find((item) => item.session_id === id) ?? null;
+        },
+      },
+      AiChatMessages: {
+        async create(payload) {
+          messages.push(payload);
+          return payload;
+        },
+      },
+      VariantSpecs: {
+        async findAll() {
+          return [
+            { variant_id: 1, toJSON: () => ({ power_hp: 180, safety_rating: 5 }) },
+            { variant_id: 2, toJSON: () => ({ power_hp: 191, safety_rating: 5 }) },
+          ];
+        },
+      },
+      VariantSpecKv: {
+        async findAll() {
+          return [];
+        },
+      },
+    },
+  };
+
+  try {
+    const response = await chatAdvisor(ctx, {
+      session_id: 17,
+      user_id: 5,
+      message: "What about resale value?",
+      context: {},
+    });
+
+    assert.equal(response.intent, "compare_car");
+    assert.equal(response.meta?.turn_type, "follow_up");
+    assert.match(response.answer.toLowerCase(), /resale/);
+    assert.deepEqual(sessions[0].context_json.compare_variant_ids, [1, 2]);
+    assert.equal(sessions[0].context_json.conversation_state.last_user_turn_type, "follow_up");
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("chat advisor treats ambiguous referential replies as clarification instead of leaking stale context", async () => {
+  const sessions = [
+    {
+      session_id: 31,
+      user_id: 11,
+      context_json: {
+        market_id: 1,
+        active_topic: {
+          intent: "recommend_car",
+          market_id: 1,
+        },
+        conversation_state: {
+          active_topic: {
+            intent: "recommend_car",
+            market_id: 1,
+          },
+          active_intent: "recommend_car",
+          referenced_vehicle_ids: [],
+          active_entities: {
+            focus_variant_id: null,
+            focus_variant_label: null,
+            compare_variant_ids: [],
+            market_id: 1,
+          },
+          active_flow_id: "flow_reco_1",
+        },
+      },
+      async update(next) {
+        Object.assign(this, next);
+      },
+    },
+  ];
+  const messages = [];
+
+  const ctx = {
+    sequelize: {},
+    models: {
+      AiChatSessions: {
+        async findByPk(id) {
+          return sessions.find((item) => item.session_id === id) ?? null;
+        },
+      },
+      AiChatMessages: {
+        async create(payload) {
+          messages.push(payload);
+          return payload;
+        },
+      },
+    },
+  };
+
+  const response = await chatAdvisor(ctx, {
+    session_id: 31,
+    user_id: 11,
+    message: "What about this one?",
+    context: {},
+  });
+
+  assert.equal(response.needs_clarification, true);
+  assert.equal(response.meta?.turn_type, "ambiguous");
+  assert.match(response.answer, /which vehicle|tell me the car/i);
+  assert.equal(sessions[0].context_json.conversation_state.pending_clarification.intent, "recommend_car");
+});
+
+test("chat advisor resets stale compare context when the user asks a new general automotive question", async () => {
+  const sessions = [
+    {
+      session_id: 21,
+      user_id: 9,
+      context_json: {
+        market_id: 1,
+        focus_variant_id: 7,
+        focus_variant_label: "2024 Toyota Corolla Cross Hybrid Premium",
+        compare_variant_ids: [7, 9],
+        active_topic: {
+          intent: "compare_car",
+          focus_variant_id: 7,
+          compare_variant_ids: [7, 9],
+          market_id: 1,
+        },
+      },
+      async update(next) {
+        Object.assign(this, next);
+      },
+    },
+  ];
+  const messages = [];
+
+  const ctx = {
+    sequelize: {},
+    models: {
+      AiChatSessions: {
+        async findByPk(id) {
+          return sessions.find((item) => item.session_id === id) ?? null;
+        },
+      },
+      AiChatMessages: {
+        async create(payload) {
+          messages.push(payload);
+          return payload;
+        },
+      },
+    },
+  };
+
+  const response = await chatAdvisor(ctx, {
+    session_id: 21,
+    user_id: 9,
+    message: "Explain the difference between hybrid and plug-in hybrid",
+    context: {},
+  });
+
+  assert.equal(response.intent, "vehicle_general_qa");
+  assert.match(response.answer, /plug-?in hybrid|phev/i);
+  assert.equal(sessions[0].context_json.active_topic.intent, "vehicle_general_qa");
+  assert.deepEqual(sessions[0].context_json.compare_variant_ids, []);
+  assert.equal(sessions[0].context_json.focus_variant_id, null);
 });
 
 test("tco service returns a partial safe result when market tax config is missing", async () => {
