@@ -1,6 +1,11 @@
 import dotenv from "dotenv";
 
-dotenv.config();
+const runtimeNodeEnv = process.env.NODE_ENV || "development";
+const shouldLoadDotenv = runtimeNodeEnv !== "production" || process.env.LOAD_DOTENV_IN_PRODUCTION === "true";
+
+if (shouldLoadDotenv) {
+  dotenv.config();
+}
 
 function toInt(value, fallback) {
   const parsed = Number.parseInt(String(value ?? ""), 10);
