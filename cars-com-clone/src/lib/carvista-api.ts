@@ -16,8 +16,6 @@ import type {
   Make,
   Model,
   NotificationItem,
-  OtpRequestResponse,
-  OtpVerifyResponse,
   SellerReview,
   User,
   VariantDetail,
@@ -64,30 +62,6 @@ export const authApi = {
 
   login(payload: { email: string; password: string }) {
     return apiFetch<AuthResponse>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-  },
-
-  requestOtp(payload: {
-    destination_type: "email" | "phone";
-    destination_value: string;
-    purpose?: "login" | "register" | "verify_contact" | "passwordless_signin";
-  }) {
-    return apiFetch<OtpRequestResponse>("/auth/otp/request", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-  },
-
-  verifyOtp(payload: {
-    challenge_id: number;
-    destination_type: "email" | "phone";
-    destination_value: string;
-    code: string;
-    profile_name?: string;
-  }) {
-    return apiFetch<OtpVerifyResponse>("/auth/otp/verify", {
       method: "POST",
       body: JSON.stringify(payload),
     });

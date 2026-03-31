@@ -17,25 +17,7 @@ export type AuthResponse = {
   user?: User | null;
 };
 
-export type OtpRequestResponse = {
-  challenge_id: number;
-  destination_type: "email" | "phone";
-  destination_value: string;
-  expires_at: string;
-  resend_available_at: string;
-};
-
-export type OtpVerifyResponse = AuthResponse & {
-  user_created?: boolean;
-};
-
 export type AuthProvidersResponse = {
-  otp: {
-    email: boolean;
-    phone: boolean;
-    expires_in_minutes: number;
-    resend_cooldown_seconds: number;
-  };
   social: {
     google: boolean;
     facebook: boolean;
