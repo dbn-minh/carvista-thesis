@@ -150,5 +150,20 @@ export const env = {
       twilioFromNumber: process.env.TWILIO_FROM_NUMBER || "",
     },
   },
+  media: {
+    provider:
+      process.env.IMAGE_PROVIDER ||
+      (process.env.CLOUDINARY_CLOUD_NAME &&
+      process.env.CLOUDINARY_API_KEY &&
+      process.env.CLOUDINARY_API_SECRET
+        ? "cloudinary"
+        : "db_legacy"),
+    cloudinary: {
+      cloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
+      apiKey: process.env.CLOUDINARY_API_KEY || "",
+      apiSecret: process.env.CLOUDINARY_API_SECRET || "",
+      folder: process.env.CLOUDINARY_FOLDER || "carvista",
+    },
+  },
   priceDropThreshold: toFloat(process.env.PRICE_DROP_THRESHOLD, 0.03),
 };

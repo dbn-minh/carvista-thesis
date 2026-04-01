@@ -225,6 +225,8 @@ export const listingsApi = {
       variant_id: number;
       custom_vehicle_created: boolean;
       image_count: number;
+      detail_path?: string;
+      detail_url?: string;
     }>("/listings", {
       method: "POST",
       body: payload instanceof FormData ? payload : JSON.stringify(payload),

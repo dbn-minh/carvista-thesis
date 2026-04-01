@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { Op } from "sequelize";
 import { z } from "zod";
+import { env } from "../config/env.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { listingImageUpload } from "../middlewares/listing-image-upload.js";
 import { validate } from "../middlewares/validate.js";
@@ -136,6 +137,35 @@ const CreateListingBodySchema = z
     }
   });
 
+const ListingIdParamsSchema = z.object({
+  body: z.any(),
+  query: z.any(),
+  params: z.object({
+    id: z.preprocess((value) => Number(value), z.number().int().positive()),
+  }),
+});
+
+const ListingImageParamsSchema = z.object({
+  body: z.any(),
+  query: z.any(),
+  params: z.object({
+    id: z.preprocess((value) => Number(value), z.number().int().positive()),
+    imageId: z.preprocess((value) => Number(value), z.number().int().positive()),
+  }),
+});
+
+const ReorderListingImagesSchema = z.object({
+  body: z.object({
+    image_ids: z
+      .array(z.preprocess((value) => Number(value), z.number().int().positive()))
+      .min(1),
+  }),
+  query: z.any(),
+  params: z.object({
+    id: z.preprocess((value) => Number(value), z.number().int().positive()),
+  }),
+});
+
 function normalizeCreateListingPayload(body) {
   return {
     ...body,
@@ -152,6 +182,23 @@ function buildListingTitle(variant) {
   const trim = variant.trim_name;
 
   return [make, model, trim].filter(Boolean).join(" ").trim() || null;
+}
+
+async function loadOwnedListing(ctx, listingId, userId) {
+  const listing = await ctx.models.Listings.findByPk(listingId);
+  if (!listing) {
+    throw { status: 404, safe: true, message: "Listing not found." };
+  }
+
+  if (listing.owner_id !== userId) {
+    throw {
+      status: 403,
+      safe: true,
+      message: "You can only manage images for your own listings.",
+    };
+  }
+
+  return listing;
 }
 
 async function resolveVariantForListing(models, payload) {
@@ -375,19 +422,23 @@ listingsRoutes.get("/listings", async (req, res, next) => {
 
 listingsRoutes.get("/listings/:id", async (req, res, next) => {
   try {
-    const { Listings, ListingImages } = req.ctx.models;
+    const { Listings } = req.ctx.models;
     const listingImageService = createListingImageService(req.ctx);
     const id = Number(req.params.id);
 
     const listing = await Listings.findByPk(id);
     if (!listing) return next({ status: 404, message: "Listing not found" });
 
-    const imageRows = await ListingImages.findAll({
-      where: { listing_id: id },
-      order: [["sort_order", "ASC"]],
-    });
-    const images = listingImageService.normalizeRecords(imageRows);
+    const images = await listingImageService.listImages(id);
     res.json({ listing, images });
+  } catch (e) { next(e); }
+});
+
+listingsRoutes.get("/listings/:id/images", validate(ListingIdParamsSchema), async (req, res, next) => {
+  try {
+    const listingImageService = createListingImageService(req.ctx);
+    const items = await listingImageService.listImages(req.validated.params.id);
+    res.json({ items });
   } catch (e) { next(e); }
 });
 
@@ -417,6 +468,78 @@ listingsRoutes.get("/listings/:id/images/:imageId", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+listingsRoutes.post(
+  "/listings/:id/images",
+  requireAuth,
+  listingImageUpload,
+  validate(ListingIdParamsSchema),
+  async (req, res, next) => {
+    try {
+      const listingId = req.validated.params.id;
+      await loadOwnedListing(req.ctx, listingId, req.user.userId);
+
+      const uploadedFiles = Array.isArray(req.files) ? req.files : [];
+      if (uploadedFiles.length === 0) {
+        return next({
+          status: 400,
+          safe: true,
+          message: "Select at least one image to upload for this listing.",
+        });
+      }
+
+      const listingImageService = createListingImageService(req.ctx);
+      const items = await listingImageService.persistUploadedImages(listingId, uploadedFiles);
+
+      res.status(201).json({
+        listing_id: listingId,
+        image_count: items.length,
+        items,
+      });
+    } catch (e) { next(e); }
+  }
+);
+
+listingsRoutes.delete(
+  "/listings/:id/images/:imageId",
+  requireAuth,
+  validate(ListingImageParamsSchema),
+  async (req, res, next) => {
+    try {
+      const { id, imageId } = req.validated.params;
+      await loadOwnedListing(req.ctx, id, req.user.userId);
+
+      const listingImageService = createListingImageService(req.ctx);
+      const removed = await listingImageService.deleteImage(id, imageId);
+
+      if (!removed) {
+        return next({ status: 404, safe: true, message: "Listing image not found." });
+      }
+
+      res.json({ ok: true, removed });
+    } catch (e) { next(e); }
+  }
+);
+
+listingsRoutes.patch(
+  "/listings/:id/images/reorder",
+  requireAuth,
+  validate(ReorderListingImagesSchema),
+  async (req, res, next) => {
+    try {
+      const listingId = req.validated.params.id;
+      await loadOwnedListing(req.ctx, listingId, req.user.userId);
+
+      const listingImageService = createListingImageService(req.ctx);
+      const items = await listingImageService.reorderImages(
+        listingId,
+        req.validated.body.image_ids
+      );
+
+      res.json({ listing_id: listingId, items });
+    } catch (e) { next(e); }
+  }
+);
+
 listingsRoutes.get("/listings/:id/ai-insights", async (req, res, next) => {
   try {
     const listingId = Number(req.params.id);
@@ -442,6 +565,8 @@ listingsRoutes.get("/listings/:id/ai-insights", async (req, res, next) => {
 });
 
 listingsRoutes.post("/listings", requireAuth, listingImageUpload, async (req, res, next) => {
+  let created = null;
+
   try {
     const { Listings } = req.ctx.models;
     const listingImageService = createListingImageService(req.ctx);
@@ -453,7 +578,7 @@ listingsRoutes.post("/listings", requireAuth, listingImageUpload, async (req, re
       return next({ status: 400, message: "A valid vehicle selection is required." });
     }
 
-    const created = await Listings.create({
+    created = await Listings.create({
       owner_id: req.user.userId,
       variant_id: variantId,
       asking_price: b.asking_price,
@@ -465,19 +590,35 @@ listingsRoutes.post("/listings", requireAuth, listingImageUpload, async (req, re
     });
 
     const uploadedFiles = Array.isArray(req.files) ? req.files : [];
+    let storedImages = [];
     if (uploadedFiles.length > 0) {
-      await listingImageService.persistUploadedImages(created.listing_id, uploadedFiles);
+      storedImages = await listingImageService.persistUploadedImages(created.listing_id, uploadedFiles);
     } else if (Array.isArray(b.image_urls) && b.image_urls.length > 0) {
-      await listingImageService.persistImageReferences(created.listing_id, b.image_urls);
+      storedImages = await listingImageService.persistImageReferences(created.listing_id, b.image_urls);
     }
+
+    const detailPath = `/listings/${created.listing_id}`;
 
     res.status(201).json({
       listing_id: created.listing_id,
       variant_id: variantId,
       custom_vehicle_created: customVehicleCreated,
-      image_count: uploadedFiles.length || b.image_urls?.length || 0,
+      image_count: storedImages.length,
+      detail_path: detailPath,
+      detail_url: `${env.frontendUrl}${detailPath}`,
     });
   } catch (e) {
+    if (created?.listing_id) {
+      try {
+        await created.destroy();
+      } catch (cleanupError) {
+        console.warn("[listings:create] Failed to roll back listing after image upload error", {
+          listingId: created.listing_id,
+          message: cleanupError?.message,
+        });
+      }
+    }
+
     if (e instanceof z.ZodError) {
       return next({
         status: 400,

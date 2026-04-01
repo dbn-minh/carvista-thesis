@@ -1,7 +1,7 @@
 export const LISTING_IMAGE_LIMITS = {
   maxCount: 10,
-  maxFileSizeBytes: 5 * 1024 * 1024,
-  maxTotalSizeBytes: 24 * 1024 * 1024,
+  maxFileSizeBytes: 8 * 1024 * 1024,
+  maxTotalSizeBytes: 60 * 1024 * 1024,
   allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
 };
 
@@ -24,7 +24,9 @@ export function validateListingImageFiles(files = []) {
     }
 
     if (Number(file?.size || 0) > LISTING_IMAGE_LIMITS.maxFileSizeBytes) {
-      throw createImageValidationError("This image is too large. Please upload a smaller file.");
+      throw createImageValidationError(
+        "One of your processed photos is still too large. Please upload a slightly smaller image."
+      );
     }
 
     totalSize += Number(file?.size || 0);
@@ -54,10 +56,10 @@ export function validateListingImageReferences(imageUrls = []) {
     if (
       typeof imageUrl !== "string" ||
       !imageUrl.trim() ||
-      (!imageUrl.startsWith("data:image/") && !/^https?:\/\//.test(imageUrl))
+      !/^https?:\/\//.test(imageUrl)
     ) {
       throw createImageValidationError(
-        "Images must be valid image URLs or supported inline image payloads."
+        "Images must be valid remote image URLs."
       );
     }
   }

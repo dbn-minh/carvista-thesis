@@ -283,6 +283,13 @@ export type ListingImage = {
   listing_id?: number | null;
   listing_image_id?: number | null;
   url?: string | null;
+  provider?: string | null;
+  publicId?: string | null;
+  assetId?: string | null;
+  width?: number | null;
+  height?: number | null;
+  format?: string | null;
+  bytes?: number | null;
   mimeType?: string | null;
   size?: number | null;
   fileName?: string | null;

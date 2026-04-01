@@ -1,14 +1,16 @@
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_FILE_COUNT = 10;
-const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
-const MAX_TOTAL_UPLOAD_BYTES = 24 * 1024 * 1024;
-const MAX_DIMENSION = 1600;
+const MAX_ORIGINAL_FILE_SIZE_BYTES = 20 * 1024 * 1024;
+const MAX_UPLOADED_FILE_SIZE_BYTES = 8 * 1024 * 1024;
+const MAX_TOTAL_UPLOAD_BYTES = 60 * 1024 * 1024;
+const MAX_DIMENSION = 1920;
 const TARGET_TYPE = "image/webp";
 const TARGET_QUALITY = 0.82;
 
 export const LISTING_IMAGE_CLIENT_LIMITS = {
   maxCount: MAX_FILE_COUNT,
-  maxFileSizeBytes: MAX_FILE_SIZE_BYTES,
+  maxOriginalFileSizeBytes: MAX_ORIGINAL_FILE_SIZE_BYTES,
+  maxUploadedFileSizeBytes: MAX_UPLOADED_FILE_SIZE_BYTES,
   maxTotalUploadBytes: MAX_TOTAL_UPLOAD_BYTES,
 };
 
@@ -44,10 +46,10 @@ export function validateSelectedImageFiles(
       break;
     }
 
-    if (file.size > MAX_FILE_SIZE_BYTES) {
+    if (file.size > MAX_ORIGINAL_FILE_SIZE_BYTES) {
       errors.push({
         code: "file_too_large",
-        message: "This image is too large. Please upload a smaller file.",
+        message: "This image is too large. Please choose one under 20 MB.",
       });
       break;
     }
@@ -67,6 +69,17 @@ export function validatePreparedListingImages(
       code: "too_many_files",
       message: `You can upload up to ${MAX_FILE_COUNT} images per listing.`,
     });
+  }
+
+  for (const file of files) {
+    if (file.size > MAX_UPLOADED_FILE_SIZE_BYTES) {
+      errors.push({
+        code: "file_too_large",
+        message:
+          "One optimized photo is still too large to upload. Please choose a slightly smaller image.",
+      });
+      break;
+    }
   }
 
   if (totalSize > MAX_TOTAL_UPLOAD_BYTES) {

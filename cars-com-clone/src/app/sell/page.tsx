@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/components/layout/Header";
 import StatusBanner from "@/components/common/StatusBanner";
@@ -39,6 +40,7 @@ function buildId(prefix: string) {
 }
 
 export default function SellPage() {
+  const router = useRouter();
   const ready = useRequireLogin("/sell");
   const [form, setForm] = useState(initialSellForm);
   const [currentStep, setCurrentStep] = useState<SellStepId>("vehicle");
@@ -295,6 +297,14 @@ export default function SellPage() {
         }));
 
         const optimizedFile = await optimizeListingImageFile(originalFile);
+        const optimizedFileErrors = validatePreparedListingImages([optimizedFile]).filter(
+          (issue) => issue.code === "file_too_large"
+        );
+
+        if (optimizedFileErrors.length > 0) {
+          throw new Error(optimizedFileErrors[0].message);
+        }
+
         const previewUrl = createObjectPreviewUrl(optimizedFile);
 
         setForm((current) => ({
@@ -542,13 +552,10 @@ export default function SellPage() {
       });
 
       const response = await listingsApi.create(formData);
+      const detailPath = response.detail_path || `/listings/${response.listing_id}`;
       setTone("success");
-      setMessage(
-        response.custom_vehicle_created
-          ? `Listing ${response.listing_id} published. A placeholder catalog vehicle was created behind the scenes for your custom car.`
-          : `Listing ${response.listing_id} published successfully with ${response.image_count} photo(s).`
-      );
-      setCurrentStep("review");
+      setMessage("Listing published successfully. Redirecting to your listing...");
+      router.replace(detailPath);
     } catch (error) {
       setTone("error");
       setMessage(error instanceof Error ? error.message : "Create listing failed");

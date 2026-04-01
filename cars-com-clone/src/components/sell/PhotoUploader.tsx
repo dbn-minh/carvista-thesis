@@ -1,5 +1,8 @@
 import { Camera, MoveLeft, MoveRight, Star, Trash2, UploadCloud } from "lucide-react";
-import { getSafeImageSrc } from "./listing-image-upload-client";
+import {
+  getSafeImageSrc,
+  LISTING_IMAGE_CLIENT_LIMITS,
+} from "./listing-image-upload-client";
 import type { PhotoDraft, SellFieldErrors } from "./sell-utils";
 import { photoTips } from "./sell-utils";
 
@@ -24,6 +27,13 @@ export default function PhotoUploader({
   onMove,
   errors,
 }: Props) {
+  const originalLimitMb = Math.round(
+    LISTING_IMAGE_CLIENT_LIMITS.maxOriginalFileSizeBytes / (1024 * 1024)
+  );
+  const uploadedLimitMb = Math.round(
+    LISTING_IMAGE_CLIENT_LIMITS.maxUploadedFileSizeBytes / (1024 * 1024)
+  );
+
   return (
     <section className="section-shell p-6">
       <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">Step 2</p>
@@ -61,7 +71,9 @@ export default function PhotoUploader({
         </div>
         <h3 className="mt-4 text-xl font-apercu-bold text-cars-primary">Drag and drop photos here</h3>
         <p className="mt-2 text-sm leading-6 text-cars-gray">
-          JPG, PNG, or WEBP. Up to 10 photos, max 5 MB each after optimization. We will use the first photo as cover by default.
+          JPG, PNG, or WEBP. Up to {LISTING_IMAGE_CLIENT_LIMITS.maxCount} photos. Originals can
+          be up to {originalLimitMb} MB each, then we optimize them before secure cloud upload.
+          Published uploads stay within {uploadedLimitMb} MB per photo.
         </p>
         <label className="mt-5 inline-flex cursor-pointer rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white">
           <input
@@ -180,7 +192,8 @@ export default function PhotoUploader({
             ))}
           </ul>
           <div className="mt-5 rounded-[20px] bg-[linear-gradient(135deg,rgba(233,241,255,0.8),rgba(255,255,255,1))] p-4 text-sm leading-6 text-cars-gray">
-            The staged upload uses local file conversion right now so you can preview and publish photos immediately. Later, this can be swapped to cloud storage without changing the seller UX.
+            Photos are optimized locally so previews stay fast, then uploaded to secure cloud
+            storage when you publish the listing.
           </div>
         </div>
       </div>

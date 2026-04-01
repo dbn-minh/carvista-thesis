@@ -165,7 +165,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [variant_id, asking_price]
+              required: [asking_price]
               properties:
                 variant_id: { type: integer }
                 asking_price: { type: number }
@@ -173,8 +173,43 @@ paths:
                 location_city: { type: string }
                 location_country_code: { type: string }
                 description: { type: string }
+                image_urls:
+                  type: array
+                  items: { type: string }
+          multipart/form-data:
+            schema:
+              type: object
+              required: [asking_price, location_city, location_country_code]
+              properties:
+                variant_id: { type: integer }
+                asking_price: { type: number }
+                mileage_km: { type: integer }
+                location_city: { type: string }
+                location_country_code: { type: string }
+                description: { type: string }
+                status: { type: string }
+                custom_vehicle:
+                  type: string
+                  description: JSON string containing custom vehicle fields
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
       responses:
-        "201": { description: Created }
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  listing_id: { type: integer }
+                  variant_id: { type: integer }
+                  custom_vehicle_created: { type: boolean }
+                  image_count: { type: integer }
+                  detail_path: { type: string, example: /listings/123 }
+                  detail_url: { type: string }
         "401": { description: Unauthorized }
 
   /listings/{id}:
@@ -198,6 +233,104 @@ paths:
           schema: { type: integer }
       responses:
         "200": { description: OK }
+
+  /listings/{id}/images:
+    get:
+      summary: List normalized listing images
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+        "404": { description: Not found }
+    post:
+      summary: Upload listing images to Cloudinary
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [images]
+              properties:
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        "201": { description: Created }
+        "400": { description: Invalid payload }
+        "401": { description: Unauthorized }
+        "403": { description: Forbidden }
+
+  /listings/{id}/images/reorder:
+    patch:
+      summary: Reorder listing images
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [image_ids]
+              properties:
+                image_ids:
+                  type: array
+                  items: { type: integer }
+      responses:
+        "200": { description: OK }
+        "400": { description: Invalid payload }
+        "401": { description: Unauthorized }
+        "403": { description: Forbidden }
+
+  /listings/{id}/images/{imageId}:
+    get:
+      summary: Resolve or redirect a listing image
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: path
+          name: imageId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+        "302": { description: Redirect }
+        "404": { description: Not found }
+    delete:
+      summary: Delete a listing image
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: path
+          name: imageId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200": { description: OK }
+        "401": { description: Unauthorized }
+        "403": { description: Forbidden }
+        "404": { description: Not found }
 
   /listings/{id}/requests:
     post:

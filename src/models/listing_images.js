@@ -22,6 +22,34 @@ export default class ListingImages extends Model {
       type: DataTypes.TEXT('long'),
       allowNull: false
     },
+    provider: {
+      type: DataTypes.STRING(32),
+      allowNull: true
+    },
+    public_id: {
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
+    asset_id: {
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
+    width: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    height: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    format: {
+      type: DataTypes.STRING(32),
+      allowNull: true
+    },
+    bytes: {
+      type: DataTypes.BIGINT,
+      allowNull: true
+    },
     sort_order: {
       type: DataTypes.INTEGER,
       allowNull: false,

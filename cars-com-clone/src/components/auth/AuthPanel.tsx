@@ -33,6 +33,7 @@ export default function AuthPanel({ mode, next, onModeChange, onSuccess }: Props
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [providerInfo, setProviderInfo] = useState<AuthProvidersResponse>(DEFAULT_PROVIDERS);
+  const [providerStatus, setProviderStatus] = useState<"loading" | "ready" | "error">("loading");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState<"success" | "error" | "info">("info");
@@ -45,11 +46,12 @@ export default function AuthPanel({ mode, next, onModeChange, onSuccess }: Props
       .then((result) => {
         if (mounted) {
           setProviderInfo(result);
+          setProviderStatus("ready");
         }
       })
       .catch(() => {
         if (mounted) {
-          setProviderInfo(DEFAULT_PROVIDERS);
+          setProviderStatus("error");
         }
       });
 
@@ -88,6 +90,10 @@ export default function AuthPanel({ mode, next, onModeChange, onSuccess }: Props
   const socialLabel = mode === "login" ? "Or continue with" : "Or create your account with";
   const socialHelp =
     "Use a trusted account and we will connect it safely to your CarVista profile.";
+  const canUseGoogle = providerStatus !== "ready" || providerInfo.social.google;
+  const canUseFacebook = providerStatus !== "ready" || providerInfo.social.facebook;
+  const noSocialProvidersAvailable =
+    providerStatus === "ready" && !providerInfo.social.google && !providerInfo.social.facebook;
 
   async function finishAuth() {
     if (onSuccess) {
@@ -283,7 +289,7 @@ export default function AuthPanel({ mode, next, onModeChange, onSuccess }: Props
           <div className="grid gap-3 sm:grid-cols-2">
             <Button
               className="h-11 rounded-full"
-              disabled={!providerInfo.social.google}
+              disabled={!canUseGoogle}
               onClick={() => handleSocialLogin("google")}
               type="button"
               variant="outline"
@@ -292,7 +298,7 @@ export default function AuthPanel({ mode, next, onModeChange, onSuccess }: Props
             </Button>
             <Button
               className="h-11 rounded-full"
-              disabled={!providerInfo.social.facebook}
+              disabled={!canUseFacebook}
               onClick={() => handleSocialLogin("facebook")}
               type="button"
               variant="outline"
@@ -301,7 +307,13 @@ export default function AuthPanel({ mode, next, onModeChange, onSuccess }: Props
               <span className="font-semibold">Facebook</span>
             </Button>
           </div>
-          {!providerInfo.social.google && !providerInfo.social.facebook ? (
+          {providerStatus === "error" ? (
+            <p className="text-xs text-slate-500">
+              We could not confirm provider availability just now, but you can still try a social
+              sign-in.
+            </p>
+          ) : null}
+          {noSocialProvidersAvailable ? (
             <p className="text-xs text-slate-500">
               Social login buttons will appear here once the provider keys are configured.
             </p>
