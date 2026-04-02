@@ -10,13 +10,14 @@ type Props = {
 
 export default function VariantCard({ item, saved = false, onToggleSave }: Props) {
   const title = `${item.make_name} ${item.model_name} ${item.trim_name || ""}`.trim();
+  const eyebrow = item.body_type || item.fuel_type ? "Catalog model" : `${item.model_year}`;
 
   return (
     <article className="section-shell flex h-full flex-col p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
-            Variant #{item.variant_id}
+            {eyebrow}
           </p>
           <h2 className="mt-3 text-2xl font-apercu-bold text-cars-primary">{title}</h2>
         </div>
@@ -47,9 +48,9 @@ export default function VariantCard({ item, saved = false, onToggleSave }: Props
         </div>
         <div className="rounded-[20px] border border-cars-gray-light/70 px-4 py-3">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
-            Research path
+            Next step
           </p>
-          <p className="mt-2 text-sm text-cars-gray">Open details, track it, and use AI next.</p>
+          <p className="mt-2 text-sm text-cars-gray">Open the details page, then compare or save it.</p>
         </div>
       </div>
 

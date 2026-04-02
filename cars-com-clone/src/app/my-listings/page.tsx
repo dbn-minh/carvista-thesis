@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Header from "@/components/layout/Header";
 import StatusBanner from "@/components/common/StatusBanner";
 import EmptyState from "@/components/common/EmptyState";
+import { buildListingEyebrow, buildListingTitle, formatLocation } from "@/components/listings/listing-utils";
 import { authApi, listingsApi } from "@/lib/carvista-api";
 import { toCurrency } from "@/lib/api-client";
 import { useRequireLogin } from "@/lib/auth-guard";
@@ -71,7 +72,7 @@ export default function MyListingsPage() {
         status: status as "active" | "reserved" | "sold" | "hidden",
       });
       setTone("success");
-      setMessage(`Listing ${editingId} updated.`);
+      setMessage("Listing updated.");
       setEditingId(null);
       await load();
     } catch (error) {
@@ -102,7 +103,7 @@ export default function MyListingsPage() {
                 Account owner
               </p>
               <p className="mt-2 text-2xl font-apercu-bold">{user?.name || "Loading..."}</p>
-              <p className="mt-1 text-sm text-white/80">User ID: {user?.user_id || "-"}</p>
+              <p className="mt-1 text-sm text-white/80">{user?.email || "Fetching account"}</p>
             </div>
           </div>
         </section>
@@ -113,7 +114,7 @@ export default function MyListingsPage() {
 
         <div className="mt-6 flex items-center justify-between gap-4">
           <p className="text-sm text-cars-gray">
-            {loading ? "Loading your listings..." : `${items.length} listing(s) owned by your account`}
+            {loading ? "Loading your listings..." : `${items.length} listing${items.length === 1 ? "" : "s"} in your seller account`}
           </p>
           <Link
             href="/sell"
@@ -138,11 +139,14 @@ export default function MyListingsPage() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
-                    Listing #{item.listing_id}
+                    {buildListingEyebrow(item)}
                   </p>
                   <p className="mt-3 text-2xl font-apercu-bold text-cars-primary">
                     {toCurrency(item.asking_price)}
                   </p>
+                  <h2 className="mt-3 text-xl font-apercu-bold text-cars-primary">
+                    {buildListingTitle(item)}
+                  </h2>
                 </div>
                 <span className="rounded-full bg-cars-off-white px-3 py-1 font-semibold capitalize text-cars-primary">
                   {item.status}
@@ -154,7 +158,7 @@ export default function MyListingsPage() {
                   Mileage: {item.mileage_km ?? "-"}
                 </p>
                 <p className="rounded-[20px] bg-cars-off-white px-4 py-3">
-                  Location: {item.location_city || "-"} / {item.location_country_code || "-"}
+                  Location: {formatLocation(item.location_city, item.location_country_code)}
                 </p>
               </div>
 
@@ -174,7 +178,7 @@ export default function MyListingsPage() {
 
         {editingId ? (
           <section className="section-shell mt-8 p-6">
-            <h2 className="text-2xl font-apercu-bold text-cars-primary">Edit listing #{editingId}</h2>
+            <h2 className="text-2xl font-apercu-bold text-cars-primary">Edit listing</h2>
             <form onSubmit={saveEdit} className="mt-5 grid gap-4 md:grid-cols-2">
               <input
                 className="h-11 rounded-full border border-cars-gray-light px-4 text-sm"

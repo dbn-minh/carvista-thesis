@@ -2,186 +2,104 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
-import { useAuthModal } from "@/components/auth/AuthModalProvider";
-import { hasToken } from "@/lib/api-client";
+import { editorialArticles } from "@/lib/editorial-content";
 
-const workflows = [
-  {
-    id: 1,
-    title: "Catalog research",
-    description: "Browse real makes, models, trims, specs, and pricing history from the CarVista catalog.",
-    image: "https://ext.same-assets.com/569242764/2708255373.webp",
-    link: "/catalog",
-    featured: true,
-    requiresAuth: false,
-  },
-  {
-    id: 2,
-    title: "Marketplace listings",
-    description: "Explore active listings, save the ones you like, and send viewing requests after login.",
-    image: "https://ext.same-assets.com/569242764/3296848294.webp",
-    link: "/listings",
-    featured: false,
-    requiresAuth: false,
-  },
-  {
-    id: 3,
-    title: "Garage and notifications",
-    description: "Track your watchlist, requests, and ownership activity from a single dashboard.",
-    image: "https://ext.same-assets.com/569242764/1361286067.webp",
-    link: "/garage",
-    featured: false,
-    requiresAuth: true,
-  },
-  {
-    id: 4,
-    title: "AI-assisted decision support",
-    description: "Compare cars, predict price, calculate TCO, and ask the advisor before you buy.",
-    image: "https://ext.same-assets.com/569242764/1269782033.webp",
-    link: "/ai",
-    featured: false,
-    requiresAuth: true,
-  },
-];
-
-const quickLinks = [
-  { label: "Open the catalog and search by make or model", href: "/catalog", requiresAuth: false },
-  { label: "Browse active listings from sellers", href: "/listings", requiresAuth: false },
-  { label: "Create or manage your own listings", href: "/my-listings", requiresAuth: true },
-  { label: "Launch AI compare, TCO, and chat tools", href: "/ai", requiresAuth: true },
-];
+const homeArticles = editorialArticles.slice(0, 5);
 
 export default function NewsSection() {
-  const router = useRouter();
-  const { openAssistant } = useAiAssistant();
-  const { openAuth } = useAuthModal();
-
-  function handleProtectedRoute(href: string) {
-    if (href === "/ai") {
-      openAssistant();
-      return;
-    }
-    if (!hasToken()) {
-      openAuth({ mode: "login", next: href });
-      return;
-    }
-    router.push(href);
-  }
+  const [featuredArticle, ...secondaryArticles] = homeArticles;
 
   return (
     <section className="py-10">
       <div className="container-cars">
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="section-shell p-6 md:p-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
-              Platform flows
-            </p>
-            <h2 className="mt-2 text-3xl font-apercu-bold text-cars-primary">
-              The Home screen now leads into real product journeys
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
-              Instead of linking to outside content, this section now explains and opens the
-              workflows already supported inside CarVista.
-            </p>
-
-            <div className="mt-8 grid gap-5 md:grid-cols-2">
-              {workflows.map((item) =>
-                item.requiresAuth ? (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => handleProtectedRoute(item.link)}
-                    className="group overflow-hidden rounded-[28px] border border-cars-gray-light/80 bg-white text-left transition-all hover:-translate-y-1 hover:border-cars-accent/25 hover:shadow-[0_16px_38px_rgba(15,45,98,0.12)]"
-                  >
-                    <div className="relative h-48 w-full">
-                      <Image src={item.image} alt={item.title} fill className="object-cover" />
-                    </div>
-                    <div className="p-5">
-                      <h3 className="text-xl font-apercu-bold text-cars-primary">{item.title}</h3>
-                      <p className="mt-3 text-sm leading-6 text-cars-gray">{item.description}</p>
-                      <span className="mt-5 inline-flex text-sm font-semibold text-cars-primary transition-colors group-hover:text-cars-accent">
-                        Open this workflow
-                      </span>
-                    </div>
-                  </button>
-                ) : (
-                  <Link
-                    key={item.id}
-                    href={item.link}
-                    className="group overflow-hidden rounded-[28px] border border-cars-gray-light/80 bg-white transition-all hover:-translate-y-1 hover:border-cars-accent/25 hover:shadow-[0_16px_38px_rgba(15,45,98,0.12)]"
-                  >
-                    <div className="relative h-48 w-full">
-                      <Image src={item.image} alt={item.title} fill className="object-cover" />
-                      {item.featured ? (
-                        <div className="absolute left-4 top-4 rounded-full bg-cars-primary px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white">
-                          Core flow
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="p-5">
-                      <h3 className="text-xl font-apercu-bold text-cars-primary">{item.title}</h3>
-                      <p className="mt-3 text-sm leading-6 text-cars-gray">{item.description}</p>
-                      <span className="mt-5 inline-flex text-sm font-semibold text-cars-primary transition-colors group-hover:text-cars-accent">
-                        Open this workflow
-                      </span>
-                    </div>
-                  </Link>
-                )
-              )}
+        <div className="section-shell p-6 md:p-8">
+          <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
+                News &amp; Tips
+              </p>
+              <h2 className="mt-2 text-3xl font-apercu-bold text-cars-primary">
+                Fresh advice for smarter car shopping
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
+                Practical buying guides, ownership tips, and side-by-side advice you can use before making a move.
+              </p>
             </div>
+
+            <Link
+              href="/tips"
+              className="inline-flex rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+            >
+              View all articles
+            </Link>
           </div>
 
-          <div className="section-shell p-6 md:p-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
-              Quick launch
-            </p>
-            <h3 className="mt-2 text-2xl font-apercu-bold text-cars-primary">
-              Everything from Home should be one click away
-            </h3>
-            <div className="mt-6 space-y-3">
-              {quickLinks.map((item, index) =>
-                item.requiresAuth ? (
-                  <button
-                    key={item.href}
-                    type="button"
-                    onClick={() => handleProtectedRoute(item.href)}
-                    className="flex w-full items-start gap-4 rounded-[24px] bg-cars-off-white px-4 py-4 text-left transition-colors hover:bg-[#e9f1ff]"
-                  >
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-apercu-bold text-cars-primary shadow-sm">
-                      {index + 1}
-                    </span>
-                    <span className="pt-1 text-sm font-medium leading-6 text-cars-primary">
-                      {item.label}
-                    </span>
-                  </button>
-                ) : (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="flex items-start gap-4 rounded-[24px] bg-cars-off-white px-4 py-4 transition-colors hover:bg-[#e9f1ff]"
-                  >
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-apercu-bold text-cars-primary shadow-sm">
-                      {index + 1}
-                    </span>
-                    <span className="pt-1 text-sm font-medium leading-6 text-cars-primary">
-                      {item.label}
-                    </span>
-                  </Link>
-                )
-              )}
-            </div>
+          <div className="space-y-5">
+            <Link
+              href={`/tips/${featuredArticle.slug}`}
+              className="group overflow-hidden rounded-[30px] border border-cars-gray-light/80 bg-white transition-all hover:-translate-y-1 hover:border-cars-accent/25 hover:shadow-[0_18px_42px_rgba(15,45,98,0.12)]"
+            >
+              <div className="grid gap-0 xl:grid-cols-[1.05fr_0.95fr]">
+                <div className="relative h-72 overflow-hidden bg-cars-off-white xl:h-full xl:min-h-[360px]">
+                  <Image
+                    src={featuredArticle.image}
+                    alt={featuredArticle.title}
+                    fill
+                    sizes="(max-width: 1280px) 100vw, 55vw"
+                    className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                  />
+                </div>
+                <div className="flex h-full flex-col p-6 md:p-7">
+                  <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
+                    <span>{featuredArticle.category}</span>
+                    <span className="text-cars-gray">{featuredArticle.readTime}</span>
+                  </div>
+                  <h3 className="mt-3 max-w-2xl text-2xl font-apercu-bold leading-tight text-cars-primary md:text-3xl">
+                    {featuredArticle.title}
+                  </h3>
+                  <p className="mt-4 max-w-2xl line-clamp-3 text-sm leading-7 text-cars-gray md:text-base">
+                    {featuredArticle.summary}
+                  </p>
+                  <span className="mt-auto inline-flex pt-6 text-sm font-semibold text-cars-primary transition-colors group-hover:text-cars-accent">
+                    Read more
+                  </span>
+                </div>
+              </div>
+            </Link>
 
-            <div className="mt-6 rounded-[24px] bg-cars-primary p-5 text-white">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
-                Thesis direction
-              </p>
-              <p className="mt-3 text-sm leading-6 text-white/85">
-                The current UI now mirrors a polished automotive marketplace while still keeping
-                your AI compare, forecasting, TCO, and seller-management features in the same
-                visual language.
-              </p>
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+              {secondaryArticles.map((article) => (
+                <Link
+                  key={article.slug}
+                  href={`/tips/${article.slug}`}
+                  className="group flex h-full flex-col overflow-hidden rounded-[28px] border border-cars-gray-light/80 bg-white transition-all hover:-translate-y-1 hover:border-cars-accent/25 hover:shadow-[0_18px_42px_rgba(15,45,98,0.12)]"
+                >
+                  <div className="relative h-52 overflow-hidden bg-cars-off-white">
+                    <Image
+                      src={article.image}
+                      alt={article.title}
+                      fill
+                      sizes="(max-width: 1280px) 50vw, 25vw"
+                      className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                    />
+                  </div>
+                  <div className="flex flex-1 flex-col p-5">
+                    <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-cars-accent">
+                      <span>{article.category}</span>
+                      <span className="text-cars-gray">{article.readTime}</span>
+                    </div>
+                    <h3 className="mt-3 line-clamp-2 text-lg font-apercu-bold leading-7 text-cars-primary">
+                      {article.title}
+                    </h3>
+                    <p className="mt-3 line-clamp-2 text-sm leading-6 text-cars-gray">
+                      {article.summary}
+                    </p>
+                    <span className="mt-auto inline-flex pt-5 text-sm font-semibold text-cars-primary transition-colors group-hover:text-cars-accent">
+                      Read more
+                    </span>
+                  </div>
+                </Link>
+              ))}
             </div>
           </div>
         </div>

@@ -12,9 +12,9 @@ const nav = [
   { href: "/catalog", label: "Catalog" },
   { href: "/listings", label: "Listings" },
   { href: "/sell", label: "Sell" },
-  { href: "/garage", label: "Garage" },
+  { href: "/garage", label: "Saved Cars" },
   { href: "/my-listings", label: "My Listings" },
-  { href: "/ai", label: "AI" },
+  { href: "/requests", label: "Viewing Requests" },
 ];
 
 export default function Header() {
@@ -23,7 +23,7 @@ export default function Header() {
   const { openAssistant } = useAiAssistant();
   const { openAuth } = useAuthModal();
   const [loggedIn, setLoggedIn] = useState(false);
-  const protectedRoutes = new Set(["/sell", "/garage", "/my-listings"]);
+  const protectedRoutes = new Set(["/sell", "/garage", "/my-listings", "/requests"]);
 
   useEffect(() => {
     const refresh = () => setLoggedIn(Boolean(getStoredToken()));
@@ -79,11 +79,6 @@ export default function Header() {
                 key={item.href}
                 href={item.href}
                 onClick={(e) => {
-                  if (item.href === "/ai") {
-                    e.preventDefault();
-                    openAssistant();
-                    return;
-                  }
                   if (!loggedIn && protectedRoutes.has(item.href)) {
                     e.preventDefault();
                     openAuth({ mode: "login", next: item.href });

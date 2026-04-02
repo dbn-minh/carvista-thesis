@@ -10,7 +10,7 @@ const quickLinks = [
   { href: "/catalog", label: "Browse catalog", mode: "link" },
   { href: "/listings", label: "Explore listings", mode: "link" },
   { href: "/sell", label: "Sell your car", mode: "login" },
-  { href: "/garage", label: "Garage dashboard", mode: "login" },
+  { href: "/garage", label: "Saved cars", mode: "login" },
 ] as const;
 
 const featureLinks = [

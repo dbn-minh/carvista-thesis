@@ -112,7 +112,7 @@ export default function CatalogDetailPage() {
     try {
       await watchlistApi.saveVariant(id);
       setTone("success");
-      setMessage(`Variant ${id} saved to watchlist.`);
+      setMessage("Saved to your watchlist.");
     } catch (error) {
       setTone("error");
       setMessage(error instanceof Error ? error.message : "Could not save variant");
@@ -145,7 +145,7 @@ export default function CatalogDetailPage() {
 
   const heading = useMemo(() => {
     const variant = detail?.variant;
-    if (!variant) return `Variant #${id}`;
+    if (!variant) return "Vehicle details";
     const modelYear = getText(variant.model_year);
     const makeName = getText(variant.make_name);
     const modelName = getText(variant.model_name);
@@ -244,7 +244,7 @@ export default function CatalogDetailPage() {
                 </div>
               ) : (
                 <div className="mt-5 flex h-[360px] items-center justify-center rounded-[28px] bg-cars-off-white text-sm font-medium text-cars-gray">
-                  No catalog images seeded for this variant yet.
+                  Photos coming soon.
                 </div>
               )}
 

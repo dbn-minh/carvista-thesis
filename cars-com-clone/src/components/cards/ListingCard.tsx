@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarDays, Fuel, Gauge, Heart, MapPin, Settings2 } from "lucide-react";
 import ListingImage from "@/components/listings/ListingImage";
 import {
+  buildListingEyebrow,
   buildListingMetaTitle,
   buildListingTitle,
   formatBodyType,
@@ -62,6 +63,7 @@ export default function ListingCard({
   const images = getListingImages(item);
   const coverImage = images[0] || null;
   const title = buildListingTitle(item);
+  const eyebrow = buildListingEyebrow(item);
   const specChips = buildSpecChips(item);
   const photoSourceLabel = formatPhotoSource(item.photo_source);
   const trustSignals = [
@@ -91,7 +93,7 @@ export default function ListingCard({
                 ? "absolute right-4 top-4 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-red-500 shadow-[0_12px_28px_rgba(15,45,98,0.18)] transition hover:scale-105"
                 : "absolute right-4 top-4 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/92 text-cars-primary shadow-[0_12px_28px_rgba(15,45,98,0.18)] transition hover:scale-105 hover:text-red-500"
             }
-            aria-label={saved ? "Remove from saved listings" : "Save listing"}
+            aria-label={saved ? "Remove from saved cars" : "Save car"}
           >
             <Heart className={saved ? "h-5 w-5 fill-current" : "h-5 w-5"} />
           </button>
@@ -102,7 +104,7 @@ export default function ListingCard({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cars-accent">
-              Listing #{item.listing_id}
+              {eyebrow}
             </p>
             <h2 className="mt-2 text-[1.75rem] font-apercu-bold leading-none text-cars-primary">
               {formatListingPrice(item.asking_price)}

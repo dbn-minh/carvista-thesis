@@ -100,20 +100,20 @@ export default function FeaturedEVs() {
     () =>
       hasElectricCars
         ? {
-            eyebrow: "Live EV spotlight",
-            title: "Featured electric cars already present in the current catalog",
+            eyebrow: "Featured EVs",
+            title: "Popular electric models",
             description:
-              "This section now prioritizes real EV records from your database and falls back to other catalog vehicles only when EV data has not been seeded yet.",
+              "Browse EVs from the catalog and jump straight to full model details.",
             cta: "/catalog?fuel=electric",
-            ctaLabel: "Browse EV research",
+            ctaLabel: "View EVs",
           }
         : {
-            eyebrow: "Featured research picks",
-            title: "Real vehicles from the current CarVista database",
+            eyebrow: "Featured cars",
+            title: "Popular models right now",
             description:
-              "Instead of showing hard-coded models that may not exist in the database, Home now surfaces catalog entries that actually exist today.",
+              "Browse a few highlights from the catalog and open the full details in a click.",
             cta: "/catalog",
-            ctaLabel: "Browse the catalog",
+            ctaLabel: "View all models",
           },
     [hasElectricCars]
   );
@@ -141,7 +141,7 @@ export default function FeaturedEVs() {
             </Link>
           </div>
 
-          {loading ? <p className="text-sm text-cars-gray">Loading featured vehicles...</p> : null}
+          {loading ? <p className="text-sm text-cars-gray">Loading featured cars...</p> : null}
 
           {!loading && errorMessage ? (
             <div className="rounded-[24px] border border-cars-accent/15 bg-white px-5 py-4 text-sm leading-6 text-cars-gray shadow-[0_16px_34px_rgba(15,45,98,0.08)]">
@@ -165,17 +165,17 @@ export default function FeaturedEVs() {
                   </div>
                 ) : (
                   <div className="flex h-52 w-full items-center justify-center bg-[linear-gradient(180deg,rgba(233,241,255,0.9),rgba(255,255,255,1))] px-8 text-center text-sm font-semibold text-cars-primary">
-                    Image not seeded yet for this featured car
+                    Photo unavailable
                   </div>
                 )}
                 <div className="p-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cars-accent">
-                    Variant #{item.variantId}
+                    Featured model
                   </p>
                   <h3 className="mt-3 text-xl font-apercu-bold text-cars-primary">{item.title}</h3>
                   <p className="mt-3 text-sm leading-6 text-cars-gray">{item.subtitle}</p>
                   <span className="mt-5 inline-flex text-sm font-semibold text-cars-primary transition-colors group-hover:text-cars-accent">
-                    Open vehicle details
+                    View details
                   </span>
                 </div>
               </Link>
@@ -196,7 +196,7 @@ export default function FeaturedEVs() {
               }}
               className="rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
             >
-              Use AI compare and TCO
+              Compare with AI
             </button>
           </div>
         </div>

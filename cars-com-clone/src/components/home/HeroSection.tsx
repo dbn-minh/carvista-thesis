@@ -10,10 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const quickActions = [
-  { label: "Shop cars for sale", href: "/listings", requiresAuth: false },
-  { label: "Research every model", href: "/catalog", requiresAuth: false },
+  { label: "Browse listings", href: "/listings", requiresAuth: false },
+  { label: "Explore models", href: "/catalog", requiresAuth: false },
   { label: "Sell your car", href: "/sell", requiresAuth: true },
-  { label: "Use AI advisor", href: "/ai", requiresAuth: true },
+  { label: "Ask AI", href: "/ai", requiresAuth: true },
 ];
 
 export default function HeroSection() {
@@ -25,7 +25,7 @@ export default function HeroSection() {
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     const normalized = query.trim();
-    router.push(normalized ? `/catalog?q=${encodeURIComponent(normalized)}` : "/catalog");
+    router.push(normalized ? `/listings?query=${encodeURIComponent(normalized)}` : "/listings");
   }
 
   return (
@@ -34,16 +34,14 @@ export default function HeroSection() {
       <div className="container-cars relative z-10 grid gap-10 py-12 md:grid-cols-[1.15fr_0.85fr] md:items-center md:py-16">
         <div className="text-white">
           <p className="mb-4 text-sm font-semibold uppercase tracking-[0.22em] text-white/70">
-            CarVista marketplace + AI insights
+            Buy, sell, and compare
           </p>
           <h1 className="max-w-2xl text-4xl font-apercu-bold leading-tight md:text-6xl">
-            Find, compare, and understand cars with a polished research and seller
-            experience.
+            Find the right car faster.
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-white/85 md:text-lg">
-            Browse a structured vehicle catalog, explore active listings, then use AI
-            features to compare models, estimate price trends, and calculate ownership
-            cost before making a decision.
+            Research models, browse live listings, and use built-in tools for pricing,
+            comparison, and ownership cost.
           </p>
 
           <form
@@ -56,7 +54,7 @@ export default function HeroSection() {
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search by make, model, trim, or EV"
+                  placeholder="Search make, model, or trim"
                   className="h-12 rounded-full border-cars-gray-light px-5 text-base"
                 />
               </div>
@@ -64,7 +62,7 @@ export default function HeroSection() {
                 type="submit"
                 className="h-12 rounded-full bg-cars-accent px-6 text-sm font-semibold text-white hover:bg-cars-primary-light"
               >
-                Search catalog
+                Search
               </Button>
             </div>
 
@@ -97,17 +95,17 @@ export default function HeroSection() {
           <div className="absolute right-0 top-0 h-full w-full rounded-[36px] border border-white/20 bg-white/10 backdrop-blur-sm" />
           <div className="absolute -left-6 bottom-10 z-20 max-w-[220px] rounded-[28px] bg-white p-5 text-cars-primary shadow-[0_20px_60px_rgba(7,20,44,0.2)]">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cars-accent">
-              What you can do
+              Why people use CarVista
             </p>
             <ul className="mt-3 space-y-3 text-sm leading-6">
-              <li>Compare variants with pros and cons</li>
-              <li>Track listings and seller activity</li>
-              <li>Estimate TCO and future pricing</li>
+              <li>Compare trims side by side</li>
+              <li>Save cars and track listings</li>
+              <li>Estimate running costs</li>
             </ul>
           </div>
           <div className="absolute inset-x-8 bottom-0 top-8">
             <Image
-              src="https://ext.same-assets.com/569242764/3049107266.png"
+              src="https://www.cars.com/images/sell/sale-dealer-woman-brand-colors.png"
               alt="CarVista hero vehicle"
               fill
               priority

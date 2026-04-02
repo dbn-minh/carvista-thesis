@@ -115,7 +115,7 @@ export default function CatalogVehiclePicker({
             <option value="">{loadingVariants ? "Loading variants..." : "Select a variant"}</option>
             {visibleVariants.map((variant) => (
               <option key={variant.variant_id} value={variant.variant_id}>
-                {variant.trim_name || `Variant #${variant.variant_id}`}
+                {variant.trim_name || buildVariantTitle(variant)}
               </option>
             ))}
           </select>

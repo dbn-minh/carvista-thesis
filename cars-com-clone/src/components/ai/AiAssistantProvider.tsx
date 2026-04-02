@@ -295,7 +295,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
       if (!Number.isFinite(variantId)) return;
       launchCompare({
         variantId,
-        variantLabel: focusVariantLabel || `Variant #${variantId}`,
+        variantLabel: focusVariantLabel || "Selected vehicle",
         marketId: Number(marketId) || 1,
       });
     }

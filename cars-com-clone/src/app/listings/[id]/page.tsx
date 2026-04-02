@@ -8,8 +8,17 @@ import PageIntelligencePanel from "@/components/ai/PageIntelligencePanel";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import Header from "@/components/layout/Header";
 import StatusBanner from "@/components/common/StatusBanner";
+import {
+  buildListingTitle,
+  formatBodyType,
+  formatFuelType,
+  formatListingPrice,
+  formatLocation,
+  formatMileage,
+  formatTransmission,
+} from "@/components/listings/listing-utils";
 import { listingsApi, requestsApi, reviewsApi, watchlistApi } from "@/lib/carvista-api";
-import { hasToken, toCurrency } from "@/lib/api-client";
+import { hasToken } from "@/lib/api-client";
 import type { ListingDetail, SellerReview } from "@/lib/types";
 
 function getImageUrl(image: Record<string, unknown>): string | null {
@@ -30,10 +39,10 @@ export default function ListingDetailPage() {
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  const [requestMessage, setRequestMessage] = useState("I want to schedule a viewing.");
-  const [contactName, setContactName] = useState("Test User");
-  const [contactEmail, setContactEmail] = useState("user@example.com");
-  const [contactPhone, setContactPhone] = useState("0900000000");
+  const [requestMessage, setRequestMessage] = useState("I would like to schedule a viewing for this car.");
+  const [contactName, setContactName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
 
   const [rating, setRating] = useState("5");
   const [reviewComment, setReviewComment] = useState("Seller communication was good.");
@@ -73,6 +82,8 @@ export default function ListingDetailPage() {
     setSelectedImage(gallery[0] || null);
   }, [gallery]);
 
+  const listingTitle = detail?.listing ? buildListingTitle(detail.listing) : "Listing details";
+
   async function sendRequest(e: FormEvent) {
     e.preventDefault();
     if (!hasToken()) {
@@ -88,7 +99,13 @@ export default function ListingDetailPage() {
         contact_phone: contactPhone,
       });
       setTone("success");
-      setMessage("Viewing request created.");
+      setMessage(
+        "Viewing request sent successfully. The seller will review your note and may contact you using the details you provided."
+      );
+      setRequestMessage("I would like to schedule a viewing for this car.");
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
     } catch (error) {
       setTone("error");
       setMessage(error instanceof Error ? error.message : "Request failed");
@@ -104,7 +121,7 @@ export default function ListingDetailPage() {
     try {
       await watchlistApi.saveListing(id);
       setTone("success");
-      setMessage(`Listing ${id} saved.`);
+      setMessage("Saved to Saved Cars.");
     } catch (error) {
       setTone("error");
       setMessage(error instanceof Error ? error.message : "Could not save listing");
@@ -144,11 +161,9 @@ export default function ListingDetailPage() {
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
-                Listing detail
+                Car for sale
               </p>
-              <h1 className="mt-2 text-4xl font-apercu-bold text-cars-primary">
-                Seller listing #{id}
-              </h1>
+              <h1 className="mt-2 text-4xl font-apercu-bold text-cars-primary">{listingTitle}</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
                 Review the listing, then log in to save it, request a viewing, or submit a
                 seller review after your interaction.
@@ -168,7 +183,7 @@ export default function ListingDetailPage() {
                   onClick={() =>
                     openCompare({
                       variantId: detail.listing.variant_id,
-                      variantLabel: `Listing ${id}`,
+                      variantLabel: listingTitle,
                       marketId: 1,
                     })
                   }
@@ -178,15 +193,15 @@ export default function ListingDetailPage() {
                 </button>
               ) : null}
               <button
-                type="button"
-                onClick={() =>
-                  openAssistant({
-                    prompt: `Help me evaluate listing ${id}, including ownership cost, market outlook, and whether it fits my needs.`,
-                    marketId: 1,
-                    variantId: detail?.listing?.variant_id,
-                    variantLabel: `Listing ${id}`,
-                  })
-                }
+                  type="button"
+                  onClick={() =>
+                    openAssistant({
+                      prompt: `Help me evaluate ${listingTitle}, including ownership cost, market outlook, and whether it fits my needs.`,
+                      marketId: 1,
+                      variantId: detail?.listing?.variant_id,
+                      variantLabel: listingTitle,
+                    })
+                  }
                 className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-white"
               >
                 Ask AI advisor
@@ -218,7 +233,7 @@ export default function ListingDetailPage() {
                 <div className="mt-5 overflow-hidden rounded-[28px] bg-cars-off-white">
                   <img
                     src={selectedImage}
-                    alt={`Listing ${id}`}
+                    alt={listingTitle}
                     className="h-[360px] w-full object-cover"
                   />
                 </div>
@@ -241,7 +256,7 @@ export default function ListingDetailPage() {
                           : "overflow-hidden rounded-[18px] border border-cars-gray-light/70"
                       }
                     >
-                      <img src={image} alt={`Listing ${id}`} className="h-20 w-full object-cover" />
+                      <img src={image} alt={listingTitle} className="h-20 w-full object-cover" />
                     </button>
                   ))}
                 </div>
@@ -255,7 +270,7 @@ export default function ListingDetailPage() {
                     Overview
                   </p>
                   <h2 className="mt-2 text-3xl font-apercu-bold text-cars-primary">
-                    {toCurrency(detail.listing.asking_price)}
+                    {formatListingPrice(detail.listing.asking_price)}
                   </h2>
                 </div>
                 <span className="rounded-full bg-cars-off-white px-3 py-1 text-sm font-semibold capitalize text-cars-primary">
@@ -265,21 +280,28 @@ export default function ListingDetailPage() {
 
               <div className="mt-6 grid gap-3 text-sm md:grid-cols-2">
                 <p className="rounded-[20px] bg-cars-off-white px-4 py-3">
-                  <span className="font-medium text-cars-primary">Variant:</span>{" "}
-                  {detail.listing.variant_id}
+                  <span className="font-medium text-cars-primary">Seller:</span>{" "}
+                  {detail.listing.seller_type || "Private seller"}
                 </p>
                 <p className="rounded-[20px] bg-cars-off-white px-4 py-3">
-                  <span className="font-medium text-cars-primary">Seller:</span>{" "}
-                  {detail.listing.owner_id}
+                  <span className="font-medium text-cars-primary">Body style:</span>{" "}
+                  {formatBodyType(detail.listing.body_type)}
                 </p>
                 <p className="rounded-[20px] bg-cars-off-white px-4 py-3">
                   <span className="font-medium text-cars-primary">Mileage:</span>{" "}
-                  {detail.listing.mileage_km ?? "-"} km
+                  {formatMileage(detail.listing.mileage_km)}
                 </p>
                 <p className="rounded-[20px] bg-cars-off-white px-4 py-3">
                   <span className="font-medium text-cars-primary">Location:</span>{" "}
-                  {detail.listing.location_city || "-"} /{" "}
-                  {detail.listing.location_country_code || "-"}
+                  {formatLocation(detail.listing.location_city, detail.listing.location_country_code)}
+                </p>
+                <p className="rounded-[20px] bg-cars-off-white px-4 py-3">
+                  <span className="font-medium text-cars-primary">Transmission:</span>{" "}
+                  {formatTransmission(detail.listing.transmission)}
+                </p>
+                <p className="rounded-[20px] bg-cars-off-white px-4 py-3">
+                  <span className="font-medium text-cars-primary">Fuel:</span>{" "}
+                  {formatFuelType(detail.listing.fuel_type)}
                 </p>
               </div>
 
@@ -312,40 +334,40 @@ export default function ListingDetailPage() {
 
         <section className="mb-8 grid gap-6 xl:grid-cols-2">
           <div className="section-shell p-6">
-            <h2 className="text-2xl font-apercu-bold text-cars-primary">Create viewing request</h2>
+            <h2 className="text-2xl font-apercu-bold text-cars-primary">Request a viewing</h2>
             <p className="mt-3 text-sm leading-6 text-cars-gray">
-              This action opens the auth popup if you are not signed in yet.
+              Send your details to the seller so they can review your request and get back to you.
             </p>
             <form onSubmit={sendRequest} className="space-y-3">
               <input
                 className="mt-5 h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
                 value={contactName}
                 onChange={(e) => setContactName(e.target.value)}
-                placeholder="contact_name"
+                placeholder="Your name"
               />
               <input
                 className="h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
                 value={contactEmail}
                 onChange={(e) => setContactEmail(e.target.value)}
-                placeholder="contact_email"
+                placeholder="Email address"
               />
               <input
                 className="h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
                 value={contactPhone}
                 onChange={(e) => setContactPhone(e.target.value)}
-                placeholder="contact_phone"
+                placeholder="Phone number"
               />
               <textarea
                 className="min-h-[120px] w-full rounded-[24px] border border-cars-gray-light px-4 py-3 text-sm"
                 value={requestMessage}
                 onChange={(e) => setRequestMessage(e.target.value)}
-                placeholder="message"
+                placeholder="Tell the seller when you would like to view the car."
               />
               <button
                 className="rounded-full bg-cars-accent px-5 py-2.5 text-sm font-semibold text-white"
                 type="submit"
               >
-                Submit request
+                Send request
               </button>
             </form>
           </div>

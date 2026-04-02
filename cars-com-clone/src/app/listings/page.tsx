@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams, type ReadonlyURLSearchParams } from "next/navigation";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import ListingCard from "@/components/cards/ListingCard";
 import EmptyState from "@/components/common/EmptyState";
@@ -34,7 +35,26 @@ const initialFilters: ListingFilterState = {
   sort: "newest",
 };
 
-export default function ListingsPage() {
+function parseSearchFilters(searchParams: URLSearchParams | ReadonlyURLSearchParams): ListingFilterState {
+  return {
+    query: searchParams.get("query") || searchParams.get("q") || "",
+    minPrice: searchParams.get("minPrice") || "",
+    maxPrice: searchParams.get("maxPrice") || "",
+    make: searchParams.get("make") || "",
+    bodyType: searchParams.get("bodyType") || "",
+    year: searchParams.get("year") || "",
+    maxMileage: searchParams.get("maxMileage") || "",
+    transmission: searchParams.get("transmission") || "",
+    fuelType: searchParams.get("fuelType") || searchParams.get("fuel") || "",
+    location: searchParams.get("location") || "",
+    sort: (searchParams.get("sort") as ListingFilterState["sort"]) || initialFilters.sort,
+  };
+}
+
+function ListingsPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const searchKey = searchParams.toString();
   const { openAuth } = useAuthModal();
   const [items, setItems] = useState<Listing[]>([]);
   const [message, setMessage] = useState("");
@@ -86,22 +106,18 @@ export default function ListingsPage() {
   }
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const variantId = Number(params.get("variantId"));
+    const variantId = Number(searchParams.get("variantId"));
     const normalizedVariantId = Number.isFinite(variantId) ? variantId : null;
     setLinkedVariantId(normalizedVariantId);
+    setFilters(parseSearchFilters(searchParams));
     void load(normalizedVariantId);
-  }, []);
+  }, [searchKey]);
 
   function clearMarketplaceFilters() {
     setFilters(initialFilters);
-
-    if (linkedVariantId != null && typeof window !== "undefined") {
-      window.history.replaceState({}, "", "/listings");
-      setLinkedVariantId(null);
-      void load(null);
-    }
+    setLinkedVariantId(null);
+    router.replace("/listings");
+    void load(null);
   }
 
   async function sendRequest(listingId: number) {
@@ -115,7 +131,12 @@ export default function ListingsPage() {
         message: requestMessage.trim() || "Hi, I'd like to schedule a viewing for this car.",
       });
       setTone("success");
-      setMessage("Viewing request sent. The seller can now review your request in their inbox.");
+      setMessage(
+        "Viewing request sent successfully. The seller can review your request and may contact you using your account details."
+      );
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
     } catch (error) {
       setTone("error");
       setMessage(error instanceof Error ? error.message : "Request failed");
@@ -138,7 +159,7 @@ export default function ListingsPage() {
         await watchlistApi.saveListing(listingId);
         setSavedListingIds((prev) => [...prev, listingId]);
         setTone("success");
-        setMessage("Listing saved to your Garage.");
+        setMessage("Listing saved to Saved Cars.");
       }
     } catch (error) {
       setTone("error");
@@ -175,7 +196,7 @@ export default function ListingsPage() {
             filteredCount={filteredItems.length}
             activeFilters={
               linkedVariantId != null
-                ? [...activeFilters, `Recommended vehicle #${linkedVariantId}`]
+                ? [...activeFilters, "Recommended match"]
                 : activeFilters
             }
             onClearFilters={clearMarketplaceFilters}
@@ -232,5 +253,26 @@ export default function ListingsPage() {
         ) : null}
       </main>
     </>
+  );
+}
+
+export default function ListingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <>
+          <Header />
+          <main className="container-cars py-8">
+            <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <ListingCardSkeleton key={index} />
+              ))}
+            </div>
+          </main>
+        </>
+      }
+    >
+      <ListingsPageContent />
+    </Suspense>
   );
 }

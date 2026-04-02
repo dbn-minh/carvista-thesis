@@ -16,16 +16,14 @@ export default function AutoTariffsSection() {
             <div>
               <div className="mb-2 flex items-center">
                 <span className="rounded-full bg-cars-off-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
-                  Ownership planning
+                  Ownership costs
                 </span>
               </div>
               <h2 className="text-3xl font-apercu-bold text-cars-primary">
-                Understand taxes, insurance, and long-term car cost before you commit
+                Know the cost before you buy
               </h2>
               <p className="mt-4 max-w-xl text-sm leading-7 text-cars-gray">
-                This block now routes into live CarVista flows. Buyers can jump into AI tools to
-                estimate total cost of ownership, compare models, and validate whether a listing
-                matches their real budget.
+                Estimate taxes, insurance, fuel, and long-term running costs before you commit.
               </p>
               <div className="mt-6 flex flex-wrap gap-4">
                 <Button
@@ -34,7 +32,7 @@ export default function AutoTariffsSection() {
                   onClick={() => openAssistant()}
                   className="h-11 rounded-full border-cars-primary text-cars-primary hover:bg-cars-primary hover:text-white"
                 >
-                  Open AI TCO tools
+                  Estimate ownership cost
                 </Button>
                 <Button
                   variant="outline"
@@ -51,23 +49,23 @@ export default function AutoTariffsSection() {
                     Compare
                   </p>
                   <p className="mt-2 text-sm font-medium text-cars-primary">
-                    See strengths and tradeoffs between variants.
+                    See the trade-offs between trims.
                   </p>
                 </div>
                 <div className="rounded-[22px] bg-cars-off-white px-4 py-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
-                    Predict
+                    Price outlook
                   </p>
                   <p className="mt-2 text-sm font-medium text-cars-primary">
-                    Estimate future pricing before you buy or sell.
+                    Check where prices may be headed.
                   </p>
                 </div>
                 <div className="rounded-[22px] bg-cars-off-white px-4 py-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
-                    Plan
+                    Ownership
                   </p>
                   <p className="mt-2 text-sm font-medium text-cars-primary">
-                    Calculate TCO using profile-based ownership inputs.
+                    Estimate monthly and long-term cost.
                   </p>
                 </div>
               </div>
@@ -75,19 +73,12 @@ export default function AutoTariffsSection() {
 
             <div className="relative min-h-[320px]">
               <Image
-                src="https://ext.same-assets.com/569242764/2943101928.webp"
+                src="https://images.cars.com/cldstatic/wp-content/uploads/202404-get-preapproved-for-car-loan-scaled.jpg"
                 alt="Ownership cost planning"
                 fill
                 className="rounded-[32px] object-cover shadow-[0_18px_48px_rgba(15,45,98,0.12)]"
               />
-              <div className="absolute bottom-5 left-5 max-w-[240px] rounded-[24px] bg-white/92 p-4 text-cars-primary shadow-lg backdrop-blur">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
-                  Buyer decision support
-                </p>
-                <p className="mt-2 text-sm leading-6">
-                  One polished flow from catalog research into AI-assisted ownership analysis.
-                </p>
-              </div>
+
               <div className="absolute -bottom-6 -right-6 hidden h-20 w-20 rounded-full bg-cars-accent md:block" />
             </div>
           </div>

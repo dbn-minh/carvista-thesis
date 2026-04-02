@@ -35,13 +35,32 @@ export function buildListingTitle(item: Listing): string {
 
   const base = [item.make_name, item.model_name, item.trim_name].filter(Boolean).join(" ").trim();
   if (base) return base;
-  if (item.variant_id) return `Variant #${item.variant_id}`;
-  return `Listing #${item.listing_id}`;
+
+  const fallback = [
+    item.model_year ? String(item.model_year) : null,
+    item.body_type ? formatLabel(item.body_type, "") : null,
+    item.fuel_type ? formatLabel(item.fuel_type, "") : null,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  return fallback ? `${fallback} car for sale` : "Car for sale";
 }
 
 export function buildListingMetaTitle(item: Listing): string {
   const title = buildListingTitle(item);
   return item.model_year ? `${title} ${item.model_year}` : title;
+}
+
+export function buildListingEyebrow(item: Listing): string {
+  const location = formatLocation(item.location_city, item.location_country_code);
+  if (location !== "Location pending") return location;
+
+  if (item.seller_type) return formatLabel(item.seller_type, "Seller");
+  if (item.model_year) return `${item.model_year} listing`;
+
+  return "Available now";
 }
 
 export function getListingImages(item: Listing): string[] {
