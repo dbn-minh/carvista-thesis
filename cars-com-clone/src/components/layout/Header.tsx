@@ -3,18 +3,27 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { Heart, Inbox, type LucideIcon } from "lucide-react";
 import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
+import { requestsApi } from "@/lib/carvista-api";
 import { clearStoredToken, getStoredToken } from "@/lib/api-client";
 
-const nav = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon?: LucideIcon;
+  iconOnly?: boolean;
+};
+
+const nav: NavItem[] = [
   { href: "/", label: "Home" },
   { href: "/catalog", label: "Catalog" },
   { href: "/listings", label: "Listings" },
   { href: "/sell", label: "Sell" },
-  { href: "/garage", label: "Saved Cars" },
   { href: "/my-listings", label: "My Listings" },
-  { href: "/requests", label: "Viewing Requests" },
+  { href: "/garage", label: "Saved Cars", icon: Heart, iconOnly: true },
+  { href: "/requests", label: "Viewing Requests", icon: Inbox, iconOnly: true },
 ];
 
 export default function Header() {
@@ -23,6 +32,7 @@ export default function Header() {
   const { openAssistant } = useAiAssistant();
   const { openAuth } = useAuthModal();
   const [loggedIn, setLoggedIn] = useState(false);
+  const [pendingRequestCount, setPendingRequestCount] = useState(0);
   const protectedRoutes = new Set(["/sell", "/garage", "/my-listings", "/requests"]);
 
   useEffect(() => {
@@ -35,6 +45,42 @@ export default function Header() {
       window.removeEventListener("carvista-auth-changed", refresh);
     };
   }, [pathname]);
+
+  useEffect(() => {
+    if (!loggedIn) {
+      setPendingRequestCount(0);
+      return;
+    }
+
+    let disposed = false;
+
+    const refreshPendingRequests = async () => {
+      try {
+        const inbox = await requestsApi.inbox();
+        if (!disposed) {
+          setPendingRequestCount(
+            inbox.items.filter((item) => item.status === "pending").length
+          );
+        }
+      } catch {
+        if (!disposed) {
+          setPendingRequestCount(0);
+        }
+      }
+    };
+
+    const handleRequestRefresh = () => {
+      void refreshPendingRequests();
+    };
+
+    void refreshPendingRequests();
+    window.addEventListener("carvista-requests-changed", handleRequestRefresh);
+
+    return () => {
+      disposed = true;
+      window.removeEventListener("carvista-requests-changed", handleRequestRefresh);
+    };
+  }, [loggedIn, pathname]);
 
   function handleLogout() {
     clearStoredToken();
@@ -58,7 +104,7 @@ export default function Header() {
         </div>
       </div>
 
-      <div className="container-cars flex flex-col gap-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="container-cars flex flex-col gap-4 py-4 lg:grid lg:grid-cols-[auto_1fr_auto] lg:items-center">
         <div className="flex items-center gap-4">
           <Link href="/" className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cars-primary text-lg font-apercu-bold text-white shadow-lg shadow-cars-primary/25">
@@ -71,13 +117,19 @@ export default function Header() {
           </Link>
         </div>
 
-        <nav className="flex flex-wrap items-center gap-2 text-sm">
+        <nav className="flex flex-wrap items-center gap-2 text-sm lg:justify-center">
           {nav.map((item) => {
             const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+            const Icon = item.icon;
+            const badgeCount = item.href === "/requests" ? pendingRequestCount : 0;
+            const accessibleLabel =
+              badgeCount > 0 ? `${item.label} (${badgeCount} pending)` : item.label;
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                aria-label={accessibleLabel}
+                title={accessibleLabel}
                 onClick={(e) => {
                   if (!loggedIn && protectedRoutes.has(item.href)) {
                     e.preventDefault();
@@ -85,25 +137,28 @@ export default function Header() {
                   }
                 }}
                 className={
-                  active
-                    ? "rounded-full bg-cars-primary px-4 py-2 font-semibold text-white shadow-sm"
-                    : "rounded-full px-4 py-2 font-medium text-cars-primary transition-colors hover:bg-cars-off-white"
+                  item.iconOnly
+                    ? active
+                      ? "relative inline-flex h-10 w-10 items-center justify-center rounded-full bg-cars-primary text-white shadow-sm"
+                      : "relative inline-flex h-10 w-10 items-center justify-center rounded-full text-cars-primary transition-colors hover:bg-cars-off-white"
+                    : active
+                      ? "rounded-full bg-cars-primary px-4 py-2 font-semibold text-white shadow-sm"
+                      : "rounded-full px-4 py-2 font-medium text-cars-primary transition-colors hover:bg-cars-off-white"
                 }
               >
-                {item.label}
+                {Icon ? <Icon className="h-4 w-4" /> : item.label}
+                {badgeCount > 0 ? (
+                  <span className="absolute -right-1.5 -top-1.5 inline-flex min-h-[1.15rem] min-w-[1.15rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white shadow-[0_8px_18px_rgba(239,68,68,0.35)]">
+                    {badgeCount > 9 ? "9+" : badgeCount}
+                  </span>
+                ) : null}
+                {item.iconOnly ? <span className="sr-only">{accessibleLabel}</span> : null}
               </Link>
             );
           })}
         </nav>
 
-        <div className="flex items-center gap-3 text-sm">
-          <Link
-            href="/listings"
-            className="hidden rounded-full border border-cars-primary/15 bg-cars-off-white px-4 py-2 font-medium text-cars-primary transition-colors hover:border-cars-accent/20 hover:text-cars-accent md:inline-flex"
-          >
-            Browse inventory
-          </Link>
-
+        <div className="flex items-center gap-3 text-sm lg:justify-end">
           {!loggedIn ? (
             <>
               <button

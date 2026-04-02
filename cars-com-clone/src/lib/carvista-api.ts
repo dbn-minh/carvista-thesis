@@ -13,6 +13,7 @@ import type {
   ChatResponse,
   Listing,
   ListingDetail,
+  ListingImage,
   Make,
   Model,
   NotificationItem,
@@ -248,6 +249,43 @@ export const listingsApi = {
       method: "PUT",
       body: JSON.stringify(payload),
     });
+  },
+
+  listImages(id: number) {
+    return apiFetch<{ items: ListingImage[] }>(`/listings/${id}/images`);
+  },
+
+  uploadImages(id: number, files: File[]) {
+    const formData = new FormData();
+    files.forEach((file) => formData.append("images", file));
+
+    return apiFetch<{
+      listing_id: number;
+      image_count: number;
+      items: ListingImage[];
+    }>(`/listings/${id}/images`, {
+      method: "POST",
+      body: formData,
+    });
+  },
+
+  deleteImage(id: number, imageId: number) {
+    return apiFetch<{ ok: true; removed: ListingImage | null }>(
+      `/listings/${id}/images/${imageId}`,
+      {
+        method: "DELETE",
+      }
+    );
+  },
+
+  reorderImages(id: number, imageIds: number[]) {
+    return apiFetch<{ listing_id: number; items: ListingImage[] }>(
+      `/listings/${id}/images/reorder`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ image_ids: imageIds }),
+      }
+    );
   },
 };
 

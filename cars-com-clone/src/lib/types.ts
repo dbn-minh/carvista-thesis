@@ -186,6 +186,13 @@ export type AiCompareItem = {
     rating_score: number;
     price_score: number;
     practicality_score: number;
+    safety_score: number;
+    comfort_score: number;
+    efficiency_score: number;
+    resale_score: number;
+    technology_score: number;
+    maintenance_score: number;
+    use_case_fit_score: number;
     final_score: number;
   };
 };

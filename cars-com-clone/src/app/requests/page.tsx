@@ -63,6 +63,9 @@ export default function RequestsPage() {
       );
 
       setItems(leads);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("carvista-requests-changed"));
+      }
     } catch (error) {
       setTone("error");
       setMessage(
@@ -87,6 +90,9 @@ export default function RequestsPage() {
           : "Viewing request declined."
       );
       await load();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("carvista-requests-changed"));
+      }
     } catch (error) {
       setTone("error");
       setMessage(error instanceof Error ? error.message : "Could not update this request.");

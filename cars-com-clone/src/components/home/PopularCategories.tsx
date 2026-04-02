@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { catalogApi } from "@/lib/carvista-api";
+import { buildCompareHref } from "@/lib/compare";
 import type { Make, Model } from "@/lib/types";
 
 type CompareSelection = {
@@ -123,7 +124,7 @@ function CompareColumn({
 }
 
 export default function PopularCategories() {
-  const { openAssistant } = useAiAssistant();
+  const router = useRouter();
   const [makes, setMakes] = useState<Make[]>([]);
   const [leftModels, setLeftModels] = useState<Model[]>([]);
   const [rightModels, setRightModels] = useState<Model[]>([]);
@@ -266,9 +267,13 @@ export default function PopularCategories() {
     }
 
     setErrorMessage("");
-    openAssistant({
-      prompt: `Compare ${leftLabel} and ${rightLabel}. Focus on comfort, practicality, fuel economy, resale outlook, and ownership cost.`,
-    });
+    router.push(
+      buildCompareHref({
+        leftQuery: leftLabel,
+        rightQuery: rightLabel,
+        marketId: 1,
+      })
+    );
   }
 
   return (

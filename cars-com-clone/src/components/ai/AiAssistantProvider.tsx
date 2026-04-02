@@ -21,6 +21,7 @@ import {
 import { setStoredAdvisorProfile } from "@/lib/advisor-profile";
 import { aiApi, catalogApi } from "@/lib/carvista-api";
 import { hasToken, toCurrency } from "@/lib/api-client";
+import { buildCompareHref, buildComparePairLabel, enrichCompareFollowUpMessage } from "@/lib/compare";
 import type {
   AiCompareResponse,
   AiConfidence,
@@ -35,12 +36,15 @@ type AssistantOptions = {
   marketId?: number;
   variantId?: number;
   variantLabel?: string;
+  compareVariantIds?: number[];
+  compareVariantLabels?: string[];
 };
 
 type CompareOptions = {
   variantId: number;
   variantLabel: string;
   marketId?: number;
+  listingId?: number;
 };
 
 type PendingAction =
@@ -59,6 +63,11 @@ type ChatBubble = {
   caveats?: string[];
   freshnessNote?: string | null;
   suggestedActions?: AiSuggestedAction[];
+};
+
+type CompareContextState = {
+  variantIds: number[];
+  labels: string[];
 };
 
 type CompareState = {
@@ -99,6 +108,11 @@ const emptyCompareState: CompareState = {
   searching: false,
   error: "",
   result: null,
+};
+
+const emptyCompareContext: CompareContextState = {
+  variantIds: [],
+  labels: [],
 };
 
 const AiAssistantContext = createContext<AiAssistantContextValue | null>(null);
@@ -231,6 +245,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
   const [chatError, setChatError] = useState("");
   const [focusVariantId, setFocusVariantId] = useState<number | null>(null);
   const [focusVariantLabel, setFocusVariantLabel] = useState("");
+  const [compareContext, setCompareContext] = useState<CompareContextState>(emptyCompareContext);
   const [queuedPrompt, setQueuedPrompt] = useState("");
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
@@ -317,6 +332,10 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
     if (options?.marketId) setMarketId(String(options.marketId));
     setFocusVariantId(options?.variantId ?? null);
     setFocusVariantLabel(options?.variantLabel || "");
+    setCompareContext({
+      variantIds: (options?.compareVariantIds ?? []).filter((value) => Number.isInteger(value)),
+      labels: (options?.compareVariantLabels ?? []).map((value) => String(value || "").trim()).filter(Boolean),
+    });
 
     if (options?.prompt) {
       setInput(options.prompt);
@@ -325,13 +344,15 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
   }
 
   function launchCompare(options: CompareOptions) {
-    setCompareState({
-      ...emptyCompareState,
-      open: true,
-      variantId: options.variantId,
-      variantLabel: options.variantLabel,
-      marketId: options.marketId || Number(marketId) || 1,
-    });
+    setOpen(false);
+    router.push(
+      buildCompareHref({
+        leftVariantId: options.variantId,
+        leftVariantLabel: options.variantLabel,
+        leftListingId: options.listingId,
+        marketId: options.marketId || Number(marketId) || 1,
+      })
+    );
   }
 
   function openAssistant(options?: AssistantOptions) {
@@ -379,13 +400,23 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
     setSending(true);
 
     try {
+      const compareAwareText =
+        compareContext.variantIds.length >= 2
+          ? enrichCompareFollowUpMessage(text, compareContext.labels)
+          : text;
       const response = await aiApi.chat({
         session_id: sessionId || undefined,
-        message: text,
+        message: compareAwareText,
         context: {
           market_id: Number(marketId) || 1,
           ...(focusVariantId ? { focus_variant_id: focusVariantId } : {}),
           ...(focusVariantLabel ? { focus_variant_label: focusVariantLabel } : {}),
+          ...(compareContext.variantIds.length >= 2
+            ? {
+                compare_variant_ids: compareContext.variantIds,
+                compare_variant_labels: compareContext.labels,
+              }
+            : {}),
         },
       });
 
@@ -532,6 +563,14 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                 <div className="mt-3 rounded-[18px] bg-white/10 px-3 py-2 text-sm leading-6 text-white/85">
                   Focused vehicle:{" "}
                   <span className="font-semibold text-white">{focusVariantLabel}</span>
+                </div>
+              ) : null}
+              {compareContext.labels.length >= 2 ? (
+                <div className="mt-3 rounded-[18px] bg-white/10 px-3 py-2 text-sm leading-6 text-white/85">
+                  Comparing:{" "}
+                  <span className="font-semibold text-white">
+                    {buildComparePairLabel(compareContext.labels)}
+                  </span>
                 </div>
               ) : null}
             </div>

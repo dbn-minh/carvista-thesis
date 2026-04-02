@@ -15,12 +15,12 @@ export function generateStaticParams() {
   }));
 }
 
-export default function TipArticlePage({
+export default async function TipArticlePage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const { slug } = params;
+  const { slug } = await params;
   const article = getEditorialArticleBySlug(slug);
 
   if (!article) {

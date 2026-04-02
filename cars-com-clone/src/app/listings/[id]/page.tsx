@@ -184,6 +184,7 @@ export default function ListingDetailPage() {
                     openCompare({
                       variantId: detail.listing.variant_id,
                       variantLabel: listingTitle,
+                      listingId: detail.listing.listing_id,
                       marketId: 1,
                     })
                   }
