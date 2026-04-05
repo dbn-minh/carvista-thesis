@@ -1,0 +1,71 @@
+{
+  "input_csv": "C:\\disk\\Working\\carvista\\backend\\data\\enriched_selected_50_models.csv",
+  "input_row_count": 150,
+  "inserted_makes": 10,
+  "updated_makes": 0,
+  "inserted_models": 45,
+  "updated_models": 0,
+  "inserted_variants": 150,
+  "updated_variants": 0,
+  "placeholder_images_created": 150,
+  "imported_rows": 150,
+  "skipped_rows": [],
+  "confidence_rows": {
+    "medium": [
+      {
+        "variant": "Ford F-150 2013 XLT",
+        "confidence": "medium",
+        "notes": "VIN decode aligned on make/year with partial trim/model ambiguity Seats not available from the structured VIN sample. Trim-level alignment is good enough for review but should be spot-checked before import."
+      },
+      {
+        "variant": "Ford F-150 2011 XLT",
+        "confidence": "medium",
+        "notes": "VIN decode aligned on make/year with partial trim/model ambiguity Seats not available from the structured VIN sample. Trim-level alignment is good enough for review but should be spot-checked before import."
+      },
+      {
+        "variant": "Ford F-150 2014 XLT",
+        "confidence": "medium",
+        "notes": "VIN decode aligned on make/year with partial trim/model ambiguity Seats not available from the structured VIN sample. Trim-level alignment is good enough for review but should be spot-checked before import."
+      },
+      {
+        "variant": "Mercedes-Benz M-Class 2011 ML350 4MATIC",
+        "confidence": "medium",
+        "notes": "VIN decode aligned on make/year with partial trim/model ambiguity Seats not available from the structured VIN sample. Trim-level alignment is good enough for review but should be spot-checked before import."
+      },
+      {
+        "variant": "Mercedes-Benz M-Class 2006 ML350",
+        "confidence": "medium",
+        "notes": "VIN decode aligned on make/year with partial trim/model ambiguity Seats not available from the structured VIN sample. Trim-level alignment is good enough for review but should be spot-checked before import."
+      }
+    ],
+    "low": [
+      {
+        "variant": "Ram 1500 2012 ST",
+        "confidence": "low",
+        "notes": "Only partial structured alignment was available Seats not available from the structured VIN sample. Manual review recommended before any future import."
+      }
+    ]
+  },
+  "ev_rule_rows": [
+    {
+      "variant": "Nissan Leaf 2012 SL",
+      "reason": "Imported under EV-safe rule even without piston-engine displacement."
+    },
+    {
+      "variant": "Nissan Leaf 2013 SV",
+      "reason": "Imported under EV-safe rule even without piston-engine displacement."
+    },
+    {
+      "variant": "Nissan Leaf 2013 S",
+      "reason": "Imported under EV-safe rule even without piston-engine displacement."
+    }
+  ],
+  "final_counts": {
+    "car_makes": 20,
+    "car_models": 56,
+    "car_variants": 172,
+    "variant_images": 150,
+    "listings": 67,
+    "listing_images": 228
+  }
+}

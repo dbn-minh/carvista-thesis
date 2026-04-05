@@ -261,11 +261,11 @@ export async function compareVariants(ctx, input) {
   const foundIds = new Set(baseRows.map((row) => Number(row.variant_id)));
   const missing = ids.filter((id) => !foundIds.has(id));
   if (missing.length) {
-    return {
-      status: "partial",
-      missing_variant_ids: missing,
-      items: baseRows,
-      notes: "Some variant_ids not found",
+    throw {
+      status: 404,
+      safe: true,
+      message: "One or more selected vehicles are not available in the CarVista catalog yet. Compare only supports catalog-backed variants.",
+      details: { missing_variant_ids: missing },
     };
   }
 

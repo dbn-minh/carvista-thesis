@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">CarVista MPV placeholder</title>
+  <desc id="desc">MPV placeholder image for catalog vehicles.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#f8fbff"/>
+      <stop offset="100%" stop-color="#dde8fb"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <rect x="180" y="420" width="840" height="130" rx="65" fill="#0f2d62" opacity="0.14"/>
+  <path d="M182 504c0-34 28-62 62-62h58l74-115c20-31 54-49 91-49h245c34 0 66 15 87 40l102 124h56c34 0 61 27 61 61v89h-92c-8-49-50-84-100-84s-92 35-100 84H410c-8-49-50-84-100-84s-92 35-100 84h-28z" fill="#214d90"/>
+  <circle cx="334" cy="592" r="60" fill="#163768"/>
+  <circle cx="334" cy="592" r="29" fill="#f7f9fc"/>
+  <circle cx="820" cy="592" r="60" fill="#163768"/>
+  <circle cx="820" cy="592" r="29" fill="#f7f9fc"/>
+  <text x="600" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="#0f2d62">MPV</text>
+  <text x="600" y="228" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#49627f">Catalog placeholder image</text>
+</svg>

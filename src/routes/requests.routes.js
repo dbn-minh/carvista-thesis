@@ -12,6 +12,7 @@ const CreateRequestSchema = z.object({
     contact_name: z.string().optional(),
     contact_email: z.string().email().optional(),
     contact_phone: z.string().optional(),
+    preferred_contact_method: z.enum(["phone", "email", "phone_or_email"]).optional(),
     preferred_viewing_time: z.string().optional(),
   }),
   query: z.any(),
@@ -33,12 +34,14 @@ requestsRoutes.post(
         contactName: payload.contact_name,
         contactEmail: payload.contact_email,
         contactPhone: payload.contact_phone,
+        preferredContactMethod: payload.preferred_contact_method,
         preferredViewingTime: payload.preferred_viewing_time,
         message: payload.message,
       });
 
       res.status(201).json({
         request_id: result.viewingRequest.request_id,
+        request: result.viewingRequest,
         seller_notified: result.sellerNotified,
         notification_provider: result.notificationProvider,
       });
@@ -70,7 +73,16 @@ requestsRoutes.get("/requests/inbox", requireAuth, async (req, res, next) => {
 
 const UpdateReqSchema = z.object({
   body: z.object({
-    status: z.enum(["accepted", "rejected", "cancelled"]),
+    status: z.enum([
+      "new",
+      "contacted",
+      "no_answer",
+      "follow_up_needed",
+      "scheduled",
+      "completed",
+      "closed",
+      "cancelled",
+    ]),
   }),
   query: z.any(),
   params: z.any(),

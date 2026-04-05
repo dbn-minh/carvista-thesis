@@ -11,8 +11,6 @@ type Props = {
   filters: ListingFilterState;
   setFilters: Dispatch<SetStateAction<ListingFilterState>>;
   options: ListingFilterOptions;
-  requestMessage: string;
-  setRequestMessage: Dispatch<SetStateAction<string>>;
 };
 
 const quickFilters = [
@@ -34,8 +32,6 @@ export default function ListingFilters({
   filters,
   setFilters,
   options,
-  requestMessage,
-  setRequestMessage,
 }: Props) {
   function updateField<Key extends keyof ListingFilterState>(key: Key, value: ListingFilterState[Key]) {
     setFilters((current) => ({
@@ -45,7 +41,7 @@ export default function ListingFilters({
   }
 
   return (
-    <section className="rounded-[32px] border border-cars-gray-light/70 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(241,246,255,0.96))] p-5 shadow-[0_18px_44px_rgba(15,45,98,0.08)] md:p-6">
+    <section className="rounded-[32px] border border-cars-gray-light/70 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(241,246,255,0.96))] p-5 shadow-[0_18px_44px_rgba(15,45,98,0.08)] dark:border-cars-gray-light/40 dark:bg-[linear-gradient(135deg,rgba(8,17,31,0.96),rgba(15,26,44,0.92))] md:p-6">
       <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
@@ -54,7 +50,7 @@ export default function ListingFilters({
             </p>
             <h1 className="mt-2 text-4xl font-apercu-bold text-cars-primary">Listings</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
-              Browse visually, compare the essentials fast, and open the cars that deserve a closer look.
+              Browse what is available now, then open each car to review the details and the seller before you inquire.
             </p>
           </div>
 
@@ -63,7 +59,7 @@ export default function ListingFilters({
               Buyer flow
             </p>
             <p className="mt-2 text-sm leading-6 text-white/85">
-              View details publicly. Save and request viewing after login.
+              Check availability first. Review the vehicle and the seller before you request a viewing.
             </p>
           </div>
         </div>
@@ -73,14 +69,14 @@ export default function ListingFilters({
             value={filters.query}
             onChange={(event) => updateField("query", event.target.value)}
             placeholder="Search brand, model, trim, city, or keyword"
-            className="h-12 rounded-full border border-cars-gray-light bg-white px-5 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className="h-12 rounded-full border border-cars-gray-light bg-white px-5 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-400"
           />
           <select
             value={filters.sort}
             onChange={(event) =>
               updateField("sort", event.target.value as ListingFilterState["sort"])
             }
-            className="h-12 rounded-full border border-cars-gray-light bg-white px-5 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className="h-12 rounded-full border border-cars-gray-light bg-white px-5 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-slate-950/70 dark:text-white"
           >
             {sortOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -96,7 +92,7 @@ export default function ListingFilters({
               key={chip.label}
               type="button"
               onClick={() => setFilters((current) => ({ ...current, ...chip.update }))}
-              className="rounded-full border border-cars-primary/12 bg-white px-4 py-2 text-sm font-semibold text-cars-primary transition hover:border-cars-accent/30 hover:bg-cars-off-white"
+              className="rounded-full border border-cars-primary/12 bg-white px-4 py-2 text-sm font-semibold text-cars-primary transition hover:border-cars-accent/30 hover:bg-cars-off-white dark:bg-slate-950/60 dark:text-white"
             >
               {chip.label}
             </button>
@@ -109,19 +105,19 @@ export default function ListingFilters({
             onChange={(event) => updateField("minPrice", event.target.value)}
             placeholder="Min price"
             inputMode="numeric"
-            className="h-11 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className="h-11 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-400"
           />
           <input
             value={filters.maxPrice}
             onChange={(event) => updateField("maxPrice", event.target.value)}
             placeholder="Max price"
             inputMode="numeric"
-            className="h-11 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className="h-11 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-400"
           />
           <select
             value={filters.make}
             onChange={(event) => updateField("make", event.target.value)}
-            className="h-11 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className="h-11 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-slate-950/70 dark:text-white"
           >
             <option value="">All brands</option>
             {options.makes.map((make) => (
@@ -133,7 +129,7 @@ export default function ListingFilters({
           <select
             value={filters.bodyType}
             onChange={(event) => updateField("bodyType", event.target.value)}
-            className="h-11 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className="h-11 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-slate-950/70 dark:text-white"
           >
             <option value="">All body types</option>
             {options.bodyTypes.map((bodyType) => (
@@ -145,7 +141,7 @@ export default function ListingFilters({
           <select
             value={filters.year}
             onChange={(event) => updateField("year", event.target.value)}
-            className="h-11 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className="h-11 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-slate-950/70 dark:text-white"
           >
             <option value="">All years</option>
             {options.years.map((year) => (
@@ -159,12 +155,12 @@ export default function ListingFilters({
             onChange={(event) => updateField("maxMileage", event.target.value)}
             placeholder="Max mileage (km)"
             inputMode="numeric"
-            className="h-11 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className="h-11 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-slate-950/70 dark:text-white dark:placeholder:text-slate-400"
           />
           <select
             value={filters.transmission}
             onChange={(event) => updateField("transmission", event.target.value)}
-            className="h-11 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className="h-11 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-slate-950/70 dark:text-white"
           >
             <option value="">All transmissions</option>
             {options.transmissions.map((transmission) => (
@@ -176,7 +172,7 @@ export default function ListingFilters({
           <select
             value={filters.fuelType}
             onChange={(event) => updateField("fuelType", event.target.value)}
-            className="h-11 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className="h-11 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-slate-950/70 dark:text-white"
           >
             <option value="">All fuel types</option>
             {options.fuelTypes.map((fuelType) => (
@@ -188,7 +184,7 @@ export default function ListingFilters({
           <select
             value={filters.location}
             onChange={(event) => updateField("location", event.target.value)}
-            className="h-11 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className="h-11 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-slate-950/70 dark:text-white"
           >
             <option value="">All locations</option>
             {options.locations.map((location) => (
@@ -199,17 +195,6 @@ export default function ListingFilters({
           </select>
         </div>
 
-        <div className="rounded-[24px] bg-white/90 p-4 shadow-[0_12px_24px_rgba(15,45,98,0.05)]">
-          <label className="block text-sm font-semibold text-cars-primary">
-            Default note for quick viewing requests
-          </label>
-          <input
-            value={requestMessage}
-            onChange={(event) => setRequestMessage(event.target.value)}
-            className="mt-3 h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
-            placeholder="Hi, I would like to schedule a viewing for this car."
-          />
-        </div>
       </div>
     </section>
   );

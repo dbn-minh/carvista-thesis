@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import PageIntelligencePanel from "@/components/ai/PageIntelligencePanel";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
+import PriceHistoryChart from "@/components/catalog/PriceHistoryChart";
 import Header from "@/components/layout/Header";
 import StatusBanner from "@/components/common/StatusBanner";
 import { catalogApi, reviewsApi, watchlistApi } from "@/lib/carvista-api";
@@ -23,7 +24,7 @@ function getImageUrl(image: Record<string, unknown>): string | null {
 
 export default function CatalogDetailPage() {
   const params = useParams<{ id: string }>();
-  const { openAssistant, openCompare } = useAiAssistant();
+  const { openAssistant } = useAiAssistant();
   const { openAuth } = useAuthModal();
   const id = Number(params.id);
 
@@ -162,6 +163,22 @@ export default function CatalogDetailPage() {
     { label: "MSRP", value: toCurrency(detail?.variant?.msrp_base) },
   ];
 
+  const listingsHref = useMemo(() => {
+    const variant = detail?.variant;
+    if (!variant) return "/listings";
+
+    const params = new URLSearchParams();
+    params.set("variantId", String(id));
+    params.set("query", heading);
+
+    if (variant.make_name != null) params.set("make", String(variant.make_name));
+    if (variant.model_year != null) params.set("year", String(variant.model_year));
+    if (variant.body_type != null) params.set("bodyType", String(variant.body_type));
+    if (variant.fuel_type != null) params.set("fuelType", String(variant.fuel_type));
+
+    return `/listings?${params.toString()}`;
+  }, [detail, heading, id]);
+
   return (
     <>
       <Header />
@@ -179,40 +196,13 @@ export default function CatalogDetailPage() {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-3 md:justify-end">
               <Link
-                href="/catalog"
-                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-white"
+                href={listingsHref}
+                className="rounded-full border border-cars-accent/20 bg-cars-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-cars-primary"
               >
-                Back to catalog
+                View listings
               </Link>
-              <button
-                type="button"
-                onClick={() =>
-                  openCompare({
-                    variantId: id,
-                    variantLabel: heading,
-                    marketId: Number(marketId) || 1,
-                  })
-                }
-                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-white"
-              >
-                Compare with AI
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  openAssistant({
-                    prompt: `Help me decide whether ${heading} fits my lifestyle and budget.`,
-                    marketId: Number(marketId) || 1,
-                    variantId: id,
-                    variantLabel: heading,
-                  })
-                }
-                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-white"
-              >
-                Ask AI advisor
-              </button>
               <button
                 type="button"
                 onClick={saveVariant}
@@ -220,6 +210,12 @@ export default function CatalogDetailPage() {
               >
                 Save to watchlist
               </button>
+              <Link
+                href="/catalog"
+                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-white"
+              >
+                Back to catalog
+              </Link>
             </div>
           </div>
         </section>
@@ -326,13 +322,13 @@ export default function CatalogDetailPage() {
                 value={marketId}
                 onChange={(e) => setMarketId(e.target.value)}
                 className="h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
-                placeholder="marketId"
+                placeholder="Market ID"
               />
               <button
                 className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary"
                 type="submit"
               >
-                Reload
+                Refresh data
               </button>
             </form>
             <div className="mt-3">
@@ -346,19 +342,7 @@ export default function CatalogDetailPage() {
                 <option value="7">7-year ownership</option>
               </select>
             </div>
-            <div className="mt-5 space-y-3 text-sm">
-              {priceHistory.length === 0 ? <p className="text-cars-gray">No price history.</p> : null}
-              {priceHistory.map((row, index) => (
-                <div
-                  key={index}
-                  className="rounded-[22px] border border-cars-gray-light/70 p-4"
-                >
-                  <p className="font-medium text-cars-primary">Price: {toCurrency(row.price)}</p>
-                  <p className="mt-2 text-cars-gray">Captured: {getText(row.captured_at)}</p>
-                  <p className="mt-1 text-cars-gray">Source: {getText(row.source)}</p>
-                </div>
-              ))}
-            </div>
+            <PriceHistoryChart rows={priceHistory} />
           </div>
 
           <div className="section-shell p-6">

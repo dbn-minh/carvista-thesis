@@ -422,15 +422,98 @@ listingsRoutes.get("/listings", async (req, res, next) => {
 
 listingsRoutes.get("/listings/:id", async (req, res, next) => {
   try {
-    const { Listings } = req.ctx.models;
+    const { Listings, Users, CarVariants, CarModels, CarMakes, VariantImages } = req.ctx.models;
     const listingImageService = createListingImageService(req.ctx);
     const id = Number(req.params.id);
 
-    const listing = await Listings.findByPk(id);
+    const listing = await Listings.findByPk(id, {
+      include: [
+        {
+          model: CarVariants,
+          as: "variant",
+          attributes: [
+            "variant_id",
+            "model_year",
+            "trim_name",
+            "body_type",
+            "fuel_type",
+            "transmission",
+            "engine",
+          ],
+          include: [
+            {
+              model: CarModels,
+              as: "model",
+              attributes: ["model_id", "name"],
+              include: [
+                {
+                  model: CarMakes,
+                  as: "make",
+                  attributes: ["make_id", "name"],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
     if (!listing) return next({ status: 404, message: "Listing not found" });
 
-    const images = await listingImageService.listImages(id);
-    res.json({ listing, images });
+    const plain = listing.get({ plain: true });
+    const listingImages = await listingImageService.listImages(id);
+    const variantImages =
+      listingImages.length === 0 && listing.variant_id
+        ? await VariantImages.findAll({
+            where: { variant_id: listing.variant_id },
+            order: [["sort_order", "ASC"]],
+          })
+        : [];
+
+    const normalizedImages =
+      listingImages.length > 0
+        ? listingImages
+        : variantImages.map((image) => ({
+            listing_id: listing.listing_id,
+            listing_image_id: null,
+            url: image.url,
+            provider: image.provider || "placeholder",
+            sortOrder: image.sort_order ?? null,
+            storage: "catalog_variant",
+            createdAt: image.created_at ?? null,
+          }));
+
+    const seller = await Users.findByPk(listing.owner_id, {
+      attributes: ["user_id", "name", "email", "phone", "preferred_contact_method"],
+    });
+
+    const firstImage = normalizedImages[0]?.url ?? null;
+
+    res.json({
+      listing: {
+        ...plain,
+        title: buildListingTitle(plain.variant),
+        model_year: plain.variant?.model_year ?? null,
+        trim_name: plain.variant?.trim_name ?? null,
+        body_type: plain.variant?.body_type ?? null,
+        fuel_type: plain.variant?.fuel_type ?? null,
+        transmission: plain.variant?.transmission ?? null,
+        engine: plain.variant?.engine ?? null,
+        make_name: plain.variant?.model?.make?.name ?? null,
+        model_name: plain.variant?.model?.name ?? null,
+        seller_type: plain.seller_type ?? null,
+        photo_source:
+          listingImages.length > 0
+            ? "listing"
+            : normalizedImages.length > 0
+              ? "catalog"
+              : "none",
+        image_count: normalizedImages.length,
+        cover_image: firstImage,
+        thumbnail: firstImage,
+      },
+      images: normalizedImages,
+      seller: seller ? seller.get({ plain: true }) : null,
+    });
   } catch (e) { next(e); }
 });
 

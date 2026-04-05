@@ -44,7 +44,7 @@ export default function ListingReviewPanel({
 
       <ListingPreviewCard form={form} selectedVariant={selectedVariant} />
 
-      <div className="rounded-[28px] border border-cars-gray-light/70 bg-white p-5 shadow-[0_12px_28px_rgba(15,45,98,0.05)]">
+      <div className="rounded-[28px] border border-cars-gray-light/70 bg-white p-5 shadow-[0_12px_28px_rgba(15,45,98,0.05)] dark:border-cars-gray-light/35 dark:bg-slate-950/55">
         <h3 className="text-lg font-apercu-bold text-cars-primary">Listing quality checklist</h3>
         <div className="mt-4 space-y-3">
           {checklist.map((item) => (
@@ -52,8 +52,8 @@ export default function ListingReviewPanel({
               key={item.label}
               className={
                 item.done
-                  ? "rounded-[20px] border border-emerald-100 bg-emerald-50 px-4 py-3"
-                  : "rounded-[20px] border border-cars-primary/8 bg-cars-off-white px-4 py-3"
+                  ? "rounded-[20px] border border-emerald-100 bg-emerald-50 px-4 py-3 dark:border-emerald-400/20 dark:bg-emerald-500/12"
+                  : "rounded-[20px] border border-cars-primary/8 bg-cars-off-white px-4 py-3 dark:border-cars-gray-light/25 dark:bg-slate-900/65"
               }
             >
               <p className="text-sm font-semibold text-cars-primary">{item.label}</p>
@@ -63,12 +63,12 @@ export default function ListingReviewPanel({
         </div>
       </div>
 
-      <div className="rounded-[28px] border border-cars-gray-light/70 bg-white p-5 shadow-[0_12px_28px_rgba(15,45,98,0.05)]">
+      <div className="rounded-[28px] border border-cars-gray-light/70 bg-white p-5 shadow-[0_12px_28px_rgba(15,45,98,0.05)] dark:border-cars-gray-light/35 dark:bg-slate-950/55">
         <h3 className="text-lg font-apercu-bold text-cars-primary">What will be published</h3>
         <p className="mt-3 text-sm leading-6 text-cars-gray">
           The current backend still stores the extra seller notes inside the listing description so the publish flow stays compatible while the richer data model catches up.
         </p>
-        <div className="mt-4 rounded-[20px] bg-cars-off-white p-4 text-sm leading-6 text-cars-gray">
+        <div className="mt-4 rounded-[20px] bg-cars-off-white p-4 text-sm leading-6 text-cars-gray dark:bg-slate-900/65">
           {composedDescription || "No description content yet."}
         </div>
       </div>

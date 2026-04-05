@@ -82,6 +82,18 @@ export const authApi = {
   me() {
     return apiFetch<{ user: User }>("/auth/me");
   },
+
+  updateMe(payload: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    preferred_contact_method?: "phone" | "email" | "phone_or_email";
+  }) {
+    return apiFetch<{ user: User }>("/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
 };
 
 export const catalogApi = {
@@ -331,11 +343,13 @@ export const requestsApi = {
       contact_name?: string;
       contact_email?: string;
       contact_phone?: string;
+      preferred_contact_method?: "phone" | "email" | "phone_or_email";
       preferred_viewing_time?: string;
     }
   ) {
     return apiFetch<{
       request_id: number;
+      request?: ViewingRequest;
       seller_notified: boolean;
       notification_provider?: string | null;
     }>(`/listings/${listingId}/requests`, {
@@ -354,7 +368,15 @@ export const requestsApi = {
 
   updateStatus(
     requestId: number,
-    status: "accepted" | "rejected" | "cancelled"
+    status:
+      | "new"
+      | "contacted"
+      | "no_answer"
+      | "follow_up_needed"
+      | "scheduled"
+      | "completed"
+      | "closed"
+      | "cancelled"
   ) {
     return apiFetch<{ ok: true }>(`/requests/${requestId}/status`, {
       method: "PATCH",

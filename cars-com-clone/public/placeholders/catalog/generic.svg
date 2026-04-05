@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">CarVista generic vehicle placeholder</title>
+  <desc id="desc">Generic placeholder image for catalog vehicles.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#f7f9fc"/>
+      <stop offset="100%" stop-color="#dce5f6"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <rect x="210" y="430" width="780" height="112" rx="56" fill="#0f2d62" opacity="0.12"/>
+  <path d="M224 506c0-31 25-56 56-56h58l89-116c20-26 50-42 83-42h235c31 0 59 14 79 39l95 119h19c31 0 56 25 56 56v70h-80c-8-45-48-77-94-77s-86 32-94 77H428c-8-45-48-77-94-77s-86 32-94 77h-16z" fill="#214d90"/>
+  <circle cx="338" cy="576" r="57" fill="#163768"/>
+  <circle cx="338" cy="576" r="27" fill="#f7f9fc"/>
+  <circle cx="776" cy="576" r="57" fill="#163768"/>
+  <circle cx="776" cy="576" r="27" fill="#f7f9fc"/>
+  <text x="600" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="#0f2d62">Vehicle</text>
+  <text x="600" y="228" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#49627f">Catalog placeholder image</text>
+</svg>

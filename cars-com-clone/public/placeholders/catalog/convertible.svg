@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">CarVista convertible placeholder</title>
+  <desc id="desc">Convertible placeholder image for catalog vehicles.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#f8fbff"/>
+      <stop offset="100%" stop-color="#dce7fb"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <rect x="250" y="446" width="700" height="98" rx="49" fill="#0f2d62" opacity="0.14"/>
+  <path d="M252 506c0-30 24-54 54-54h101l75-80c24-25 57-39 92-39h130c27 0 53 10 74 29l75 68h65c30 0 54 24 54 54v88h-81c-8-44-46-76-90-76s-82 32-90 76H431c-8-44-46-76-90-76s-82 32-90 76h-1z" fill="#214d90"/>
+  <circle cx="342" cy="572" r="56" fill="#163768"/>
+  <circle cx="342" cy="572" r="26" fill="#f7f9fc"/>
+  <circle cx="760" cy="572" r="56" fill="#163768"/>
+  <circle cx="760" cy="572" r="26" fill="#f7f9fc"/>
+  <text x="600" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="#0f2d62">Convertible</text>
+  <text x="600" y="228" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#49627f">Catalog placeholder image</text>
+</svg>

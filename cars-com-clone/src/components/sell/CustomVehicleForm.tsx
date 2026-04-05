@@ -12,9 +12,11 @@ type Props = {
 };
 
 export default function CustomVehicleForm({ value, onChange, errors }: Props) {
+  const fieldClass =
+    "h-12 w-full rounded-[20px] border border-cars-gray-light px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-slate-950/60 dark:text-white dark:placeholder:text-slate-400";
   return (
     <div className="grid gap-4">
-      <div className="rounded-[22px] border border-cars-primary/12 bg-cars-off-white p-4 text-sm leading-6 text-cars-gray">
+      <div className="rounded-[22px] border border-cars-primary/12 bg-cars-off-white p-4 text-sm leading-6 text-cars-gray dark:border-cars-gray-light/35 dark:bg-slate-950/45">
         Your car can still be listed even if it is missing from the current catalog. We will create
         a placeholder vehicle behind the scenes and keep the marketplace listing flow intact.
       </div>
@@ -25,7 +27,7 @@ export default function CustomVehicleForm({ value, onChange, errors }: Props) {
           <input
             value={value.make}
             onChange={(event) => onChange("make", event.target.value)}
-            className="h-12 w-full rounded-[20px] border border-cars-gray-light px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className={fieldClass}
             placeholder="Toyota"
           />
           {errors.customMake ? <p className="mt-2 text-xs font-medium text-red-600">{errors.customMake}</p> : null}
@@ -36,7 +38,7 @@ export default function CustomVehicleForm({ value, onChange, errors }: Props) {
           <input
             value={value.model}
             onChange={(event) => onChange("model", event.target.value)}
-            className="h-12 w-full rounded-[20px] border border-cars-gray-light px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className={fieldClass}
             placeholder="Corolla Cross"
           />
           {errors.customModel ? <p className="mt-2 text-xs font-medium text-red-600">{errors.customModel}</p> : null}
@@ -48,7 +50,7 @@ export default function CustomVehicleForm({ value, onChange, errors }: Props) {
             value={value.year}
             onChange={(event) => onChange("year", event.target.value)}
             inputMode="numeric"
-            className="h-12 w-full rounded-[20px] border border-cars-gray-light px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className={fieldClass}
             placeholder="2021"
           />
           {errors.customYear ? <p className="mt-2 text-xs font-medium text-red-600">{errors.customYear}</p> : null}
@@ -59,7 +61,7 @@ export default function CustomVehicleForm({ value, onChange, errors }: Props) {
           <input
             value={value.trimName}
             onChange={(event) => onChange("trimName", event.target.value)}
-            className="h-12 w-full rounded-[20px] border border-cars-gray-light px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className={fieldClass}
             placeholder="1.8V or Custom listing"
           />
         </div>
@@ -69,7 +71,7 @@ export default function CustomVehicleForm({ value, onChange, errors }: Props) {
           <select
             value={value.bodyType}
             onChange={(event) => onChange("bodyType", event.target.value)}
-            className="h-12 w-full rounded-[20px] border border-cars-gray-light px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className={fieldClass}
           >
             <option value="">Select body type</option>
             {bodyTypeOptions.map((option) => (
@@ -88,7 +90,7 @@ export default function CustomVehicleForm({ value, onChange, errors }: Props) {
           <select
             value={value.fuelType}
             onChange={(event) => onChange("fuelType", event.target.value)}
-            className="h-12 w-full rounded-[20px] border border-cars-gray-light px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className={fieldClass}
           >
             <option value="">Select fuel type</option>
             {fuelTypeOptions.map((option) => (
@@ -107,7 +109,7 @@ export default function CustomVehicleForm({ value, onChange, errors }: Props) {
           <input
             value={value.transmission}
             onChange={(event) => onChange("transmission", event.target.value)}
-            className="h-12 w-full rounded-[20px] border border-cars-gray-light px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className={fieldClass}
             placeholder="Automatic"
           />
         </div>
@@ -117,7 +119,7 @@ export default function CustomVehicleForm({ value, onChange, errors }: Props) {
           <input
             value={value.drivetrain}
             onChange={(event) => onChange("drivetrain", event.target.value)}
-            className="h-12 w-full rounded-[20px] border border-cars-gray-light px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className={fieldClass}
             placeholder="FWD, RWD, AWD"
           />
         </div>
@@ -127,7 +129,7 @@ export default function CustomVehicleForm({ value, onChange, errors }: Props) {
           <input
             value={value.engine}
             onChange={(event) => onChange("engine", event.target.value)}
-            className="h-12 w-full rounded-[20px] border border-cars-gray-light px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className={fieldClass}
             placeholder="2.0L turbo"
           />
         </div>
@@ -137,7 +139,7 @@ export default function CustomVehicleForm({ value, onChange, errors }: Props) {
           <input
             value={value.vin}
             onChange={(event) => onChange("vin", event.target.value)}
-            className="h-12 w-full rounded-[20px] border border-cars-gray-light px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className={fieldClass}
             placeholder="Optional but recommended"
           />
         </div>
@@ -149,7 +151,7 @@ export default function CustomVehicleForm({ value, onChange, errors }: Props) {
           <input
             value={value.licensePlate}
             onChange={(event) => onChange("licensePlate", event.target.value)}
-            className="h-12 w-full rounded-[20px] border border-cars-gray-light px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className={fieldClass}
             placeholder="Private or partial plate"
           />
         </div>

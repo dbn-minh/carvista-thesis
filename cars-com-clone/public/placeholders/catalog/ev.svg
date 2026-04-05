@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">CarVista electric vehicle placeholder</title>
+  <desc id="desc">Electric vehicle placeholder image for catalog vehicles.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#f3fbf8"/>
+      <stop offset="100%" stop-color="#d6f5eb"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <rect x="220" y="430" width="760" height="112" rx="56" fill="#0f2d62" opacity="0.1"/>
+  <path d="M228 506c0-31 25-56 56-56h62l88-118c19-25 49-40 80-40h247c31 0 60 14 79 38l96 120h20c31 0 56 25 56 56v70h-79c-8-45-48-77-94-77s-86 32-94 77H433c-8-45-48-77-94-77s-86 32-94 77h-17z" fill="#14936b"/>
+  <circle cx="342" cy="576" r="57" fill="#0f6b4e"/>
+  <circle cx="342" cy="576" r="27" fill="#f7f9fc"/>
+  <circle cx="780" cy="576" r="57" fill="#0f6b4e"/>
+  <circle cx="780" cy="576" r="27" fill="#f7f9fc"/>
+  <path d="M821 262l48 0-43 88h48l-86 120 22-88h-46z" fill="#14936b"/>
+  <text x="600" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="#0f6b4e">Electric Vehicle</text>
+  <text x="600" y="228" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#3d7566">Catalog placeholder image</text>
+</svg>

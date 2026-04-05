@@ -9,6 +9,7 @@ export type User = {
   name: string;
   email: string;
   phone?: string | null;
+  preferred_contact_method?: "phone" | "email" | "phone_or_email" | null;
   role: string;
 };
 
@@ -305,9 +306,18 @@ export type ListingImage = {
   createdAt?: string | null;
 };
 
+export type ListingSeller = {
+  user_id: number;
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  preferred_contact_method?: "phone" | "email" | "phone_or_email" | null;
+};
+
 export type ListingDetail = {
   listing: Listing;
   images: ListingImage[];
+  seller?: ListingSeller | null;
 };
 
 export type NotificationItem = {
@@ -328,9 +338,12 @@ export type ViewingRequest = {
   contact_name?: string | null;
   contact_email?: string | null;
   contact_phone?: string | null;
+  preferred_contact_method?: "phone" | "email" | "phone_or_email" | null;
   preferred_viewing_time?: string | null;
   message?: string | null;
   status: string;
+  lifecycle_status?: string | null;
+  follow_up_status?: string | null;
   created_at?: string;
   notified_at?: string | null;
 };

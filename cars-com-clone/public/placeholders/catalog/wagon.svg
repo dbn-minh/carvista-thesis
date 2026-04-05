@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">CarVista wagon placeholder</title>
+  <desc id="desc">Wagon placeholder image for catalog vehicles.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#f7fbff"/>
+      <stop offset="100%" stop-color="#dfe9fb"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <rect x="210" y="430" width="780" height="110" rx="55" fill="#0f2d62" opacity="0.14"/>
+  <path d="M214 504c0-31 25-56 56-56h52l91-125c20-27 51-43 84-43h265c27 0 53 11 72 31l96 104h16c31 0 56 25 56 56v81h-81c-8-46-48-79-94-79s-86 33-94 79H432c-8-46-48-79-94-79s-86 33-94 79h-30z" fill="#214d90"/>
+  <circle cx="338" cy="552" r="58" fill="#163768"/>
+  <circle cx="338" cy="552" r="27" fill="#f7f9fc"/>
+  <circle cx="786" cy="552" r="58" fill="#163768"/>
+  <circle cx="786" cy="552" r="27" fill="#f7f9fc"/>
+  <text x="600" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="#0f2d62">Wagon</text>
+  <text x="600" y="228" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#49627f">Catalog placeholder image</text>
+</svg>

@@ -30,7 +30,7 @@ import {
 } from "@/components/listings/listing-utils";
 import { getStoredAdvisorProfile } from "@/lib/advisor-profile";
 import { aiApi, catalogApi, listingsApi } from "@/lib/carvista-api";
-import { toCurrency } from "@/lib/api-client";
+import { apiFetch, toCurrency } from "@/lib/api-client";
 import { useRequireLogin } from "@/lib/auth-guard";
 import {
   buildCompareHref,
@@ -61,6 +61,15 @@ type SearchState = {
   loading: boolean;
   error: string;
   options: VariantListItem[];
+};
+
+type ResolutionStatus = "empty" | "exact" | "multiple" | "unsupported";
+
+type ResolutionResult = {
+  selection: SelectedVehicle | null;
+  status: ResolutionStatus;
+  note: string | null;
+  searchQuery?: string;
 };
 
 type FollowUpMessage = {
@@ -150,6 +159,32 @@ function normalizeLabel(value: string) {
   return value.trim().toLowerCase();
 }
 
+function buildCatalogSupportMessage(label?: string | null) {
+  const prefix = label?.trim() ? label.trim() : "This vehicle";
+  return `${prefix} is not available as a compare-ready CarVista catalog variant yet. Compare only works with catalog-backed vehicles.`;
+}
+
+function stripLeadingYearQuery(query: string) {
+  const trimmed = query.trim();
+  if (!trimmed) return "";
+  return trimmed.replace(/^(19|20)\d{2}\s+/, "").trim();
+}
+
+async function fetchCompareReadyVariants(query: string) {
+  const qs = new URLSearchParams();
+  qs.set("q", query);
+  qs.set("compareReady", "true");
+  return apiFetch<{ items: VariantListItem[] }>(`/catalog/variants?${qs.toString()}`);
+}
+
+async function fetchCompareReadyVariantDetail(variantId: number) {
+  const qs = new URLSearchParams();
+  qs.set("compareReady", "true");
+  return apiFetch<{ variant: Record<string, unknown> | null }>(
+    `/catalog/variants/${variantId}?${qs.toString()}`
+  );
+}
+
 function pickBestVariantMatch(query: string, items: VariantListItem[]) {
   const normalizedQuery = normalizeLabel(query);
   const ranked = [...items].sort((left, right) => {
@@ -170,6 +205,15 @@ function pickBestVariantMatch(query: string, items: VariantListItem[]) {
   return ranked[0] ?? null;
 }
 
+function findExactVariantMatch(query: string, items: VariantListItem[]) {
+  const normalizedQuery = normalizeLabel(query);
+  const exactMatches = items.filter(
+    (item) => normalizeLabel(buildVariantLabel(item)) === normalizedQuery
+  );
+  if (exactMatches.length === 1) return exactMatches[0];
+  return null;
+}
+
 async function resolveSelectionFromParams({
   listingId,
   variantId,
@@ -180,59 +224,185 @@ async function resolveSelectionFromParams({
   variantId: number | null;
   variantLabel: string;
   query: string;
-}): Promise<SelectedVehicle | null> {
+}): Promise<ResolutionResult> {
   if (listingId) {
     const detail = await listingsApi.detail(listingId);
     const label = buildListingTitle(detail.listing);
+    const resolvedVariantId = detail.listing.variant_id ?? variantId;
+    if (!resolvedVariantId) {
+      return {
+        selection: null,
+        status: "unsupported",
+        note: buildCatalogSupportMessage(label),
+        searchQuery: "",
+      };
+    }
+    try {
+      await fetchCompareReadyVariantDetail(resolvedVariantId);
+    } catch {
+      return {
+        selection: null,
+        status: "unsupported",
+        note: buildCatalogSupportMessage(label),
+        searchQuery: "",
+      };
+    }
     return {
-      variantId: detail.listing.variant_id ?? variantId,
-      label,
-      query: label,
-      listingId,
-      listing: detail,
-      resolutionNote: null,
-      source: "listing",
+      selection: {
+        variantId: resolvedVariantId,
+        label,
+        query: label,
+        listingId,
+        listing: detail,
+        resolutionNote: null,
+        source: "listing",
+      },
+      status: "exact",
+      note: null,
+      searchQuery: label,
     };
   }
 
   if (variantId) {
     let label = variantLabel.trim();
-    if (!label) {
-      const detail = await catalogApi.variantDetail(variantId);
-      label = buildLabelFromVariantDetailPayload(detail.variant);
+    try {
+      const detail = await fetchCompareReadyVariantDetail(variantId);
+      if (!label) {
+        label = buildLabelFromVariantDetailPayload(detail.variant);
+      }
+    } catch {
+      const fallbackLabel = label || query.trim() || "This vehicle";
+      return {
+        selection: null,
+        status: "unsupported",
+        note: buildCatalogSupportMessage(fallbackLabel),
+        searchQuery: "",
+      };
     }
 
     return {
-      variantId,
-      label: label || query.trim() || "Selected vehicle",
-      query: label || query.trim() || "Selected vehicle",
-      listingId: null,
-      listing: null,
-      resolutionNote: null,
-      source: "variant",
+      selection: {
+        variantId,
+        label: label || query.trim() || "Selected vehicle",
+        query: label || query.trim() || "Selected vehicle",
+        listingId: null,
+        listing: null,
+        resolutionNote: null,
+        source: "variant",
+      },
+      status: "exact",
+      note: null,
+      searchQuery: label || query.trim() || "Selected vehicle",
     };
   }
 
   if (query.trim().length >= 2) {
-    const response = await catalogApi.variants({ q: query.trim() });
-    const candidate = pickBestVariantMatch(query, response.items);
-    if (!candidate) return null;
+    const trimmedQuery = query.trim();
+    const response = await fetchCompareReadyVariants(trimmedQuery);
+    const exactMatch = findExactVariantMatch(trimmedQuery, response.items);
+    if (exactMatch) {
+      return {
+        selection: {
+          variantId: exactMatch.variant_id,
+          label: buildVariantLabel(exactMatch),
+          query: buildVariantLabel(exactMatch),
+          listingId: null,
+          listing: null,
+          resolutionNote: null,
+          source: "query",
+        },
+        status: "exact",
+        note: null,
+        searchQuery: buildVariantLabel(exactMatch),
+      };
+    }
+    if (response.items.length === 1) {
+      const candidate = response.items[0];
+      return {
+        selection: {
+          variantId: candidate.variant_id,
+          label: buildVariantLabel(candidate),
+          query: buildVariantLabel(candidate),
+          listingId: null,
+          listing: null,
+          resolutionNote: `Matched the closest supported catalog variant for "${trimmedQuery}".`,
+          source: "query",
+        },
+        status: "exact",
+        note: `Matched the closest supported catalog variant for "${trimmedQuery}".`,
+        searchQuery: buildVariantLabel(candidate),
+      };
+    }
+    if (response.items.length > 1) {
+      return {
+        selection: null,
+        status: "multiple",
+        note: `${response.items.length} supported variants match "${trimmedQuery}". Choose the exact trim to compare.`,
+        searchQuery: trimmedQuery,
+      };
+    }
+
+    const fallbackQuery = stripLeadingYearQuery(trimmedQuery);
+    if (fallbackQuery && fallbackQuery !== trimmedQuery) {
+      const fallbackResponse = await fetchCompareReadyVariants(fallbackQuery);
+      const fallbackExact = findExactVariantMatch(fallbackQuery, fallbackResponse.items);
+      if (fallbackExact) {
+        return {
+          selection: {
+            variantId: fallbackExact.variant_id,
+            label: buildVariantLabel(fallbackExact),
+            query: buildVariantLabel(fallbackExact),
+            listingId: null,
+            listing: null,
+            resolutionNote: `The exact year from "${trimmedQuery}" is not in the current compare catalog. Using the supported match below instead.`,
+            source: "query",
+          },
+          status: "exact",
+          note: `The exact year from "${trimmedQuery}" is not in the current compare catalog. Using a supported match instead.`,
+          searchQuery: buildVariantLabel(fallbackExact),
+        };
+      }
+      if (fallbackResponse.items.length === 1) {
+        const candidate = fallbackResponse.items[0];
+        return {
+          selection: {
+            variantId: candidate.variant_id,
+            label: buildVariantLabel(candidate),
+            query: buildVariantLabel(candidate),
+            listingId: null,
+            listing: null,
+            resolutionNote: `The exact year from "${trimmedQuery}" is not in the current compare catalog. Using the only supported variant found for ${fallbackQuery}.`,
+            source: "query",
+          },
+          status: "exact",
+          note: `The exact year from "${trimmedQuery}" is not in the current compare catalog. Using the only supported variant found for ${fallbackQuery}.`,
+          searchQuery: buildVariantLabel(candidate),
+        };
+      }
+      if (fallbackResponse.items.length > 1) {
+        return {
+          selection: null,
+          status: "multiple",
+          note: `${trimmedQuery} is not in the current compare catalog. Choose one of the supported ${fallbackQuery} variants instead.`,
+          searchQuery: fallbackQuery,
+        };
+      }
+    }
 
     return {
-      variantId: candidate.variant_id,
-      label: buildVariantLabel(candidate),
-      query: buildVariantLabel(candidate),
-      listingId: null,
-      listing: null,
-      resolutionNote:
-        response.items.length > 1
-          ? `Using the closest trim match available for "${query.trim()}".`
-          : null,
-      source: "query",
+      selection: null,
+      status: "unsupported",
+      note: buildCatalogSupportMessage(trimmedQuery),
+      searchQuery: "",
     };
   }
 
-  return null;
+  return {
+    selection: null,
+    status: "empty",
+    note: null,
+    searchQuery: "",
+  };
 }
 
 function getSelectionImage(selection: SelectedVehicle | null) {
@@ -368,6 +538,8 @@ function CompareSearchPanel({
   onChange,
   searchState,
   selected,
+  helperNote,
+  helperTone = "info",
   onSelect,
   onClear,
 }: {
@@ -376,6 +548,8 @@ function CompareSearchPanel({
   onChange: (value: string) => void;
   searchState: SearchState;
   selected: SelectedVehicle | null;
+  helperNote?: string | null;
+  helperTone?: "info" | "error";
   onSelect: (item: VariantListItem) => void;
   onClear: () => void;
 }) {
@@ -385,7 +559,7 @@ function CompareSearchPanel({
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">{title}</p>
           <p className="mt-2 text-sm leading-6 text-cars-gray">
-            Search by make, model, trim, or year.
+            Search the compare-ready catalog only. Select an exact supported variant before comparing.
           </p>
         </div>
         {selected ? (
@@ -402,7 +576,7 @@ function CompareSearchPanel({
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder="Type year, make, and model"
+        placeholder="Search compare-ready year, make, model, or trim"
         className="mt-4 h-12 w-full rounded-2xl border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
       />
 
@@ -425,8 +599,23 @@ function CompareSearchPanel({
         </p>
       ) : null}
 
+      {!selected && helperNote ? (
+        <p
+          className={`mt-4 rounded-[18px] border px-4 py-3 text-sm ${
+            helperTone === "error"
+              ? "border-red-200 bg-red-50 text-red-700"
+              : "border-slate-200 bg-slate-50 text-slate-700"
+          }`}
+        >
+          {helperNote}
+        </p>
+      ) : null}
+
       {!selected && searchState.options.length > 0 ? (
         <div className="mt-4 space-y-2">
+          <p className="px-1 text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
+            Supported variants
+          </p>
           {searchState.options.map((item) => (
             <button
               key={item.variant_id}
@@ -520,6 +709,10 @@ function ComparePageContent() {
   const [rightQuery, setRightQuery] = useState(searchParams.get("rightQuery") || searchParams.get("rightVariantLabel") || "");
   const [leftSearch, setLeftSearch] = useState<SearchState>(emptySearchState);
   const [rightSearch, setRightSearch] = useState<SearchState>(emptySearchState);
+  const [leftHelperNote, setLeftHelperNote] = useState<string | null>(null);
+  const [rightHelperNote, setRightHelperNote] = useState<string | null>(null);
+  const [leftHelperTone, setLeftHelperTone] = useState<"info" | "error">("info");
+  const [rightHelperTone, setRightHelperTone] = useState<"info" | "error">("info");
   const [loadingSelections, setLoadingSelections] = useState(true);
   const [comparing, setComparing] = useState(false);
   const [message, setMessage] = useState("");
@@ -530,6 +723,18 @@ function ComparePageContent() {
   const [followUpSessionId, setFollowUpSessionId] = useState<number | null>(null);
   const [followUpMessages, setFollowUpMessages] = useState<FollowUpMessage[]>([]);
   const autoRunKeyRef = useRef("");
+  const leftHasInitialInput = Boolean(
+    searchParams.get("leftListingId") ||
+      searchParams.get("leftVariantId") ||
+      searchParams.get("leftQuery") ||
+      searchParams.get("leftVariantLabel")
+  );
+  const rightHasInitialInput = Boolean(
+    searchParams.get("rightListingId") ||
+      searchParams.get("rightVariantId") ||
+      searchParams.get("rightQuery") ||
+      searchParams.get("rightVariantLabel")
+  );
 
   useEffect(() => {
     if (!ready) return;
@@ -543,6 +748,8 @@ function ComparePageContent() {
       setResult(null);
       setFollowUpMessages([]);
       setFollowUpSessionId(null);
+      setLeftHelperNote(null);
+      setRightHelperNote(null);
       autoRunKeyRef.current = "";
 
       try {
@@ -563,15 +770,50 @@ function ComparePageContent() {
 
         if (cancelled) return;
 
-        setLeftSelection(resolvedLeft);
-        setRightSelection(resolvedRight);
-        setLeftQuery(resolvedLeft?.query ?? searchParams.get("leftQuery") ?? searchParams.get("leftVariantLabel") ?? "");
-        setRightQuery(resolvedRight?.query ?? searchParams.get("rightQuery") ?? searchParams.get("rightVariantLabel") ?? "");
+        setLeftSelection(resolvedLeft.selection);
+        setRightSelection(resolvedRight.selection);
+        setLeftQuery(
+          resolvedLeft.selection?.query ??
+            resolvedLeft.searchQuery ??
+            ""
+        );
+        setRightQuery(
+          resolvedRight.selection?.query ??
+            resolvedRight.searchQuery ??
+            ""
+        );
 
-        const notes = [resolvedLeft?.resolutionNote, resolvedRight?.resolutionNote].filter(Boolean);
-        if (notes.length > 0) {
+        setLeftHelperNote(resolvedLeft.note);
+        setRightHelperNote(resolvedRight.note);
+        setLeftHelperTone(resolvedLeft.status === "unsupported" ? "error" : "info");
+        setRightHelperTone(resolvedRight.status === "unsupported" ? "error" : "info");
+
+        const blockingNotes: string[] = [];
+        const infoNotes: string[] = [];
+
+        if (leftHasInitialInput && resolvedLeft.status === "unsupported") {
+          blockingNotes.push(
+            resolvedLeft.note ||
+              "Vehicle A could not be matched to a CarVista catalog variant yet. Search again to pick a supported vehicle."
+          );
+        }
+        if (rightHasInitialInput && resolvedRight.status === "unsupported") {
+          blockingNotes.push(
+            resolvedRight.note ||
+              "Vehicle B could not be matched to a CarVista catalog variant yet. Search again to pick a supported vehicle."
+          );
+        }
+        if (resolvedLeft.status === "multiple" && resolvedLeft.note) infoNotes.push(`Vehicle A: ${resolvedLeft.note}`);
+        if (resolvedRight.status === "multiple" && resolvedRight.note) infoNotes.push(`Vehicle B: ${resolvedRight.note}`);
+        if (resolvedLeft.status === "exact" && resolvedLeft.note) infoNotes.push(resolvedLeft.note);
+        if (resolvedRight.status === "exact" && resolvedRight.note) infoNotes.push(resolvedRight.note);
+
+        if (blockingNotes.length > 0) {
+          setTone("error");
+          setMessage(blockingNotes.join(" "));
+        } else if (infoNotes.length > 0) {
           setTone("info");
-          setMessage(notes.join(" "));
+          setMessage(infoNotes.join(" "));
         }
       } catch (error) {
         if (cancelled) return;
@@ -603,11 +845,15 @@ function ComparePageContent() {
     if (side === "left") {
       setLeftSelection(selection);
       setLeftQuery(query);
+      setLeftHelperNote(null);
+      setLeftHelperTone("info");
       return;
     }
 
     setRightSelection(selection);
     setRightQuery(query);
+    setRightHelperNote(null);
+    setRightHelperTone("info");
   }
 
   useEffect(() => {
@@ -615,6 +861,7 @@ function ComparePageContent() {
     let cancelled = false;
 
     async function searchVariants(
+      side: "left" | "right",
       query: string,
       selected: SelectedVehicle | null,
       setter: React.Dispatch<React.SetStateAction<SearchState>>,
@@ -624,13 +871,20 @@ function ComparePageContent() {
 
       if (!trimmed || trimmed.length < 2 || (selected && normalizeLabel(selected.label) === normalizeLabel(trimmed))) {
         setter(emptySearchState);
+        if (side === "left") {
+          setLeftHelperNote(selected?.resolutionNote ?? null);
+          setLeftHelperTone("info");
+        } else {
+          setRightHelperNote(selected?.resolutionNote ?? null);
+          setRightHelperTone("info");
+        }
         return;
       }
 
-      setter((prev) => ({ ...prev, loading: true, error: "" }));
+        setter((prev) => ({ ...prev, loading: true, error: "" }));
 
       try {
-        const response = await catalogApi.variants({ q: trimmed });
+        const response = await fetchCompareReadyVariants(trimmed);
         if (cancelled) return;
         setter({
           loading: false,
@@ -639,6 +893,35 @@ function ComparePageContent() {
             .filter((item) => !excludeIds.includes(item.variant_id))
             .slice(0, 8),
         });
+
+        if (trimmed.length >= 2 && response.items.length === 0) {
+          const note = buildCatalogSupportMessage(trimmed);
+          if (side === "left") {
+            setLeftHelperNote(note);
+            setLeftHelperTone("error");
+          } else {
+            setRightHelperNote(note);
+            setRightHelperTone("error");
+          }
+        } else if (trimmed.length >= 2 && response.items.length > 1) {
+          const note = `${response.items.length} supported variants found. Pick the exact trim to compare.`;
+          if (side === "left") {
+            setLeftHelperNote(note);
+            setLeftHelperTone("info");
+          } else {
+            setRightHelperNote(note);
+            setRightHelperTone("info");
+          }
+        } else if (trimmed.length >= 2 && response.items.length === 1) {
+          const note = "One supported variant found. Select it to compare.";
+          if (side === "left") {
+            setLeftHelperNote(note);
+            setLeftHelperTone("info");
+          } else {
+            setRightHelperNote(note);
+            setRightHelperTone("info");
+          }
+        }
       } catch (error) {
         if (cancelled) return;
         setter({
@@ -649,8 +932,8 @@ function ComparePageContent() {
       }
     }
 
-    void searchVariants(leftQuery, leftSelection, setLeftSearch, [rightSelection?.variantId ?? -1]);
-    void searchVariants(rightQuery, rightSelection, setRightSearch, [leftSelection?.variantId ?? -1]);
+    void searchVariants("left", leftQuery, leftSelection, setLeftSearch, [rightSelection?.variantId ?? -1]);
+    void searchVariants("right", rightQuery, rightSelection, setRightSearch, [leftSelection?.variantId ?? -1]);
 
     return () => {
       cancelled = true;
@@ -658,7 +941,11 @@ function ComparePageContent() {
   }, [ready, leftQuery, rightQuery, leftSelection, rightSelection]);
 
   async function runCompare(activeLeft = leftSelection, activeRight = rightSelection) {
-    if (!activeLeft?.variantId || !activeRight?.variantId) return;
+    if (!activeLeft?.variantId || !activeRight?.variantId) {
+      setTone("error");
+      setMessage("Compare only works with vehicles that already exist in the CarVista catalog. Search and choose two supported models to continue.");
+      return;
+    }
     if (activeLeft.variantId === activeRight.variantId) {
       setTone("error");
       setMessage("Pick two different vehicles so the comparison stays useful.");
@@ -713,6 +1000,10 @@ function ComparePageContent() {
 
   const verdictCards = useMemo(() => (result ? buildVerdictCards(result.items) : []), [result]);
   const compareTitle = buildComparePairLabel(vehicleLabels);
+  const compareBlocked =
+    Boolean(leftHasInitialInput || leftSelection) &&
+    Boolean(rightHasInitialInput || rightSelection) &&
+    (!leftSelection?.variantId || !rightSelection?.variantId);
   const recommendedItem = useMemo(
     () =>
       result?.recommended_variant_id
@@ -901,12 +1192,14 @@ function ComparePageContent() {
         </div>
 
         <section className="mt-6 grid gap-5 xl:grid-cols-[1fr_auto_1fr] xl:items-start">
-          <CompareSearchPanel
+      <CompareSearchPanel
             title="Vehicle A"
             value={leftQuery}
             onChange={(value) => updateSide("left", null, value)}
             searchState={leftSearch}
             selected={leftSelection}
+            helperNote={leftHelperNote}
+            helperTone={leftHelperTone}
             onSelect={(item) =>
               updateSide(
                 "left",
@@ -937,6 +1230,8 @@ function ComparePageContent() {
             onChange={(value) => updateSide("right", null, value)}
             searchState={rightSearch}
             selected={rightSelection}
+            helperNote={rightHelperNote}
+            helperTone={rightHelperTone}
             onSelect={(item) =>
               updateSide(
                 "right",
@@ -956,11 +1251,15 @@ function ComparePageContent() {
           />
         </section>
 
-        {!loadingSelections && (!leftSelection || !rightSelection) ? (
+        {!loadingSelections && (!leftSelection?.variantId || !rightSelection?.variantId) ? (
           <div className="mt-6">
             <EmptyState
-              title="Choose two vehicles to compare"
-              description="Once both sides are selected, CarVista will build the comparison automatically."
+              title={compareBlocked ? "Compare works with catalog-backed vehicles only" : "Choose two vehicles to compare"}
+              description={
+                compareBlocked
+                  ? "One or both selections are not linked to a CarVista catalog variant yet. Search again and pick supported models to generate the comparison."
+                  : "Once both sides are selected, CarVista will build the comparison automatically."
+              }
             />
           </div>
         ) : null}

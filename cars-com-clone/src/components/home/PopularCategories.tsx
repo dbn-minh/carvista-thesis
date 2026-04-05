@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { apiFetch } from "@/lib/api-client";
 import {
   Select,
   SelectContent,
@@ -11,9 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { catalogApi } from "@/lib/carvista-api";
 import { buildCompareHref } from "@/lib/compare";
-import type { Make, Model } from "@/lib/types";
+import type { Make, Model, VariantListItem } from "@/lib/types";
 
 type CompareSelection = {
   makeId: string;
@@ -27,8 +27,9 @@ const emptySelection: CompareSelection = {
   year: "",
 };
 
-const currentYear = new Date().getFullYear();
-const yearOptions = Array.from({ length: 8 }, (_, index) => String(currentYear - index));
+async function fetchCompareReadyVariants() {
+  return apiFetch<{ items: VariantListItem[] }>("/catalog/variants?compareReady=true");
+}
 
 function buildVehicleLabel(selection: CompareSelection, makes: Make[], models: Model[]) {
   const makeName = makes.find((item) => String(item.make_id) === selection.makeId)?.name;
@@ -42,6 +43,7 @@ function CompareColumn({
   selection,
   makes,
   models,
+  years,
   loadingModels,
   onChange,
 }: {
@@ -49,6 +51,7 @@ function CompareColumn({
   selection: CompareSelection;
   makes: Make[];
   models: Model[];
+  years: string[];
   loadingModels: boolean;
   onChange: (next: CompareSelection) => void;
 }) {
@@ -60,7 +63,7 @@ function CompareColumn({
           <label className="mb-2 block text-sm font-medium text-cars-primary">Make</label>
           <Select
             value={selection.makeId}
-            onValueChange={(value) => onChange({ makeId: value, modelId: "", year: selection.year })}
+            onValueChange={(value) => onChange({ makeId: value, modelId: "", year: "" })}
           >
             <SelectTrigger className="h-11 rounded-2xl border-cars-gray-light bg-white text-cars-primary">
               <SelectValue placeholder="Choose a make" />
@@ -79,7 +82,7 @@ function CompareColumn({
           <label className="mb-2 block text-sm font-medium text-cars-primary">Model</label>
           <Select
             value={selection.modelId}
-            onValueChange={(value) => onChange({ ...selection, modelId: value })}
+            onValueChange={(value) => onChange({ ...selection, modelId: value, year: "" })}
             disabled={!selection.makeId || loadingModels || models.length === 0}
           >
             <SelectTrigger className="h-11 rounded-2xl border-cars-gray-light bg-white text-cars-primary">
@@ -105,12 +108,18 @@ function CompareColumn({
 
         <div>
           <label className="mb-2 block text-sm font-medium text-cars-primary">Year</label>
-          <Select value={selection.year} onValueChange={(value) => onChange({ ...selection, year: value })}>
+          <Select
+            value={selection.year}
+            onValueChange={(value) => onChange({ ...selection, year: value })}
+            disabled={!selection.modelId || years.length === 0}
+          >
             <SelectTrigger className="h-11 rounded-2xl border-cars-gray-light bg-white text-cars-primary">
-              <SelectValue placeholder="Select a year" />
+              <SelectValue
+                placeholder={!selection.modelId ? "Choose a model first" : years.length === 0 ? "No years available" : "Select a year"}
+              />
             </SelectTrigger>
             <SelectContent>
-              {yearOptions.map((year) => (
+              {years.map((year) => (
                 <SelectItem key={year} value={year}>
                   {year}
                 </SelectItem>
@@ -126,13 +135,10 @@ function CompareColumn({
 export default function PopularCategories() {
   const router = useRouter();
   const [makes, setMakes] = useState<Make[]>([]);
-  const [leftModels, setLeftModels] = useState<Model[]>([]);
-  const [rightModels, setRightModels] = useState<Model[]>([]);
+  const [compareVariants, setCompareVariants] = useState<VariantListItem[]>([]);
   const [left, setLeft] = useState<CompareSelection>(emptySelection);
   const [right, setRight] = useState<CompareSelection>(emptySelection);
   const [loadingMakes, setLoadingMakes] = useState(true);
-  const [loadingLeftModels, setLoadingLeftModels] = useState(false);
-  const [loadingRightModels, setLoadingRightModels] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
@@ -143,14 +149,22 @@ export default function PopularCategories() {
       setErrorMessage("");
 
       try {
-        const response = await catalogApi.makes();
+        const response = await fetchCompareReadyVariants();
         if (cancelled) return;
-        const sorted = [...response.items].sort((a, b) => a.name.localeCompare(b.name));
-        setMakes(sorted);
+        setCompareVariants(response.items);
+        const uniqueMakes = Array.from(
+          new Map(
+            response.items.map((item) => [
+              item.make_id,
+              { make_id: item.make_id, name: item.make_name },
+            ])
+          ).values()
+        ).sort((a, b) => a.name.localeCompare(b.name));
+        setMakes(uniqueMakes);
       } catch (error) {
         if (cancelled) return;
         setErrorMessage(
-          error instanceof Error ? error.message : "Could not load makes right now."
+          error instanceof Error ? error.message : "Could not load compare-ready vehicles right now."
         );
       } finally {
         if (!cancelled) {
@@ -166,82 +180,78 @@ export default function PopularCategories() {
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
+  const leftModels = useMemo(() => {
+    if (!left.makeId) return [];
+    return Array.from(
+      new Map(
+        compareVariants
+          .filter((item) => String(item.make_id) === left.makeId)
+          .map((item) => [
+            item.model_id,
+            {
+              model_id: item.model_id,
+              make_id: item.make_id,
+              name: item.model_name,
+            },
+          ])
+      ).values()
+    ).sort((a, b) => a.name.localeCompare(b.name));
+  }, [compareVariants, left.makeId]);
 
-    if (!left.makeId) {
-      setLeftModels([]);
-      return;
-    }
+  const rightModels = useMemo(() => {
+    if (!right.makeId) return [];
+    return Array.from(
+      new Map(
+        compareVariants
+          .filter((item) => String(item.make_id) === right.makeId)
+          .map((item) => [
+            item.model_id,
+            {
+              model_id: item.model_id,
+              make_id: item.make_id,
+              name: item.model_name,
+            },
+          ])
+      ).values()
+    ).sort((a, b) => a.name.localeCompare(b.name));
+  }, [compareVariants, right.makeId]);
 
-    async function loadModels() {
-      setLoadingLeftModels(true);
-      setErrorMessage("");
-      try {
-        const response = await catalogApi.models(Number(left.makeId));
-        if (cancelled) return;
-        const sorted = [...response.items].sort((a, b) => a.name.localeCompare(b.name));
-        setLeftModels(sorted);
-      } catch (error) {
-        if (cancelled) return;
-        setErrorMessage(
-          error instanceof Error ? error.message : "Could not load models right now."
-        );
-      } finally {
-        if (!cancelled) {
-          setLoadingLeftModels(false);
-        }
-      }
-    }
+  const leftYears = useMemo(() => {
+    if (!left.makeId || !left.modelId) return [];
+    return Array.from(
+      new Set(
+        compareVariants
+          .filter(
+            (item) =>
+              String(item.make_id) === left.makeId &&
+              String(item.model_id) === left.modelId
+          )
+          .map((item) => String(item.model_year))
+      )
+    ).sort((a, b) => Number(b) - Number(a));
+  }, [compareVariants, left.makeId, left.modelId]);
 
-    void loadModels();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [left.makeId]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!right.makeId) {
-      setRightModels([]);
-      return;
-    }
-
-    async function loadModels() {
-      setLoadingRightModels(true);
-      setErrorMessage("");
-      try {
-        const response = await catalogApi.models(Number(right.makeId));
-        if (cancelled) return;
-        const sorted = [...response.items].sort((a, b) => a.name.localeCompare(b.name));
-        setRightModels(sorted);
-      } catch (error) {
-        if (cancelled) return;
-        setErrorMessage(
-          error instanceof Error ? error.message : "Could not load models right now."
-        );
-      } finally {
-        if (!cancelled) {
-          setLoadingRightModels(false);
-        }
-      }
-    }
-
-    void loadModels();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [right.makeId]);
+  const rightYears = useMemo(() => {
+    if (!right.makeId || !right.modelId) return [];
+    return Array.from(
+      new Set(
+        compareVariants
+          .filter(
+            (item) =>
+              String(item.make_id) === right.makeId &&
+              String(item.model_id) === right.modelId
+          )
+          .map((item) => String(item.model_year))
+      )
+    ).sort((a, b) => Number(b) - Number(a));
+  }, [compareVariants, right.makeId, right.modelId]);
 
   const compareSummary = useMemo(() => {
     const leftLabel = buildVehicleLabel(left, makes, leftModels);
     const rightLabel = buildVehicleLabel(right, makes, rightModels);
 
     if (!leftLabel || !rightLabel) {
-      return "Choose two cars and CarVista will line up the key trade-offs for you.";
+      return "Choose two supported cars from the current compare catalog.";
     }
 
     return `Ready to compare ${leftLabel} and ${rightLabel}.`;
@@ -315,7 +325,8 @@ export default function PopularCategories() {
               selection={left}
               makes={makes}
               models={leftModels}
-              loadingModels={loadingLeftModels}
+              years={leftYears}
+              loadingModels={loadingMakes}
               onChange={setLeft}
             />
 
@@ -330,7 +341,8 @@ export default function PopularCategories() {
               selection={right}
               makes={makes}
               models={rightModels}
-              loadingModels={loadingRightModels}
+              years={rightYears}
+              loadingModels={loadingMakes}
               onChange={setRight}
             />
           </div>
@@ -341,7 +353,7 @@ export default function PopularCategories() {
                 {loadingMakes ? "Loading compare options..." : compareSummary}
               </p>
               <p className="mt-1 text-sm text-cars-gray">
-                You can compare daily drivers, family SUVs, hybrids, and more from one place.
+                Only compare-ready vehicles already in the CarVista catalog appear here.
               </p>
               {errorMessage ? <p className="mt-2 text-sm font-medium text-red-600">{errorMessage}</p> : null}
             </div>

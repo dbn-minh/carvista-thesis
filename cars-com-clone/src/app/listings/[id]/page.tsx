@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import { Building2, CheckCheck, Clock3, Mail, MapPin, Phone, ShieldCheck } from "lucide-react";
 import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import PageIntelligencePanel from "@/components/ai/PageIntelligencePanel";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
-import Header from "@/components/layout/Header";
 import StatusBanner from "@/components/common/StatusBanner";
+import Header from "@/components/layout/Header";
 import {
   buildListingTitle,
   formatBodyType,
@@ -17,9 +18,19 @@ import {
   formatMileage,
   formatTransmission,
 } from "@/components/listings/listing-utils";
-import { listingsApi, requestsApi, reviewsApi, watchlistApi } from "@/lib/carvista-api";
-import { hasToken } from "@/lib/api-client";
-import type { ListingDetail, SellerReview } from "@/lib/types";
+import CompleteProfileDialog from "@/components/requests/CompleteProfileDialog";
+import StarRating from "@/components/reviews/StarRating";
+import { authApi, listingsApi, requestsApi, reviewsApi, watchlistApi } from "@/lib/carvista-api";
+import { ApiError, hasToken, toDateTime } from "@/lib/api-client";
+import type { ListingDetail, SellerReview, User, ViewingRequest } from "@/lib/types";
+import { buildMarketplaceSellerProfile } from "@/lib/seller-profile";
+import {
+  DEFAULT_VIEWING_REQUEST_MESSAGE,
+  getRequestStatusLabel,
+  isActiveViewingRequestStatus,
+  preferredContactOptions,
+  type PreferredContactMethod,
+} from "@/lib/viewing-requests";
 
 function getImageUrl(image: Record<string, unknown>): string | null {
   const value = image.url ?? image.image_url ?? image.src ?? image.image;
@@ -39,12 +50,22 @@ export default function ListingDetailPage() {
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  const [requestMessage, setRequestMessage] = useState("I would like to schedule a viewing for this car.");
+  const [profile, setProfile] = useState<User | null>(null);
+  const [activeRequest, setActiveRequest] = useState<ViewingRequest | null>(null);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [requestPanelMessage, setRequestPanelMessage] = useState("");
+  const [requestPanelTone, setRequestPanelTone] = useState<"success" | "error" | "info">(
+    "info"
+  );
+
+  const [requestMessage, setRequestMessage] = useState(DEFAULT_VIEWING_REQUEST_MESSAGE);
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
+  const [preferredContactMethod, setPreferredContactMethod] =
+    useState<PreferredContactMethod>("phone_or_email");
 
-  const [rating, setRating] = useState("5");
+  const [rating, setRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("Seller communication was good.");
 
   async function load() {
@@ -59,6 +80,23 @@ export default function ListingDetailPage() {
       } catch {
         setReviews([]);
       }
+
+      if (hasToken()) {
+        const [profileResponse, outboxResponse] = await Promise.all([
+          authApi.me(),
+          requestsApi.outbox(),
+        ]);
+        setProfile(profileResponse.user);
+        const latestRequest =
+          outboxResponse.items.find((item) => item.listing_id === detailRes.listing.listing_id) ||
+          null;
+        setActiveRequest(
+          latestRequest && isActiveViewingRequestStatus(latestRequest.status) ? latestRequest : null
+        );
+      } else {
+        setProfile(null);
+        setActiveRequest(null);
+      }
     } catch (error) {
       setTone("error");
       setMessage(error instanceof Error ? error.message : "Could not load listing detail");
@@ -69,7 +107,7 @@ export default function ListingDetailPage() {
 
   useEffect(() => {
     if (Number.isFinite(id)) {
-      load();
+      void load();
     }
   }, [id]);
 
@@ -82,7 +120,31 @@ export default function ListingDetailPage() {
     setSelectedImage(gallery[0] || null);
   }, [gallery]);
 
+  useEffect(() => {
+    if (!profile) return;
+    setContactName((current) => current || profile.name || "");
+    setContactEmail((current) => current || profile.email || "");
+    setContactPhone((current) => current || profile.phone || "");
+    setPreferredContactMethod(
+      ((profile.preferred_contact_method as PreferredContactMethod | null) ||
+        "phone_or_email") as PreferredContactMethod
+    );
+  }, [profile]);
+
   const listingTitle = detail?.listing ? buildListingTitle(detail.listing) : "Listing details";
+  const sellerProfile = useMemo(
+    () =>
+      detail?.listing
+        ? buildMarketplaceSellerProfile({
+            listing: detail.listing,
+            seller: detail.seller,
+            reviews,
+          })
+        : null,
+    [detail, reviews]
+  );
+  const formControlClass =
+    "w-full border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-slate-950/60 dark:text-white dark:placeholder:text-slate-400";
 
   async function sendRequest(e: FormEvent) {
     e.preventDefault();
@@ -91,24 +153,90 @@ export default function ListingDetailPage() {
       return;
     }
 
+    const contactDraft = {
+      name: contactName.trim() || profile?.name || "",
+      email: contactEmail.trim() || profile?.email || "",
+      phone: contactPhone.trim() || profile?.phone || "",
+      preferred_contact_method: preferredContactMethod,
+    };
+
+    if (!contactDraft.email || !contactDraft.phone) {
+      setProfileDialogOpen(true);
+      return;
+    }
+
     try {
-      await requestsApi.createRequest(id, {
-        message: requestMessage,
-        contact_name: contactName,
-        contact_email: contactEmail,
-        contact_phone: contactPhone,
-      });
-      setTone("success");
-      setMessage(
-        "Viewing request sent successfully. The seller will review your note and may contact you using the details you provided."
-      );
-      setRequestMessage("I would like to schedule a viewing for this car.");
-      if (typeof window !== "undefined") {
-        window.scrollTo({ top: 0, behavior: "smooth" });
+      const shouldPersistProfile =
+        !profile ||
+        contactDraft.name !== (profile.name || "") ||
+        contactDraft.email !== (profile.email || "") ||
+        contactDraft.phone !== (profile.phone || "") ||
+        contactDraft.preferred_contact_method !==
+          ((profile.preferred_contact_method as PreferredContactMethod | null) ||
+            "phone_or_email");
+
+      let activeProfile = profile;
+      if (shouldPersistProfile) {
+        const updated = await authApi.updateMe({
+          name: contactDraft.name,
+          email: contactDraft.email,
+          phone: contactDraft.phone,
+          preferred_contact_method: contactDraft.preferred_contact_method,
+        });
+        activeProfile = updated.user;
+        setProfile(updated.user);
       }
+
+      const response = await requestsApi.createRequest(id, {
+        message: requestMessage.trim() || DEFAULT_VIEWING_REQUEST_MESSAGE,
+        contact_name: contactDraft.name,
+        contact_email: contactDraft.email,
+        contact_phone: contactDraft.phone,
+        preferred_contact_method: contactDraft.preferred_contact_method,
+      });
+
+      const nextRequest =
+        response.request ||
+        ({
+          request_id: response.request_id,
+          listing_id: id,
+          buyer_id: activeProfile?.user_id || 0,
+          contact_name: contactDraft.name,
+          contact_email: contactDraft.email,
+          contact_phone: contactDraft.phone,
+          preferred_contact_method: contactDraft.preferred_contact_method,
+          message: requestMessage.trim() || DEFAULT_VIEWING_REQUEST_MESSAGE,
+          status: "new",
+        } satisfies ViewingRequest);
+
+      setActiveRequest(nextRequest);
+      setRequestPanelTone("success");
+      setRequestPanelMessage(
+        "Request sent. The seller now has your contact details and can follow up using your preferred method."
+      );
     } catch (error) {
-      setTone("error");
-      setMessage(error instanceof Error ? error.message : "Request failed");
+      if (error instanceof ApiError && error.status === 409) {
+        setActiveRequest({
+          request_id:
+            Number((error.details as { request_id?: unknown } | undefined)?.request_id) || 0,
+          listing_id: id,
+          buyer_id: profile?.user_id || 0,
+          contact_name: contactDraft.name,
+          contact_email: contactDraft.email,
+          contact_phone: contactDraft.phone,
+          preferred_contact_method: contactDraft.preferred_contact_method,
+          status:
+            typeof (error.details as { status?: unknown } | undefined)?.status === "string"
+              ? String((error.details as { status?: string }).status)
+              : "new",
+        });
+        setRequestPanelTone("info");
+        setRequestPanelMessage("You already have an active viewing request for this listing.");
+        return;
+      }
+
+      setRequestPanelTone("error");
+      setRequestPanelMessage(error instanceof Error ? error.message : "Request failed");
     }
   }
 
@@ -140,7 +268,7 @@ export default function ListingDetailPage() {
       await reviewsApi.createSellerReview({
         seller_id: detail.listing.owner_id,
         listing_id: detail.listing.listing_id,
-        rating: Number(rating),
+        rating,
         comment: reviewComment,
       });
       setTone("success");
@@ -156,8 +284,31 @@ export default function ListingDetailPage() {
   return (
     <>
       <Header />
+      <CompleteProfileDialog
+        open={profileDialogOpen}
+        onOpenChange={setProfileDialogOpen}
+        initialProfile={{
+          ...profile,
+          name: contactName || profile?.name || "",
+          email: contactEmail || profile?.email || "",
+          phone: contactPhone || profile?.phone || "",
+          preferred_contact_method: preferredContactMethod,
+        }}
+        onSaved={(user) => {
+          setProfile(user);
+          setContactName(user.name || "");
+          setContactEmail(user.email || "");
+          setContactPhone(user.phone || "");
+          setPreferredContactMethod(
+            ((user.preferred_contact_method as PreferredContactMethod | null) ||
+              "phone_or_email") as PreferredContactMethod
+          );
+        }}
+        submitLabel="Save contact details"
+      />
+
       <main className="container-cars py-8">
-        <section className="section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(233,241,255,0.9))] p-6 md:p-8">
+        <section className="section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(233,241,255,0.9))] p-6 dark:bg-[linear-gradient(135deg,rgba(8,17,31,0.96),rgba(15,26,44,0.9))] md:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
@@ -165,8 +316,8 @@ export default function ListingDetailPage() {
               </p>
               <h1 className="mt-2 text-4xl font-apercu-bold text-cars-primary">{listingTitle}</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
-                Review the listing, then log in to save it, request a viewing, or submit a
-                seller review after your interaction.
+                Review the listing, then log in to save it, request a viewing, or submit a seller
+                review after your interaction.
               </p>
             </div>
 
@@ -194,15 +345,15 @@ export default function ListingDetailPage() {
                 </button>
               ) : null}
               <button
-                  type="button"
-                  onClick={() =>
-                    openAssistant({
-                      prompt: `Help me evaluate ${listingTitle}, including ownership cost, market outlook, and whether it fits my needs.`,
-                      marketId: 1,
-                      variantId: detail?.listing?.variant_id,
-                      variantLabel: listingTitle,
-                    })
-                  }
+                type="button"
+                onClick={() =>
+                  openAssistant({
+                    prompt: `Help me evaluate ${listingTitle}, including ownership cost, market outlook, and whether it fits my needs.`,
+                    marketId: 1,
+                    variantId: detail?.listing?.variant_id,
+                    variantLabel: listingTitle,
+                  })
+                }
                 className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-white"
               >
                 Ask AI advisor
@@ -282,7 +433,7 @@ export default function ListingDetailPage() {
               <div className="mt-6 grid gap-3 text-sm md:grid-cols-2">
                 <p className="rounded-[20px] bg-cars-off-white px-4 py-3">
                   <span className="font-medium text-cars-primary">Seller:</span>{" "}
-                  {detail.listing.seller_type || "Private seller"}
+                  {sellerProfile?.sellerType || detail.listing.seller_type || "Private seller"}
                 </p>
                 <p className="rounded-[20px] bg-cars-off-white px-4 py-3">
                   <span className="font-medium text-cars-primary">Body style:</span>{" "}
@@ -323,6 +474,125 @@ export default function ListingDetailPage() {
           </section>
         ) : null}
 
+        {detail?.listing && sellerProfile ? (
+          <section className="mb-8 section-shell p-6">
+            <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
+              <div className="rounded-[28px] border border-cars-primary/10 bg-cars-off-white/80 p-5 dark:border-cars-gray-light/30 dark:bg-slate-950/40">
+                <div className="flex items-start gap-4">
+                  <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-cars-primary text-white shadow-[0_12px_28px_rgba(15,45,98,0.16)]">
+                    <Building2 className="h-6 w-6" />
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cars-accent">
+                      Seller profile
+                    </p>
+                    <h2 className="mt-2 text-2xl font-apercu-bold text-cars-primary">
+                      {sellerProfile.displayName}
+                    </h2>
+                    <p className="mt-2 text-sm text-cars-gray">{sellerProfile.sellerType}</p>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {sellerProfile.trustHighlights.map((highlight) => (
+                    <span
+                      key={highlight}
+                      className="rounded-full border border-cars-primary/12 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-cars-gray"
+                    >
+                      {highlight}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="mt-5 rounded-[22px] border border-cars-primary/10 bg-white/80 px-4 py-4 dark:border-cars-gray-light/25 dark:bg-slate-950/55">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <StarRating value={sellerProfile.reviewAverage || 0} size="sm" />
+                    <p className="text-sm font-medium text-cars-primary">
+                      {sellerProfile.reviewAverage
+                        ? `${sellerProfile.reviewAverage.toFixed(1)} average seller rating`
+                        : "No seller ratings yet"}
+                    </p>
+                  </div>
+                  <p className="mt-2 text-sm text-cars-gray">
+                    {sellerProfile.reviewCount > 0
+                      ? `${sellerProfile.reviewCount} review${sellerProfile.reviewCount === 1 ? "" : "s"} from CarVista buyers.`
+                      : "Seller reviews will appear here once buyers leave feedback after contact or a viewing."}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cars-accent">
+                  Who you are buying from
+                </p>
+                <p className="mt-3 text-sm leading-7 text-cars-gray">{sellerProfile.about}</p>
+
+                <div className="mt-5 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-[22px] border border-cars-gray-light/70 bg-cars-off-white/70 px-4 py-4 dark:bg-slate-950/40">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-cars-primary">
+                      <Phone className="h-4 w-4 text-cars-accent" />
+                      Contact phone
+                    </p>
+                    {sellerProfile.phone ? (
+                      <a
+                        href={`tel:${sellerProfile.phone}`}
+                        className="mt-2 inline-flex text-sm font-medium text-cars-primary transition hover:text-cars-accent"
+                      >
+                        {sellerProfile.phone}
+                      </a>
+                    ) : (
+                      <p className="mt-2 text-sm text-cars-gray">
+                        Available after you send a request
+                      </p>
+                    )}
+                  </div>
+                  <div className="rounded-[22px] border border-cars-gray-light/70 bg-cars-off-white/70 px-4 py-4 dark:bg-slate-950/40">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-cars-primary">
+                      <Mail className="h-4 w-4 text-cars-accent" />
+                      Email
+                    </p>
+                    {sellerProfile.email ? (
+                      <a
+                        href={`mailto:${sellerProfile.email}`}
+                        className="mt-2 inline-flex text-sm font-medium text-cars-primary transition hover:text-cars-accent"
+                      >
+                        {sellerProfile.email}
+                      </a>
+                    ) : (
+                      <p className="mt-2 text-sm text-cars-gray">Shared after contact</p>
+                    )}
+                  </div>
+                  <div className="rounded-[22px] border border-cars-gray-light/70 bg-cars-off-white/70 px-4 py-4 dark:bg-slate-950/40">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-cars-primary">
+                      <MapPin className="h-4 w-4 text-cars-accent" />
+                      Address
+                    </p>
+                    <p className="mt-2 text-sm text-cars-gray">{sellerProfile.addressLine}</p>
+                  </div>
+                  <div className="rounded-[22px] border border-cars-gray-light/70 bg-cars-off-white/70 px-4 py-4 dark:bg-slate-950/40">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-cars-primary">
+                      <Clock3 className="h-4 w-4 text-cars-accent" />
+                      Availability
+                    </p>
+                    <p className="mt-2 text-sm text-cars-gray">{sellerProfile.availability}</p>
+                  </div>
+                </div>
+
+                <div className="mt-5 rounded-[22px] border border-cars-primary/10 bg-cars-off-white/70 px-4 py-4 dark:bg-slate-950/40">
+                  <p className="flex items-center gap-2 text-sm font-semibold text-cars-primary">
+                    <ShieldCheck className="h-4 w-4 text-cars-accent" />
+                    Why this matters
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-cars-gray">
+                    Review the seller details before you request a viewing so you know who is
+                    offering the car, how they prefer to be contacted, and what kind of follow-up to expect.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
         {detail?.listing ? (
           <PageIntelligencePanel
             subjectType="listing"
@@ -337,40 +607,99 @@ export default function ListingDetailPage() {
           <div className="section-shell p-6">
             <h2 className="text-2xl font-apercu-bold text-cars-primary">Request a viewing</h2>
             <p className="mt-3 text-sm leading-6 text-cars-gray">
-              Send your details to the seller so they can review your request and get back to you.
+              We will prefill your saved contact details so the seller can follow up without extra
+              back-and-forth.
             </p>
-            <form onSubmit={sendRequest} className="space-y-3">
-              <input
-                className="mt-5 h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
-                value={contactName}
-                onChange={(e) => setContactName(e.target.value)}
-                placeholder="Your name"
-              />
-              <input
-                className="h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
-                value={contactEmail}
-                onChange={(e) => setContactEmail(e.target.value)}
-                placeholder="Email address"
-              />
-              <input
-                className="h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
-                value={contactPhone}
-                onChange={(e) => setContactPhone(e.target.value)}
-                placeholder="Phone number"
-              />
-              <textarea
-                className="min-h-[120px] w-full rounded-[24px] border border-cars-gray-light px-4 py-3 text-sm"
-                value={requestMessage}
-                onChange={(e) => setRequestMessage(e.target.value)}
-                placeholder="Tell the seller when you would like to view the car."
-              />
-              <button
-                className="rounded-full bg-cars-accent px-5 py-2.5 text-sm font-semibold text-white"
-                type="submit"
-              >
-                Send request
-              </button>
-            </form>
+
+            <div className="mt-4">
+              <StatusBanner tone={requestPanelTone}>{requestPanelMessage}</StatusBanner>
+            </div>
+
+            {activeRequest ? (
+              <div className="mt-5 rounded-[24px] border border-emerald-200 bg-emerald-50/90 p-4 dark:border-emerald-400/20 dark:bg-emerald-500/10">
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-100">
+                    <CheckCheck className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-100">
+                      Viewing request sent
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-emerald-700 dark:text-emerald-100/90">
+                      Current seller status: {getRequestStatusLabel(activeRequest.status)}
+                      {activeRequest.created_at
+                        ? ` - Sent ${toDateTime(activeRequest.created_at)}`
+                        : ""}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {!activeRequest ? (
+              <form onSubmit={sendRequest} className="space-y-3">
+                <input
+                  className={`mt-5 h-11 rounded-full ${formControlClass}`}
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
+                  placeholder="Your name"
+                />
+                <input
+                  className={`h-11 rounded-full ${formControlClass}`}
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  placeholder="Email address"
+                />
+                <input
+                  className={`h-11 rounded-full ${formControlClass}`}
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                  placeholder="Phone number"
+                />
+                <select
+                  className={`h-11 rounded-full ${formControlClass}`}
+                  value={preferredContactMethod}
+                  onChange={(event) =>
+                    setPreferredContactMethod(event.target.value as PreferredContactMethod)
+                  }
+                >
+                  {preferredContactOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      Preferred contact: {option.label}
+                    </option>
+                  ))}
+                </select>
+                <textarea
+                  className={`min-h-[120px] rounded-[24px] py-3 ${formControlClass}`}
+                  value={requestMessage}
+                  onChange={(e) => setRequestMessage(e.target.value)}
+                  placeholder="Tell the seller when you would like to view the car."
+                />
+                <button
+                  className="rounded-full bg-cars-accent px-5 py-2.5 text-sm font-semibold text-white"
+                  type="submit"
+                >
+                  Send request
+                </button>
+              </form>
+            ) : (
+              <div className="mt-5 grid gap-3 text-sm">
+                <div className="rounded-[20px] border border-cars-gray-light/70 bg-cars-off-white/60 px-4 py-3 dark:bg-slate-950/40">
+                  <span className="font-medium text-cars-primary">Email:</span>{" "}
+                  {activeRequest.contact_email || contactEmail || "Saved to profile"}
+                </div>
+                <div className="rounded-[20px] border border-cars-gray-light/70 bg-cars-off-white/60 px-4 py-3 dark:bg-slate-950/40">
+                  <span className="font-medium text-cars-primary">Phone:</span>{" "}
+                  {activeRequest.contact_phone || contactPhone || "Saved to profile"}
+                </div>
+                <div className="rounded-[20px] border border-cars-gray-light/70 bg-cars-off-white/60 px-4 py-3 dark:bg-slate-950/40">
+                  <span className="font-medium text-cars-primary">Preferred contact:</span>{" "}
+                  {preferredContactOptions.find(
+                    (option) => option.value === activeRequest.preferred_contact_method
+                  )?.label || "Phone or email"}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="section-shell p-6">
@@ -379,17 +708,17 @@ export default function ListingDetailPage() {
               Leave a rating and comment for the seller after a real interaction.
             </p>
             <form onSubmit={submitSellerReview} className="space-y-3">
-              <input
-                className="mt-5 h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
-                value={rating}
-                onChange={(e) => setRating(e.target.value)}
-                placeholder="rating 1-5"
-              />
+              <div className="mt-5 rounded-[24px] border border-cars-gray-light/70 bg-cars-off-white/60 px-4 py-4 dark:bg-slate-950/40">
+                <p className="text-sm font-semibold text-cars-primary">Seller rating</p>
+                <div className="mt-3">
+                  <StarRating value={rating} onChange={setRating} size="lg" />
+                </div>
+              </div>
               <textarea
-                className="min-h-[120px] w-full rounded-[24px] border border-cars-gray-light px-4 py-3 text-sm"
+                className={`min-h-[120px] rounded-[24px] py-3 ${formControlClass}`}
                 value={reviewComment}
                 onChange={(e) => setReviewComment(e.target.value)}
-                placeholder="comment"
+                placeholder="Share how the seller communicated, followed up, and handled the viewing."
               />
               <button
                 className="rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white"
@@ -404,13 +733,20 @@ export default function ListingDetailPage() {
         <section className="mb-8 section-shell p-6">
           <h2 className="text-2xl font-apercu-bold text-cars-primary">Seller reviews</h2>
           <div className="space-y-3 text-sm">
-            {reviews.length === 0 ? <p className="mt-4 text-cars-gray">No seller reviews yet.</p> : null}
+            {reviews.length === 0 ? (
+              <p className="mt-4 text-cars-gray">No seller reviews yet.</p>
+            ) : null}
             {reviews.map((review, index) => (
               <div
                 key={review.seller_review_id || index}
-                className="mt-4 rounded-[22px] border border-cars-gray-light/70 p-4"
+                className="mt-4 rounded-[22px] border border-cars-gray-light/70 bg-cars-off-white/55 p-4 dark:bg-slate-950/35"
               >
-                <p className="font-medium text-cars-primary">Rating: {review.rating}/5</p>
+                <div className="flex items-center justify-between gap-3">
+                  <StarRating value={Number(review.rating || 0)} size="sm" />
+                  {review.created_at ? (
+                    <span className="text-xs text-cars-gray">{toDateTime(review.created_at)}</span>
+                  ) : null}
+                </div>
                 <p className="mt-2 text-cars-gray">{review.comment || "-"}</p>
               </div>
             ))}

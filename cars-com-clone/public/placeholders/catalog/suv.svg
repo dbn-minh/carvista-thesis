@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">CarVista SUV placeholder</title>
+  <desc id="desc">SUV placeholder image for catalog vehicles.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#f6f8fb"/>
+      <stop offset="100%" stop-color="#d7e5fb"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <rect x="200" y="420" width="800" height="130" rx="65" fill="#0f2d62" opacity="0.14"/>
+  <path d="M206 510v-18c0-36 29-65 65-65h72l88-118c19-26 50-41 82-41h195c29 0 56 13 74 34l107 125h55c30 0 55 24 55 54v71h-89c-9-48-50-82-98-82s-89 34-98 82H422c-9-48-50-82-98-82s-89 34-98 82h-20z" fill="#214d90"/>
+  <circle cx="350" cy="556" r="60" fill="#163768"/>
+  <circle cx="350" cy="556" r="28" fill="#f7f9fc"/>
+  <circle cx="798" cy="556" r="60" fill="#163768"/>
+  <circle cx="798" cy="556" r="28" fill="#f7f9fc"/>
+  <text x="600" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="#0f2d62">SUV</text>
+  <text x="600" y="228" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#49627f">Catalog placeholder image</text>
+</svg>

@@ -17,7 +17,7 @@ import {
   type ListingFilterState,
 } from "@/components/listings/listing-utils";
 import Header from "@/components/layout/Header";
-import { listingsApi, requestsApi, watchlistApi } from "@/lib/carvista-api";
+import { listingsApi, watchlistApi } from "@/lib/carvista-api";
 import { hasToken } from "@/lib/api-client";
 import type { Listing } from "@/lib/types";
 
@@ -60,7 +60,6 @@ function ListingsPageContent() {
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState<"success" | "error" | "info">("info");
   const [loading, setLoading] = useState(true);
-  const [requestMessage, setRequestMessage] = useState("Hi, I'd like to schedule a viewing for this car.");
   const [savedListingIds, setSavedListingIds] = useState<number[]>([]);
   const [filters, setFilters] = useState<ListingFilterState>(initialFilters);
   const [linkedVariantId, setLinkedVariantId] = useState<number | null>(null);
@@ -74,7 +73,7 @@ function ListingsPageContent() {
         ? watchlistApi.savedListings()
         : Promise.resolve({ items: [] as Array<{ listing_id: number }> });
 
-      const [listings, saved] = await Promise.allSettled([
+      const [listings, sessionData] = await Promise.allSettled([
         listingsApi.list({
           status: "active",
           ...(Number.isFinite(activeVariantId) ? { variantId: Number(activeVariantId) } : {}),
@@ -92,8 +91,8 @@ function ListingsPageContent() {
         throw listings.reason;
       }
 
-      if (saved.status === "fulfilled") {
-        setSavedListingIds(saved.value.items.map((item) => item.listing_id));
+      if (sessionData.status === "fulfilled") {
+        setSavedListingIds(sessionData.value.items.map((item) => item.listing_id));
       } else {
         setSavedListingIds([]);
       }
@@ -118,29 +117,6 @@ function ListingsPageContent() {
     setLinkedVariantId(null);
     router.replace("/listings");
     void load(null);
-  }
-
-  async function sendRequest(listingId: number) {
-    if (!hasToken()) {
-      openAuth({ mode: "login", next: "/listings" });
-      return;
-    }
-
-    try {
-      await requestsApi.createRequest(listingId, {
-        message: requestMessage.trim() || "Hi, I'd like to schedule a viewing for this car.",
-      });
-      setTone("success");
-      setMessage(
-        "Viewing request sent successfully. The seller can review your request and may contact you using your account details."
-      );
-      if (typeof window !== "undefined") {
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      }
-    } catch (error) {
-      setTone("error");
-      setMessage(error instanceof Error ? error.message : "Request failed");
-    }
   }
 
   async function toggleSave(listingId: number) {
@@ -178,13 +154,7 @@ function ListingsPageContent() {
     <>
       <Header />
       <main className="container-cars py-8">
-        <ListingFilters
-          filters={filters}
-          setFilters={setFilters}
-          options={filterOptions}
-          requestMessage={requestMessage}
-          setRequestMessage={setRequestMessage}
-        />
+        <ListingFilters filters={filters} setFilters={setFilters} options={filterOptions} />
 
         <div className="mt-6">
           <StatusBanner tone={tone}>{message}</StatusBanner>
@@ -195,9 +165,7 @@ function ListingsPageContent() {
             totalCount={items.length}
             filteredCount={filteredItems.length}
             activeFilters={
-              linkedVariantId != null
-                ? [...activeFilters, "Recommended match"]
-                : activeFilters
+              linkedVariantId != null ? [...activeFilters, "Recommended match"] : activeFilters
             }
             onClearFilters={clearMarketplaceFilters}
           />
@@ -214,9 +182,24 @@ function ListingsPageContent() {
         {!loading && items.length === 0 ? (
           <div className="mt-6">
             <EmptyState
-              title="No active listings"
-              description="Create a listing from Sell or seed more marketplace cars in the backend."
+              title={linkedVariantId != null ? "No active listings for this vehicle yet" : "No active listings"}
+              description={
+                linkedVariantId != null
+                  ? `We couldn't find any active marketplace listings for ${filters.query || "this vehicle"} right now. Try browsing all listings or check back later.`
+                  : "There are no active marketplace listings yet. Check back later or browse another search."
+              }
             />
+            {linkedVariantId != null ? (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={clearMarketplaceFilters}
+                  className="rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+                >
+                  Browse all listings
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -245,7 +228,6 @@ function ListingsPageContent() {
                 key={item.listing_id}
                 item={item}
                 saved={savedListingIds.includes(item.listing_id)}
-                onRequest={sendRequest}
                 onToggleSave={toggleSave}
               />
             ))}

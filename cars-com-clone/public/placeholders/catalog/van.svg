@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">CarVista van placeholder</title>
+  <desc id="desc">Van placeholder image for catalog vehicles.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#f7fbff"/>
+      <stop offset="100%" stop-color="#dbe8fb"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <rect x="170" y="420" width="860" height="130" rx="65" fill="#0f2d62" opacity="0.14"/>
+  <path d="M170 505c0-35 28-63 63-63h97V301c0-40 32-72 72-72h302c34 0 66 13 91 37l129 124h48c36 0 65 29 65 65v97h-96c-8-50-50-86-101-86s-93 36-101 86H402c-8-50-50-86-101-86s-93 36-101 86h-30z" fill="#214d90"/>
+  <circle cx="330" cy="552" r="61" fill="#163768"/>
+  <circle cx="330" cy="552" r="29" fill="#f7f9fc"/>
+  <circle cx="834" cy="552" r="61" fill="#163768"/>
+  <circle cx="834" cy="552" r="29" fill="#f7f9fc"/>
+  <text x="600" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="#0f2d62">Van</text>
+  <text x="600" y="228" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#49627f">Catalog placeholder image</text>
+</svg>

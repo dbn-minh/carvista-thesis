@@ -46,6 +46,10 @@ export default class ViewingRequests extends Model {
       type: DataTypes.STRING(30),
       allowNull: true
     },
+    preferred_contact_method: {
+      type: DataTypes.STRING(40),
+      allowNull: true
+    },
     message: {
       type: DataTypes.TEXT,
       allowNull: true
@@ -58,6 +62,11 @@ export default class ViewingRequests extends Model {
       type: DataTypes.ENUM('pending','accepted','rejected','cancelled'),
       allowNull: false,
       defaultValue: "pending"
+    },
+    follow_up_status: {
+      type: DataTypes.STRING(40),
+      allowNull: true,
+      defaultValue: "new"
     },
     notified_at: {
       type: DataTypes.DATE,

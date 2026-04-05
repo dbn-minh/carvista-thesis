@@ -1,0 +1,151 @@
+make_name,model_name,model_year,trim_name,body_type_normalized,transmission_normalized,msrp_base_candidate,source_row_count,needs_enrichment,selection_reason,variant_sort_order,source_mmr_median,source_sellingprice_median
+Audi,A4,2012,2.0T Premium quattro,sedan,Automatic,20700,232,True,Premium compact sedan alternative with clear user-facing recognition.,1,20700.0,20400
+Audi,A4,2013,2.0T Premium quattro,sedan,Automatic,23200,123,True,Premium compact sedan alternative with clear user-facing recognition.,2,23200.0,23400
+Audi,A4,2009,2.0T Premium quattro,sedan,Automatic,11900,123,True,Premium compact sedan alternative with clear user-facing recognition.,3,11900.0,11900
+BMW,3 Series,2012,328i,sedan,Automatic,23500,894,True,Premium sport sedan anchor with strong volume for later compare use cases.,1,23500.0,23950
+BMW,3 Series,2011,328i,sedan,Automatic,18700,838,True,Premium sport sedan anchor with strong volume for later compare use cases.,2,18700.0,18500
+BMW,3 Series,2011,328i xDrive,sedan,Automatic,19450,598,True,Premium sport sedan anchor with strong volume for later compare use cases.,3,19450.0,19275
+BMW,X3,2007,3.0si,suv,Automatic,9588,164,True,Premium compact SUV with good compare potential.,1,9588.0,9200
+BMW,X3,2006,3.0i,suv,Automatic,7775,149,True,Premium compact SUV with good compare potential.,2,7775.0,7500
+BMW,X3,2008,3.0si,suv,Automatic,11350,141,True,Premium compact SUV with good compare potential.,3,11350.0,10900
+BMW,X5,2012,xDrive35i Premium,suv,Automatic,33900,328,True,Premium midsize SUV anchor with strong row volume.,1,33900.0,33625
+BMW,X5,2012,xDrive35d,suv,Automatic,32700,208,True,Premium midsize SUV anchor with strong row volume.,2,32700.0,32000
+BMW,X5,2013,xDrive35i,suv,Automatic,35600,193,True,Premium midsize SUV anchor with strong row volume.,3,35600.0,35500
+Chevrolet,Cruze,2014,1LT,sedan,Automatic,12300,1016,True,Mainstream compact option with usable pricing coverage and trim spread.,1,12300.0,12000
+Chevrolet,Cruze,2014,2LT,sedan,Automatic,13150,960,True,Mainstream compact option with usable pricing coverage and trim spread.,2,13150.0,13100
+Chevrolet,Cruze,2013,1LT,sedan,Automatic,10600,813,True,Mainstream compact option with usable pricing coverage and trim spread.,3,10600.0,10500
+Chevrolet,Equinox,2013,LT,suv,Automatic,15900,751,True,Compact SUV value option with usable data quality.,1,15900.0,15700
+Chevrolet,Equinox,2012,LT,suv,Automatic,14250,496,True,Compact SUV value option with usable data quality.,2,14250.0,14225
+Chevrolet,Equinox,2012,LS,suv,Automatic,13050,457,True,Compact SUV value option with usable data quality.,3,13050.0,12900
+Chevrolet,Silverado 1500,2014,LT,pickup,Automatic,27700,683,True,High-volume pickup that adds truck compare coverage.,1,27700.0,27700
+Chevrolet,Silverado 1500,2013,LT,pickup,Automatic,25400,503,True,High-volume pickup that adds truck compare coverage.,2,25400.0,25300
+Chevrolet,Silverado 1500,2011,LT,pickup,Automatic,20300,477,True,High-volume pickup that adds truck compare coverage.,3,20300.0,20400
+Chevrolet,Traverse,2012,LS,suv,Automatic,14900,315,True,Three-row family SUV with practical compare value.,1,14900.0,14900
+Chevrolet,Traverse,2012,LT,suv,Automatic,17500,186,True,Three-row family SUV with practical compare value.,2,17500.0,17000
+Chevrolet,Traverse,2014,LT,suv,Automatic,25700,183,True,Three-row family SUV with practical compare value.,3,25700.0,25600
+Chevrolet,Volt,2012,Base,hatchback,Automatic,12350,347,True,Electrified model with recognizable identity and enough signal for later enrichment.,1,12350.0,12200
+Chevrolet,Volt,2013,Base,hatchback,Automatic,14025,124,True,Electrified model with recognizable identity and enough signal for later enrichment.,2,14025.0,14400
+Chevrolet,Volt,2011,Base,hatchback,Automatic,13175,24,True,Electrified model with recognizable identity and enough signal for later enrichment.,3,13175.0,13050
+Dodge,Grand Caravan,2014,SXT,mpv,Automatic,16600,1950,True,High-volume minivan benchmark with strong later compare value.,1,16600.0,16600
+Dodge,Grand Caravan,2013,SXT,mpv,Automatic,11700,1149,True,High-volume minivan benchmark with strong later compare value.,2,11700.0,11600
+Dodge,Grand Caravan,2012,SXT,mpv,Automatic,10500,651,True,High-volume minivan benchmark with strong later compare value.,3,10500.0,10200
+Ford,Escape,2013,SE,suv,Automatic,15350,2001,True,Mainstream compact SUV with good pricing coverage.,1,15350.0,14900
+Ford,Escape,2012,XLT,suv,Automatic,14500,1468,True,Mainstream compact SUV with good pricing coverage.,2,14500.0,14300
+Ford,Escape,2013,SEL,suv,Automatic,18300,1399,True,Mainstream compact SUV with good pricing coverage.,3,18300.0,18000
+Ford,Explorer,2013,XLT,suv,Automatic,25600,1674,True,Large family SUV with strong row volume and recognizable buyer use case.,1,25600.0,25000
+Ford,Explorer,2014,Limited,suv,Automatic,28200,741,True,Large family SUV with strong row volume and recognizable buyer use case.,2,28200.0,27800
+Ford,Explorer,2012,XLT,suv,Automatic,22900,512,True,Large family SUV with strong row volume and recognizable buyer use case.,3,22900.0,22900
+Ford,F-150,2013,XLT,pickup,Automatic,25000,1144,True,Full-size pickup benchmark with strong row count and trim spread.,1,25000.0,24800
+Ford,F-150,2011,XLT,pickup,Automatic,21400,1059,True,Full-size pickup benchmark with strong row count and trim spread.,2,21400.0,21000
+Ford,F-150,2014,XLT,pickup,Automatic,26850,916,True,Full-size pickup benchmark with strong row count and trim spread.,3,26850.0,26000
+Ford,Focus,2013,SE,sedan,Automatic,10850,3136,True,Popular compact with enough volume to support 1-3 representative variants.,1,10850.0,10600
+Ford,Focus,2014,SE,sedan,Automatic,12250,2458,True,Popular compact with enough volume to support 1-3 representative variants.,2,12250.0,12000
+Ford,Focus,2012,SE,sedan,Automatic,9500,1440,True,Popular compact with enough volume to support 1-3 representative variants.,3,9500.0,9200
+Ford,Fusion,2013,SE,sedan,Automatic,14250,2826,True,High-volume sedan with strong pricing signal and representative trims.,1,14250.0,13800
+Ford,Fusion,2014,SE,sedan,Automatic,15000,2377,True,High-volume sedan with strong pricing signal and representative trims.,2,15000.0,14800
+Ford,Fusion,2012,SE,sedan,Automatic,10350,1910,True,High-volume sedan with strong pricing signal and representative trims.,3,10350.0,10000
+Ford,Fusion Hybrid,2014,SE,sedan,Automatic,16950,211,True,Hybrid-branded model name makes it a good candidate for later enriched compare workflows.,1,16950.0,17400
+Ford,Fusion Hybrid,2013,SE,sedan,Automatic,16050,169,True,Hybrid-branded model name makes it a good candidate for later enriched compare workflows.,2,16050.0,15200
+Ford,Fusion Hybrid,2014,Titanium,sedan,Automatic,20350,136,True,Hybrid-branded model name makes it a good candidate for later enriched compare workflows.,3,20350.0,20200
+GMC,Acadia,2012,Denali,suv,Automatic,28900,185,True,Family crossover that strengthens three-row SUV coverage.,1,28900.0,29000
+GMC,Acadia,2008,SLT-1,suv,Automatic,11050,158,True,Family crossover that strengthens three-row SUV coverage.,2,11050.0,10650
+GMC,Acadia,2012,SLT-1,suv,Automatic,23300,153,True,Family crossover that strengthens three-row SUV coverage.,3,23300.0,22900
+Honda,Accord,2012,SE,sedan,Automatic,13200,1039,True,Well-known midsize sedan with reliable price coverage across trims and years.,1,13200.0,13300
+Honda,Accord,2012,LX,sedan,Automatic,12200,827,True,Well-known midsize sedan with reliable price coverage across trims and years.,2,12200.0,12300
+Honda,Accord,2012,EX-L,sedan,Automatic,14700,389,True,Well-known midsize sedan with reliable price coverage across trims and years.,3,14700.0,14700
+Honda,CR-V,2012,EX-L,suv,Automatic,20300,312,True,Compact SUV benchmark with marketplace relevance.,1,20300.0,20300
+Honda,CR-V,2012,EX,suv,Automatic,17950,275,True,Compact SUV benchmark with marketplace relevance.,2,17950.0,17900
+Honda,CR-V,2013,LX,suv,Automatic,17350,159,True,Compact SUV benchmark with marketplace relevance.,3,17350.0,17400
+Honda,Civic,2012,LX,sedan,Automatic,11000,1739,True,Compact benchmark with strong volume and practical trim diversity.,1,11000.0,10900
+Honda,Civic,2012,EX,sedan,Automatic,12100,640,True,Compact benchmark with strong volume and practical trim diversity.,2,12100.0,12000
+Honda,Civic,2013,LX,sedan,Automatic,13150,381,True,Compact benchmark with strong volume and practical trim diversity.,3,13150.0,13000
+Honda,Odyssey,2012,EX,mpv,Automatic,18200,406,True,High-recognition minivan with strong buyer relevance.,1,18200.0,18000
+Honda,Odyssey,2012,EX-L,mpv,Automatic,22200,358,True,High-recognition minivan with strong buyer relevance.,2,22200.0,21900
+Honda,Odyssey,2007,EX-L,mpv,Automatic,7238,228,True,High-recognition minivan with strong buyer relevance.,3,7238.0,6900
+Hyundai,Elantra,2013,GLS,sedan,Automatic,11250,2894,True,Compact sedan with broad year coverage and clean model identity.,1,11250.0,11200
+Hyundai,Elantra,2012,GLS,sedan,Automatic,10500,647,True,Compact sedan with broad year coverage and clean model identity.,2,10500.0,10500
+Hyundai,Elantra,2014,SE,sedan,Automatic,13100,579,True,Compact sedan with broad year coverage and clean model identity.,3,13100.0,12700
+Hyundai,Santa Fe,2013,Sport,suv,Automatic,17300,173,True,Midsize SUV with enough clean rows for seed review.,1,17300.0,17200
+Hyundai,Santa Fe,2010,GLS,suv,Automatic,10050,101,True,Midsize SUV with enough clean rows for seed review.,2,10050.0,9900
+Hyundai,Santa Fe,2005,GLS,suv,Automatic,3300,98,True,Midsize SUV with enough clean rows for seed review.,3,3300.0,2900
+Hyundai,Sonata,2013,GLS,sedan,Automatic,12250,1683,True,Midsize sedan with strong row count and practical price coverage.,1,12250.0,12100
+Hyundai,Sonata,2012,GLS,sedan,Automatic,11700,1030,True,Midsize sedan with strong row count and practical price coverage.,2,11700.0,11600
+Hyundai,Sonata,2014,GLS,sedan,Automatic,13900,615,True,Midsize sedan with strong row count and practical price coverage.,3,13900.0,13400
+Jeep,Grand Cherokee,2012,Laredo,suv,Automatic,22800,602,True,Popular midsize SUV with clear brand positioning.,1,22800.0,22500
+Jeep,Grand Cherokee,2014,Limited,suv,Automatic,31150,526,True,Popular midsize SUV with clear brand positioning.,2,31150.0,31000
+Jeep,Grand Cherokee,2011,Laredo,suv,Automatic,19775,304,True,Popular midsize SUV with clear brand positioning.,3,19775.0,19450
+Jeep,Wrangler,2014,Unlimited Sahara,suv,Automatic,30600,232,True,Lifestyle/off-road SUV that improves body-style diversity.,1,30600.0,30400
+Jeep,Wrangler,2013,Unlimited Sport,suv,Automatic,25400,192,True,Lifestyle/off-road SUV that improves body-style diversity.,2,25400.0,25600
+Jeep,Wrangler,2012,Unlimited Sahara,suv,Automatic,27100,170,True,Lifestyle/off-road SUV that improves body-style diversity.,3,27100.0,26800
+Kia,Optima,2014,LX,sedan,Automatic,15150,1367,True,Midsize sedan alternative with solid pricing signal.,1,15150.0,15000
+Kia,Optima,2013,LX,sedan,Automatic,12250,641,True,Midsize sedan alternative with solid pricing signal.,2,12250.0,12100
+Kia,Optima,2012,LX,sedan,Automatic,11750,377,True,Midsize sedan alternative with solid pricing signal.,3,11750.0,11700
+Kia,Sorento,2015,LX,suv,Automatic,20600,923,True,Midsize family SUV that broadens non-premium SUV coverage.,1,20600.0,20500
+Kia,Sorento,2014,LX,suv,Automatic,16850,666,True,Midsize family SUV that broadens non-premium SUV coverage.,2,16850.0,16800
+Kia,Sorento,2013,LX,suv,Automatic,15100,244,True,Midsize family SUV that broadens non-premium SUV coverage.,3,15100.0,15200
+Kia,Soul,2014,+,wagon,Automatic,13900,846,True,Distinct practical hatchback/wagon-style option that improves segment diversity.,1,13900.0,13800
+Kia,Soul,2013,+,wagon,Automatic,11050,416,True,Distinct practical hatchback/wagon-style option that improves segment diversity.,2,11050.0,10975
+Kia,Soul,2013,Base,wagon,Automatic,10650,269,True,Distinct practical hatchback/wagon-style option that improves segment diversity.,3,10650.0,10400
+Lexus,ES 350,2012,Base,sedan,Automatic,22100,600,True,Comfort-oriented premium sedan that adds useful compare contrast.,1,22100.0,22000
+Lexus,ES 350,2013,Base,sedan,Automatic,28000,337,True,Comfort-oriented premium sedan that adds useful compare contrast.,2,28000.0,27900
+Lexus,ES 350,2007,Base,sedan,Automatic,10050,266,True,Comfort-oriented premium sedan that adds useful compare contrast.,3,10050.0,9900
+Lexus,RX 350,2012,Base,suv,Automatic,27900,937,True,Comfort-oriented premium crossover with solid row count.,1,27900.0,27800
+Lexus,RX 350,2013,Base,suv,Automatic,32400,616,True,Comfort-oriented premium crossover with solid row count.,2,32400.0,32000
+Lexus,RX 350,2011,Base,suv,Automatic,24250,236,True,Comfort-oriented premium crossover with solid row count.,3,24250.0,24225
+Mazda,Mazda3,2013,i Sport,sedan,Automatic,10100,327,True,Compact sedan/hatch family with strong compare potential.,1,10100.0,10000
+Mazda,Mazda3,2012,i Sport,sedan,Automatic,9475,263,True,Compact sedan/hatch family with strong compare potential.,2,9475.0,9500
+Mazda,Mazda3,2012,i Touring,sedan,Automatic,11200,261,True,Compact sedan/hatch family with strong compare potential.,3,11200.0,11250
+Mercedes-Benz,C-Class,2012,C250 Sport,sedan,Automatic,20900,700,True,Premium sedan baseline with good data density.,1,20900.0,20500
+Mercedes-Benz,C-Class,2012,C300 Luxury 4MATIC,sedan,Automatic,21500,525,True,Premium sedan baseline with good data density.,2,21500.0,21250
+Mercedes-Benz,C-Class,2013,C250 Sport,sedan,Automatic,22300,521,True,Premium sedan baseline with good data density.,3,22300.0,22000
+Mercedes-Benz,M-Class,2011,ML350 4MATIC,suv,Automatic,26000,271,True,Premium SUV option with practical luxury compare value.,1,26000.0,25000
+Mercedes-Benz,M-Class,2012,ML350 4MATIC,suv,Automatic,33500,233,True,Premium SUV option with practical luxury compare value.,2,33500.0,32750
+Mercedes-Benz,M-Class,2006,ML350,suv,Automatic,9362,156,True,Premium SUV option with practical luxury compare value.,3,9362.0,9000
+Nissan,Altima,2012,2.5 S,sedan,Automatic,12050,7175,True,Large midsize sedan sample with good coverage for later value comparisons.,1,12050.0,11800
+Nissan,Altima,2013,2.5,sedan,Automatic,13100,4703,True,Large midsize sedan sample with good coverage for later value comparisons.,2,13100.0,13000
+Nissan,Altima,2014,2.5 S,sedan,Automatic,14650,1869,True,Large midsize sedan sample with good coverage for later value comparisons.,3,14650.0,14300
+Nissan,Leaf,2012,SL,hatchback,Automatic,11025,468,True,Clear EV-oriented model name that adds electrified diversity without guessing specs.,1,11025.0,11000
+Nissan,Leaf,2013,SV,hatchback,Automatic,9488,400,True,Clear EV-oriented model name that adds electrified diversity without guessing specs.,2,9488.0,9500
+Nissan,Leaf,2013,S,hatchback,Automatic,8462,204,True,Clear EV-oriented model name that adds electrified diversity without guessing specs.,3,8462.0,8500
+Nissan,Rogue,2012,S,suv,Automatic,14250,1382,True,Compact SUV with enough rows and pricing signal for practical compare later.,1,14250.0,14200
+Nissan,Rogue,2012,SV,suv,Automatic,14950,1133,True,Compact SUV with enough rows and pricing signal for practical compare later.,2,14950.0,14800
+Nissan,Rogue,2011,SV,suv,Automatic,14800,721,True,Compact SUV with enough rows and pricing signal for practical compare later.,3,14800.0,14900
+Nissan,Sentra,2012,2.0 SR,sedan,Automatic,10200,803,True,Compact value sedan with enough rows for a stable seed candidate.,1,10200.0,10300
+Nissan,Sentra,2013,SV,sedan,Automatic,11200,514,True,Compact value sedan with enough rows for a stable seed candidate.,2,11200.0,11000
+Nissan,Sentra,2014,SV,sedan,Automatic,12250,360,True,Compact value sedan with enough rows for a stable seed candidate.,3,12250.0,11800
+Ram,1500,2014,SLT,pickup,Automatic,25400,519,True,Full-size pickup alternative with solid row count.,1,25400.0,25000
+Ram,1500,2013,Tradesman,pickup,Automatic,23500,483,True,Full-size pickup alternative with solid row count.,2,23500.0,23500
+Ram,1500,2012,ST,pickup,Automatic,18450,354,True,Full-size pickup alternative with solid row count.,3,18450.0,18400
+Subaru,Forester,2015,2.5i Premium PZEV,suv,Automatic,23500,180,True,Practical AWD crossover with enough clean variants.,1,23500.0,23500
+Subaru,Forester,2014,2.5i Premium PZEV,suv,Automatic,21800,111,True,Practical AWD crossover with enough clean variants.,2,21800.0,21600
+Subaru,Forester,2011,2.5X Premium,suv,Automatic,17050,65,True,Practical AWD crossover with enough clean variants.,3,17050.0,16600
+Subaru,Outback,2014,2.5i Premium PZEV,wagon,Automatic,22500,328,True,Wagon/crossover-style entry that broadens body-style diversity.,1,22500.0,22700
+Subaru,Outback,2014,2.5i Limited PZEV,wagon,Automatic,25700,138,True,Wagon/crossover-style entry that broadens body-style diversity.,2,25700.0,26000
+Subaru,Outback,2011,2.5i Premium,wagon,Automatic,14725,58,True,Wagon/crossover-style entry that broadens body-style diversity.,3,14725.0,14850
+Toyota,4Runner,2011,SR5,suv,Automatic,23500,103,True,Distinct SUV profile that adds rugged utility to the seed mix.,1,23500.0,23600
+Toyota,4Runner,2005,SR5,suv,Automatic,7600,94,True,Distinct SUV profile that adds rugged utility to the seed mix.,2,7600.0,7300
+Toyota,4Runner,2006,SR5,suv,Automatic,9675,85,True,Distinct SUV profile that adds rugged utility to the seed mix.,3,9675.0,9500
+Toyota,Camry,2014,SE,sedan,Automatic,16350,1639,True,High-volume midsize sedan with strong pricing signal and broad compare relevance.,1,16350.0,16200
+Toyota,Camry,2014,LE,sedan,Automatic,15250,1296,True,High-volume midsize sedan with strong pricing signal and broad compare relevance.,2,15250.0,15100
+Toyota,Camry,2012,LE,sedan,Automatic,12850,1221,True,High-volume midsize sedan with strong pricing signal and broad compare relevance.,3,12850.0,12800
+Toyota,Corolla,2013,LE,sedan,Automatic,11200,1083,True,Mainstream compact sedan with strong market familiarity and clean transaction volume.,1,11200.0,11100
+Toyota,Corolla,2014,LE,sedan,Automatic,13350,682,True,Mainstream compact sedan with strong market familiarity and clean transaction volume.,2,13350.0,12800
+Toyota,Corolla,2012,LE,sedan,Automatic,10000,673,True,Mainstream compact sedan with strong market familiarity and clean transaction volume.,3,10000.0,10000
+Toyota,Highlander,2012,Base,suv,Automatic,22000,259,True,Family-focused crossover with strong marketplace relevance.,1,22000.0,21800
+Toyota,Highlander,2012,Limited,suv,Automatic,27200,158,True,Family-focused crossover with strong marketplace relevance.,2,27200.0,27000
+Toyota,Highlander,2003,Base,suv,Automatic,5338,138,True,Family-focused crossover with strong marketplace relevance.,3,5338.0,5250
+Toyota,Prius,2013,Two,hatchback,Automatic,14550,301,True,Recognizable hybrid nameplate that will be useful for later efficiency-focused compares.,1,14550.0,14500
+Toyota,Prius,2011,Three,hatchback,Automatic,13200,281,True,Recognizable hybrid nameplate that will be useful for later efficiency-focused compares.,2,13200.0,13200
+Toyota,Prius,2012,Three,hatchback,Automatic,13750,260,True,Recognizable hybrid nameplate that will be useful for later efficiency-focused compares.,3,13750.0,13625
+Toyota,RAV4,2012,Base,suv,Automatic,14750,659,True,High-demand compact SUV with broad trim coverage.,1,14750.0,14700
+Toyota,RAV4,2011,Base,suv,Automatic,14600,577,True,High-demand compact SUV with broad trim coverage.,2,14600.0,14600
+Toyota,RAV4,2013,LE,suv,Automatic,16900,424,True,High-demand compact SUV with broad trim coverage.,3,16900.0,16700
+Toyota,Sienna,2013,LE 7-Passenger Mobility Auto Access,mpv,Automatic,17350,395,True,Family minivan anchor with useful pricing signal.,1,17350.0,17100
+Toyota,Sienna,2014,LE 7-Passenger Mobility Auto Access,mpv,Automatic,22200,303,True,Family minivan anchor with useful pricing signal.,2,22200.0,22200
+Toyota,Sienna,2012,LE 8-Passenger,mpv,Automatic,17050,206,True,Family minivan anchor with useful pricing signal.,3,17050.0,17000
+Toyota,Tacoma,2013,V6,pickup,Automatic,27500,165,True,Mid-size pickup that improves truck segment diversity.,1,27500.0,27200
+Toyota,Tacoma,2013,PreRunner V6,pickup,Automatic,24700,94,True,Mid-size pickup that improves truck segment diversity.,2,24700.0,24225
+Toyota,Tacoma,2011,V6,pickup,Automatic,23800,91,True,Mid-size pickup that improves truck segment diversity.,3,23800.0,23600
+Volkswagen,Jetta,2012,SE PZEV,sedan,Automatic,10100,436,True,Recognizable compact sedan with enough clean rows to seed safely.,1,10100.0,9800
+Volkswagen,Jetta,2013,SE PZEV,sedan,Automatic,11350,393,True,Recognizable compact sedan with enough clean rows to seed safely.,2,11350.0,11200
+Volkswagen,Jetta,2014,SE PZEV,sedan,Automatic,12400,350,True,Recognizable compact sedan with enough clean rows to seed safely.,3,12400.0,11900

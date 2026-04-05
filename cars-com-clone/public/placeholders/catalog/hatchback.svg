@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">CarVista hatchback placeholder</title>
+  <desc id="desc">Hatchback placeholder image for catalog vehicles.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#f8fbff"/>
+      <stop offset="100%" stop-color="#dce9fb"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <rect x="230" y="430" width="740" height="110" rx="55" fill="#0f2d62" opacity="0.14"/>
+  <path d="M230 504c0-30 24-54 54-54h52l97-130c20-27 51-42 84-42h200c31 0 59 14 79 39l89 108h26c30 0 55 24 55 54v73h-78c-8-45-48-77-94-77s-86 32-94 77H425c-8-45-48-77-94-77s-86 32-94 77h-7z" fill="#214d90"/>
+  <circle cx="340" cy="552" r="57" fill="#163768"/>
+  <circle cx="340" cy="552" r="27" fill="#f7f9fc"/>
+  <circle cx="760" cy="552" r="57" fill="#163768"/>
+  <circle cx="760" cy="552" r="27" fill="#f7f9fc"/>
+  <text x="600" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="#0f2d62">Hatchback</text>
+  <text x="600" y="228" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#49627f">Catalog placeholder image</text>
+</svg>

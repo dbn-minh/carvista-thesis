@@ -59,6 +59,19 @@ const SocialProviderParamsSchema = z.object({
   }),
 });
 
+const UpdateProfileSchema = z.object({
+  body: z.object({
+    name: z.string().min(1).optional(),
+    email: z.string().email().optional(),
+    phone: z.string().min(6).max(30).optional(),
+    preferred_contact_method: z
+      .enum(["phone", "email", "phone_or_email"])
+      .optional(),
+  }),
+  query: z.any(),
+  params: z.any(),
+});
+
 authRoutes.post(
   ["/auth/register", "/auth/password/register"],
   validate(RegisterSchema),
@@ -207,6 +220,21 @@ authRoutes.get("/auth/me", requireAuth, async (req, res, next) => {
   }
 });
 
+authRoutes.patch("/auth/me", requireAuth, validate(UpdateProfileSchema), async (req, res, next) => {
+  try {
+    const authService = createAuthService(req.ctx);
+    const user = await authService.updateCurrentUserProfile(req.user.userId, {
+      name: req.validated.body.name,
+      email: req.validated.body.email,
+      phone: req.validated.body.phone,
+      preferredContactMethod: req.validated.body.preferred_contact_method,
+    });
+    res.json({ user: sanitizeUser(user) });
+  } catch (e) {
+    next(e);
+  }
+});
+
 function sanitizeUser(user) {
   if (!user) return null;
   return {
@@ -214,6 +242,7 @@ function sanitizeUser(user) {
     name: user.name,
     email: user.email,
     phone: user.phone ?? null,
+    preferred_contact_method: user.preferred_contact_method ?? null,
     role: user.role,
   };
 }

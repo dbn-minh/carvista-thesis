@@ -6,6 +6,7 @@ import { PasswordAuthService } from "./password-auth.service.js";
 import { RateLimitService } from "./rate-limit.service.js";
 import { SocialAuthService } from "./social-auth.service.js";
 import { TokenService } from "./token.service.js";
+import { ensureUserProfileSchema } from "../users/user-profile-schema.service.js";
 
 export class AuthService {
   constructor(ctx) {
@@ -77,9 +78,56 @@ export class AuthService {
   }
 
   async getCurrentUser(userId) {
+    await ensureUserProfileSchema(this.ctx);
     return this.ctx.models.Users.findByPk(userId, {
-      attributes: ["user_id", "name", "email", "phone", "role"],
+      attributes: [
+        "user_id",
+        "name",
+        "email",
+        "phone",
+        "preferred_contact_method",
+        "role",
+      ],
     });
+  }
+
+  async updateCurrentUserProfile(userId, payload) {
+    await ensureUserProfileSchema(this.ctx);
+    const { Users } = this.ctx.models;
+
+    const user = await Users.findByPk(userId);
+    if (!user) {
+      throw { status: 404, safe: true, message: "User not found." };
+    }
+
+    const nextEmail = payload.email?.trim().toLowerCase() || user.email;
+    if (nextEmail !== user.email) {
+      const existingUser = await Users.findOne({
+        where: { email: nextEmail },
+        attributes: ["user_id"],
+      });
+
+      if (existingUser && Number(existingUser.user_id) !== Number(userId)) {
+        throw {
+          status: 409,
+          safe: true,
+          message: "That email address is already in use by another account.",
+        };
+      }
+    }
+
+    await user.update({
+      name: payload.name?.trim() || user.name,
+      email: nextEmail,
+      phone:
+        payload.phone === undefined ? user.phone : payload.phone?.trim() || null,
+      preferred_contact_method:
+        payload.preferredContactMethod === undefined
+          ? user.preferred_contact_method
+          : payload.preferredContactMethod || null,
+    });
+
+    return this.getCurrentUser(userId);
   }
 }
 

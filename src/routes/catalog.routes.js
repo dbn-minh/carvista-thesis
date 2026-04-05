@@ -11,6 +11,36 @@ function parseNumber(value, fallback = null) {
   return Number.isFinite(numeric) ? numeric : fallback;
 }
 
+function isTruthyFlag(value) {
+  if (value == null) return false;
+  const normalized = String(value).trim().toLowerCase();
+  return ["1", "true", "yes", "on"].includes(normalized);
+}
+
+function buildCompareReadyClause(alias = "cv", specAlias = "vs") {
+  return `
+    ${alias}.body_type IS NOT NULL
+    AND ${alias}.body_type <> ''
+    AND ${alias}.body_type <> 'other'
+    AND ${alias}.fuel_type IS NOT NULL
+    AND ${alias}.fuel_type <> ''
+    AND ${alias}.fuel_type <> 'other'
+    AND ${alias}.transmission IS NOT NULL
+    AND ${alias}.transmission <> ''
+    AND (
+      ${alias}.fuel_type = 'ev'
+      OR (
+        ${alias}.drivetrain IS NOT NULL
+        AND ${alias}.drivetrain <> ''
+        AND (
+          (${alias}.engine IS NOT NULL AND ${alias}.engine <> '')
+          OR ${specAlias}.displacement_cc IS NOT NULL
+        )
+      )
+    )
+  `;
+}
+
 catalogRoutes.get("/catalog/makes", async (req, res, next) => {
   try {
     const { CarMakes } = req.ctx.models;
@@ -32,7 +62,8 @@ catalogRoutes.get("/catalog/models", async (req, res, next) => {
 catalogRoutes.get("/catalog/variants", async (req, res, next) => {
   try {
     const { sequelize } = req.ctx;
-    const { make, model, year, fuel, bodyType, q } = req.query;
+    const { make, model, year, fuel, bodyType, q, compareReady } = req.query;
+    const compareReadyOnly = isTruthyFlag(compareReady);
 
     const where = [];
     const params = {};
@@ -42,17 +73,33 @@ catalogRoutes.get("/catalog/variants", async (req, res, next) => {
     if (year) { where.push("cv.model_year = :year"); params.year = Number(year); }
     if (fuel) { where.push("cv.fuel_type = :fuel"); params.fuel = fuel; }
     if (bodyType) { where.push("cv.body_type = :bodyType"); params.bodyType = bodyType; }
-    if (q) { where.push("(cm.name LIKE :q OR mk.name LIKE :q OR cv.trim_name LIKE :q)"); params.q = `%${q}%`; }
+    if (q) {
+      where.push(`(
+        cm.name LIKE :q
+        OR mk.name LIKE :q
+        OR cv.trim_name LIKE :q
+        OR CONCAT_WS(' ', cv.model_year, mk.name, cm.name, cv.trim_name) LIKE :q
+        OR CONCAT_WS(' ', mk.name, cm.name, cv.trim_name) LIKE :q
+        OR CONCAT_WS(' ', cv.model_year, mk.name, cm.name) LIKE :q
+        OR CONCAT_WS(' ', mk.name, cm.name) LIKE :q
+      )`);
+      params.q = `%${q}%`;
+    }
+    if (compareReadyOnly) {
+      where.push(buildCompareReadyClause("cv", "vs"));
+    }
 
     const sql = `
       SELECT
         cv.variant_id, cv.model_year, cv.trim_name, cv.body_type, cv.fuel_type,
         cv.engine, cv.transmission, cv.drivetrain, cv.msrp_base,
         cm.model_id, cm.name AS model_name,
-        mk.make_id, mk.name AS make_name
+        mk.make_id, mk.name AS make_name,
+        ${compareReadyOnly ? "TRUE" : buildCompareReadyClause("cv", "vs")} AS compare_ready
       FROM car_variants cv
       JOIN car_models cm ON cm.model_id = cv.model_id
       JOIN car_makes mk ON mk.make_id = cm.make_id
+      LEFT JOIN variant_specs vs ON vs.variant_id = cv.variant_id
       ${where.length ? "WHERE " + where.join(" AND ") : ""}
       ORDER BY mk.name, cm.name, cv.model_year DESC, cv.trim_name
       LIMIT 200
@@ -66,21 +113,31 @@ catalogRoutes.get("/catalog/variants/:id", async (req, res, next) => {
   try {
     const { sequelize, models: { VariantSpecs, VariantSpecKv, VariantImages } } = req.ctx;
     const id = Number(req.params.id);
+    const compareReadyOnly = isTruthyFlag(req.query.compareReady);
 
     const sql = `
       SELECT
         cv.*,
         cm.name AS model_name,
-        mk.name AS make_name
+        mk.name AS make_name,
+        ${buildCompareReadyClause("cv", "vs")} AS compare_ready
       FROM car_variants cv
       JOIN car_models cm ON cm.model_id = cv.model_id
       JOIN car_makes mk ON mk.make_id = cm.make_id
+      LEFT JOIN variant_specs vs ON vs.variant_id = cv.variant_id
       WHERE cv.variant_id = :id
       LIMIT 1
     `;
     const [rows] = await sequelize.query(sql, { replacements: { id } });
     const variant = rows[0] ?? null;
     if (!variant) return next({ status: 404, message: "Variant not found" });
+    if (compareReadyOnly && !variant.compare_ready) {
+      return next({
+        status: 404,
+        safe: true,
+        message: "This vehicle is not available as a compare-ready catalog variant.",
+      });
+    }
 
     const spec = await VariantSpecs.findByPk(id);
     const kv = await VariantSpecKv.findAll({ where: { variant_id: id }, limit: 50, order: [["spec_key","ASC"]] });

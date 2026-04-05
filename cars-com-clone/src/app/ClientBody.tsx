@@ -3,23 +3,24 @@
 import { useEffect } from "react";
 import { AiAssistantProvider } from "@/components/ai/AiAssistantProvider";
 import { AuthModalProvider } from "@/components/auth/AuthModalProvider";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 
 export default function ClientBody({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Remove any extension-added classes during hydration
   useEffect(() => {
-    // This runs only on the client after hydration
-    document.body.className = "antialiased font-apercu-regular";
+    document.body.classList.add("antialiased", "font-apercu-regular");
   }, []);
 
   return (
-    <AuthModalProvider>
-      <AiAssistantProvider>
-        <div className="antialiased font-apercu-regular">{children}</div>
-      </AiAssistantProvider>
-    </AuthModalProvider>
+    <ThemeProvider>
+      <AuthModalProvider>
+        <AiAssistantProvider>
+          <div className="antialiased font-apercu-regular">{children}</div>
+        </AiAssistantProvider>
+      </AuthModalProvider>
+    </ThemeProvider>
   );
 }

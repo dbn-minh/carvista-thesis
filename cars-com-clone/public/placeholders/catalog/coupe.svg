@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">CarVista coupe placeholder</title>
+  <desc id="desc">Coupe placeholder image for catalog vehicles.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#f8fbff"/>
+      <stop offset="100%" stop-color="#dde7fb"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#bg)"/>
+  <rect x="245" y="440" width="710" height="104" rx="52" fill="#0f2d62" opacity="0.14"/>
+  <path d="M248 504c0-29 23-52 52-52h54l103-117c22-25 53-39 86-39h166c35 0 68 14 92 39l104 117h12c29 0 53 24 53 53v67h-78c-8-43-45-74-88-74s-80 31-88 74H429c-8-43-45-74-88-74s-80 31-88 74h-5z" fill="#214d90"/>
+  <circle cx="344" cy="572" r="56" fill="#163768"/>
+  <circle cx="344" cy="572" r="26" fill="#f7f9fc"/>
+  <circle cx="760" cy="572" r="56" fill="#163768"/>
+  <circle cx="760" cy="572" r="26" fill="#f7f9fc"/>
+  <text x="600" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="#0f2d62">Coupe</text>
+  <text x="600" y="228" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#49627f">Catalog placeholder image</text>
+</svg>

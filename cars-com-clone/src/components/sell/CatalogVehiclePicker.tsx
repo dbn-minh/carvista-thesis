@@ -33,6 +33,8 @@ export default function CatalogVehiclePicker({
   onChange,
   errors,
 }: Props) {
+  const fieldClass =
+    "h-12 w-full rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-slate-950/60 dark:text-white";
   const years = Array.from(new Set(variants.map((variant) => variant.model_year))).sort(
     (a, b) => b - a
   );
@@ -50,7 +52,7 @@ export default function CatalogVehiclePicker({
           <select
             value={selectedMakeId}
             onChange={(event) => onChange("selectedMakeId", event.target.value)}
-            className="h-12 w-full rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className={fieldClass}
           >
             <option value="">Select a make</option>
             {makes.map((make) => (
@@ -70,7 +72,7 @@ export default function CatalogVehiclePicker({
             value={selectedModelId}
             onChange={(event) => onChange("selectedModelId", event.target.value)}
             disabled={!selectedMakeId || loadingModels}
-            className="h-12 w-full rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition disabled:cursor-not-allowed disabled:bg-cars-off-white focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className={`${fieldClass} disabled:cursor-not-allowed disabled:bg-cars-off-white dark:disabled:bg-slate-900/60`}
           >
             <option value="">{loadingModels ? "Loading models..." : "Select a model"}</option>
             {models.map((model) => (
@@ -90,7 +92,7 @@ export default function CatalogVehiclePicker({
             value={selectedYear}
             onChange={(event) => onChange("selectedYear", event.target.value)}
             disabled={!selectedModelId || loadingVariants}
-            className="h-12 w-full rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition disabled:cursor-not-allowed disabled:bg-cars-off-white focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className={`${fieldClass} disabled:cursor-not-allowed disabled:bg-cars-off-white dark:disabled:bg-slate-900/60`}
           >
             <option value="">{loadingVariants ? "Loading years..." : "Select a year"}</option>
             {years.map((year) => (
@@ -110,7 +112,7 @@ export default function CatalogVehiclePicker({
             value={selectedVariantId}
             onChange={(event) => onChange("selectedVariantId", event.target.value)}
             disabled={!selectedModelId || loadingVariants}
-            className="h-12 w-full rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition disabled:cursor-not-allowed disabled:bg-cars-off-white focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className={`${fieldClass} disabled:cursor-not-allowed disabled:bg-cars-off-white dark:disabled:bg-slate-900/60`}
           >
             <option value="">{loadingVariants ? "Loading variants..." : "Select a variant"}</option>
             {visibleVariants.map((variant) => (
@@ -126,7 +128,7 @@ export default function CatalogVehiclePicker({
       </div>
 
       {selectedVariant ? (
-        <div className="rounded-[24px] border border-cars-primary/10 bg-cars-off-white p-5">
+        <div className="rounded-[24px] border border-cars-primary/10 bg-cars-off-white p-5 dark:border-cars-gray-light/35 dark:bg-slate-950/45">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
             Selected catalog vehicle
           </p>
@@ -136,22 +138,22 @@ export default function CatalogVehiclePicker({
           <p className="mt-2 text-sm leading-6 text-cars-gray">{buildVariantSubtitle(selectedVariant)}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {selectedVariant.body_type ? (
-              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-cars-primary">
+              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-cars-primary dark:bg-slate-900/80 dark:text-white">
                 {formatOptionLabel(selectedVariant.body_type)}
               </span>
             ) : null}
             {selectedVariant.fuel_type ? (
-              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-cars-primary">
+              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-cars-primary dark:bg-slate-900/80 dark:text-white">
                 {formatOptionLabel(selectedVariant.fuel_type)}
               </span>
             ) : null}
             {selectedVariant.transmission ? (
-              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-cars-primary">
+              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-cars-primary dark:bg-slate-900/80 dark:text-white">
                 {selectedVariant.transmission}
               </span>
             ) : null}
             {selectedVariant.drivetrain ? (
-              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-cars-primary">
+              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-cars-primary dark:bg-slate-900/80 dark:text-white">
                 {selectedVariant.drivetrain}
               </span>
             ) : null}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { Mail, Phone } from "lucide-react";
 import EmptyState from "@/components/common/EmptyState";
 import StatusBanner from "@/components/common/StatusBanner";
 import Header from "@/components/layout/Header";
@@ -14,21 +15,17 @@ import { listingsApi, requestsApi } from "@/lib/carvista-api";
 import { toDateTime } from "@/lib/api-client";
 import { useRequireLogin } from "@/lib/auth-guard";
 import type { Listing, ViewingRequest } from "@/lib/types";
+import {
+  getPreferredContactLabel,
+  getRequestStatusBadgeClass,
+  getRequestStatusLabel,
+  sellerFollowUpStatusOptions,
+} from "@/lib/viewing-requests";
 
 type SellerLead = {
   request: ViewingRequest;
   listing: Listing | null;
 };
-
-function derivePreferredContact(request: ViewingRequest) {
-  const hasPhone = Boolean(request.contact_phone);
-  const hasEmail = Boolean(request.contact_email);
-
-  if (hasPhone && hasEmail) return "Phone or email";
-  if (hasPhone) return "Phone";
-  if (hasEmail) return "Email";
-  return "Account message";
-}
 
 export default function RequestsPage() {
   const ready = useRequireLogin("/requests");
@@ -80,15 +77,14 @@ export default function RequestsPage() {
     void load();
   }, []);
 
-  async function updateStatus(requestId: number, status: "accepted" | "rejected") {
+  async function updateStatus(
+    requestId: number,
+    status: (typeof sellerFollowUpStatusOptions)[number]["value"]
+  ) {
     try {
       await requestsApi.updateStatus(requestId, status);
       setTone("success");
-      setMessage(
-        status === "accepted"
-          ? "Viewing request accepted. The buyer can follow up using the contact details they shared."
-          : "Viewing request declined."
-      );
+      setMessage(`Request updated to ${getRequestStatusLabel(status)}.`);
       await load();
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("carvista-requests-changed"));
@@ -109,6 +105,8 @@ export default function RequestsPage() {
     [items]
   );
 
+  const newLeadCount = sortedItems.filter((item) => item.request.status === "new").length;
+
   return (
     <>
       <Header />
@@ -119,19 +117,22 @@ export default function RequestsPage() {
               <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
                 Seller leads
               </p>
-              <h1 className="mt-2 text-4xl font-apercu-bold text-cars-primary">Viewing Requests</h1>
+              <h1 className="mt-2 text-4xl font-apercu-bold text-cars-primary">
+                Viewing Requests
+              </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
-                See who wants to view your cars, what they asked for, and how they prefer to be contacted.
+                Scan incoming buyers quickly, see how they want to be contacted, and keep your
+                follow-up workflow tidy.
               </p>
             </div>
 
             <div className="rounded-[28px] bg-cars-primary p-5 text-white shadow-[0_18px_44px_rgba(15,45,98,0.18)]">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/70">
-                Open requests
+                New requests
               </p>
-              <p className="mt-2 text-3xl font-apercu-bold">{sortedItems.length}</p>
+              <p className="mt-2 text-3xl font-apercu-bold">{newLeadCount}</p>
               <p className="mt-1 text-sm text-white/80">
-                Buyer lead{sortedItems.length === 1 ? "" : "s"}
+                Buyer lead{newLeadCount === 1 ? "" : "s"} waiting
               </p>
             </div>
           </div>
@@ -163,7 +164,7 @@ export default function RequestsPage() {
         ) : null}
 
         {!loading && sortedItems.length > 0 ? (
-          <div className="mt-6 grid gap-5 xl:grid-cols-2">
+          <div className="mt-6 space-y-3">
             {sortedItems.map(({ request, listing }) => {
               const listingTitle = listing ? buildListingTitle(listing) : "Saved listing";
               const listingPrice = listing ? formatListingPrice(listing.asking_price) : null;
@@ -172,92 +173,145 @@ export default function RequestsPage() {
                 : null;
 
               return (
-                <article
-                  key={request.request_id}
-                  className="section-shell flex h-full flex-col p-6"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
-                        Buyer request
-                      </p>
-                      <h2 className="mt-2 text-2xl font-apercu-bold text-cars-primary">
-                        {request.contact_name || "Interested buyer"}
-                      </h2>
-                      <p className="mt-2 text-sm text-cars-gray">
-                        Sent {toDateTime(request.created_at)}
-                      </p>
+                <article key={request.request_id} className="section-shell p-4 md:p-5">
+                  <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
+                          Buyer lead
+                        </span>
+                        <span
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold ${getRequestStatusBadgeClass(request.status)}`}
+                        >
+                          {getRequestStatusLabel(request.status)}
+                        </span>
+                        <span className="text-xs text-cars-gray">
+                          Sent {toDateTime(request.created_at)}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h2 className="text-xl font-apercu-bold text-cars-primary">
+                            {request.contact_name || "Interested buyer"}
+                          </h2>
+                          <p className="mt-1 text-sm font-medium text-cars-gray">{listingTitle}</p>
+                        </div>
+
+                        <div className="text-sm text-cars-gray">
+                          {listingPrice ? <span>{listingPrice}</span> : null}
+                          {location && location !== "Location pending" ? (
+                            <span>{listingPrice ? " - " : ""}{location}</span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                        <div className="rounded-[18px] border border-cars-gray-light/60 px-3 py-2.5 text-sm">
+                          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-cars-accent">
+                            Email
+                          </p>
+                          <p className="mt-1 text-cars-primary">
+                            {request.contact_email || "Not provided"}
+                          </p>
+                        </div>
+                        <div className="rounded-[18px] border border-cars-gray-light/60 px-3 py-2.5 text-sm">
+                          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-cars-accent">
+                            Phone
+                          </p>
+                          <p className="mt-1 text-cars-primary">
+                            {request.contact_phone || "Not provided"}
+                          </p>
+                        </div>
+                        <div className="rounded-[18px] border border-cars-gray-light/60 px-3 py-2.5 text-sm">
+                          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-cars-accent">
+                            Preferred
+                          </p>
+                          <p className="mt-1 text-cars-primary">
+                            {getPreferredContactLabel(
+                              request.preferred_contact_method,
+                              request
+                            )}
+                          </p>
+                        </div>
+                        <div className="rounded-[18px] border border-cars-gray-light/60 px-3 py-2.5 text-sm">
+                          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-cars-accent">
+                            Requested time
+                          </p>
+                          <p className="mt-1 text-cars-primary">
+                            {request.preferred_viewing_time || "To be arranged"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 rounded-[20px] bg-cars-off-white px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-cars-accent">
+                          Buyer message
+                        </p>
+                        <p className="mt-1 line-clamp-3 text-sm leading-6 text-cars-gray">
+                          {request.message || "No note was included with this request."}
+                        </p>
+                      </div>
                     </div>
-                    <span className="rounded-full bg-cars-off-white px-3 py-1 text-sm font-semibold capitalize text-cars-primary">
-                      {request.status}
-                    </span>
-                  </div>
 
-                  <div className="mt-5 rounded-[24px] bg-cars-off-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
-                      Requested listing
-                    </p>
-                    <p className="mt-2 text-lg font-apercu-bold text-cars-primary">{listingTitle}</p>
-                    <div className="mt-2 flex flex-wrap gap-3 text-sm text-cars-gray">
-                      {listingPrice ? <span>{listingPrice}</span> : null}
-                      {location && location !== "Location pending" ? <span>{location}</span> : null}
-                    </div>
-                    {listing ? (
-                      <Link
-                        href={`/listings/${listing.listing_id}`}
-                        className="mt-4 inline-flex text-sm font-semibold text-cars-primary hover:text-cars-accent"
-                      >
-                        View listing
-                      </Link>
-                    ) : null}
-                  </div>
+                    <aside className="xl:w-[260px] xl:flex-shrink-0">
+                      <div className="grid gap-3 rounded-[22px] border border-cars-gray-light/60 p-4">
+                        <label className="text-xs font-semibold uppercase tracking-[0.12em] text-cars-accent">
+                          Follow-up status
+                        </label>
+                        <select
+                          value={request.status}
+                          onChange={(event) =>
+                            void updateStatus(
+                              request.request_id,
+                              event.target.value as (typeof sellerFollowUpStatusOptions)[number]["value"]
+                            )
+                          }
+                          className="h-11 rounded-[18px] border border-cars-gray-light bg-white px-4 text-sm font-medium text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-background"
+                        >
+                          {request.status === "cancelled" ? (
+                            <option value="cancelled" disabled>
+                              Cancelled by buyer
+                            </option>
+                          ) : null}
+                          {sellerFollowUpStatusOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
 
-                  <div className="mt-5 grid gap-3 text-sm md:grid-cols-2">
-                    <p className="rounded-[20px] border border-cars-gray-light/70 px-4 py-3">
-                      <span className="font-medium text-cars-primary">Phone:</span>{" "}
-                      {request.contact_phone || "Not provided"}
-                    </p>
-                    <p className="rounded-[20px] border border-cars-gray-light/70 px-4 py-3">
-                      <span className="font-medium text-cars-primary">Email:</span>{" "}
-                      {request.contact_email || "Not provided"}
-                    </p>
-                    <p className="rounded-[20px] border border-cars-gray-light/70 px-4 py-3">
-                      <span className="font-medium text-cars-primary">Preferred contact:</span>{" "}
-                      {derivePreferredContact(request)}
-                    </p>
-                    <p className="rounded-[20px] border border-cars-gray-light/70 px-4 py-3">
-                      <span className="font-medium text-cars-primary">Requested time:</span>{" "}
-                      {request.preferred_viewing_time || "To be arranged"}
-                    </p>
+                        <div className="flex flex-wrap gap-2">
+                          {listing ? (
+                            <Link
+                              href={`/listings/${listing.listing_id}`}
+                              className="inline-flex items-center justify-center rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+                            >
+                              View listing
+                            </Link>
+                          ) : null}
+                          {request.contact_phone ? (
+                            <a
+                              href={`tel:${request.contact_phone}`}
+                              className="inline-flex items-center justify-center gap-2 rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+                            >
+                              <Phone className="h-4 w-4" />
+                              Call
+                            </a>
+                          ) : null}
+                          {request.contact_email ? (
+                            <a
+                              href={`mailto:${request.contact_email}`}
+                              className="inline-flex items-center justify-center gap-2 rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+                            >
+                              <Mail className="h-4 w-4" />
+                              Email
+                            </a>
+                          ) : null}
+                        </div>
+                      </div>
+                    </aside>
                   </div>
-
-                  <div className="mt-5 rounded-[24px] border border-cars-gray-light/70 px-4 py-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
-                      Buyer note
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-cars-gray">
-                      {request.message || "No message was included with this request."}
-                    </p>
-                  </div>
-
-                  {request.status === "pending" ? (
-                    <div className="mt-auto flex flex-wrap gap-2 pt-5">
-                      <button
-                        type="button"
-                        onClick={() => void updateStatus(request.request_id, "accepted")}
-                        className="rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white"
-                      >
-                        Accept request
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void updateStatus(request.request_id, "rejected")}
-                        className="rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-700"
-                      >
-                        Decline
-                      </button>
-                    </div>
-                  ) : null}
                 </article>
               );
             })}

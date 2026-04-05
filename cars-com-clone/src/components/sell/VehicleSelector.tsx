@@ -67,7 +67,7 @@ export default function VehicleSelector({
           className={
             vehicleMode === "catalog"
               ? "rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white"
-              : "rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+              : "rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white dark:border-cars-gray-light/35 dark:bg-slate-950/35 dark:text-white"
           }
         >
           Choose from catalog
@@ -78,7 +78,7 @@ export default function VehicleSelector({
           className={
             vehicleMode === "custom"
               ? "rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white"
-              : "rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+              : "rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white dark:border-cars-gray-light/35 dark:bg-slate-950/35 dark:text-white"
           }
         >
           Other / My car is not listed
@@ -106,7 +106,7 @@ export default function VehicleSelector({
       </div>
 
       {vehicleMode === "custom" && buildCustomVehicleTitle(customVehicle) ? (
-        <div className="mt-5 rounded-[24px] border border-cars-accent/15 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(233,241,255,0.8))] p-5">
+        <div className="mt-5 rounded-[24px] border border-cars-accent/15 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(233,241,255,0.8))] p-5 dark:border-cars-gray-light/35 dark:bg-[linear-gradient(135deg,rgba(8,17,31,0.96),rgba(15,26,44,0.78))]">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
             Custom vehicle draft
           </p>

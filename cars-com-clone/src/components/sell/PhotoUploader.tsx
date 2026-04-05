@@ -44,7 +44,7 @@ export default function PhotoUploader({
             Buyers trust listings with strong photos. Aim for at least 5 to 10 clear images in daylight.
           </p>
         </div>
-        <div className="rounded-[22px] bg-cars-off-white px-4 py-3 text-sm font-medium text-cars-primary">
+        <div className="rounded-[22px] bg-cars-off-white px-4 py-3 text-sm font-medium text-cars-primary dark:bg-slate-950/45 dark:text-white">
           {photos.length > 0 ? `${photos.length} photo${photos.length > 1 ? "s" : ""} staged` : "No photos staged yet"}
         </div>
       </div>
@@ -62,11 +62,11 @@ export default function PhotoUploader({
         }}
         className={
           isDragging
-            ? "mt-6 rounded-[28px] border-2 border-dashed border-cars-accent bg-[linear-gradient(135deg,rgba(233,241,255,0.9),rgba(255,255,255,1))] p-8 text-center"
-            : "mt-6 rounded-[28px] border-2 border-dashed border-cars-primary/15 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(241,246,255,0.95))] p-8 text-center"
+            ? "mt-6 rounded-[28px] border-2 border-dashed border-cars-accent bg-[linear-gradient(135deg,rgba(233,241,255,0.9),rgba(255,255,255,1))] p-8 text-center dark:bg-[linear-gradient(135deg,rgba(15,26,44,0.98),rgba(8,17,31,0.94))]"
+            : "mt-6 rounded-[28px] border-2 border-dashed border-cars-primary/15 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(241,246,255,0.95))] p-8 text-center dark:border-cars-gray-light/35 dark:bg-[linear-gradient(135deg,rgba(8,17,31,0.98),rgba(13,21,37,0.94))]"
         }
       >
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white text-cars-primary shadow-sm">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white text-cars-primary shadow-sm dark:bg-slate-900/85 dark:text-white">
           <UploadCloud className="h-8 w-8" />
         </div>
         <h3 className="mt-4 text-xl font-apercu-bold text-cars-primary">Drag and drop photos here</h3>
@@ -95,14 +95,14 @@ export default function PhotoUploader({
       <div className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <div>
           {photos.length === 0 ? (
-            <div className="rounded-[24px] border border-cars-primary/10 bg-cars-off-white px-5 py-4 text-sm leading-6 text-cars-gray">
+            <div className="rounded-[24px] border border-cars-primary/10 bg-cars-off-white px-5 py-4 text-sm leading-6 text-cars-gray dark:border-cars-gray-light/35 dark:bg-slate-950/45">
               Listings without photos still work, but they usually attract less attention from buyers.
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {photos.map((photo, index) => (
-                <div key={photo.id} className="overflow-hidden rounded-[24px] border border-cars-primary/10 bg-white shadow-[0_12px_28px_rgba(15,45,98,0.06)]">
-                  <div className="relative h-44 overflow-hidden bg-cars-off-white">
+                <div key={photo.id} className="overflow-hidden rounded-[24px] border border-cars-primary/10 bg-white shadow-[0_12px_28px_rgba(15,45,98,0.06)] dark:border-cars-gray-light/35 dark:bg-slate-950/55">
+                  <div className="relative h-44 overflow-hidden bg-cars-off-white dark:bg-slate-900/80">
                     {getSafeImageSrc(photo.previewUrl) ? (
                       <img
                         src={getSafeImageSrc(photo.previewUrl) || undefined}
@@ -117,7 +117,7 @@ export default function PhotoUploader({
                       </div>
                     )}
                     {photo.isCover ? (
-                      <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-xs font-semibold text-cars-primary shadow-sm">
+                      <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-xs font-semibold text-cars-primary shadow-sm dark:bg-slate-950/85 dark:text-white">
                         <Star className="h-3.5 w-3.5 fill-current text-cars-accent" />
                         Cover photo
                       </span>
@@ -130,7 +130,7 @@ export default function PhotoUploader({
                         Photo {index + 1} - {Math.round(photo.size / 1024)} KB
                       </p>
                     </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-cars-off-white">
+                    <div className="h-2 overflow-hidden rounded-full bg-cars-off-white dark:bg-slate-900/80">
                       <div
                         className="h-full rounded-full bg-cars-accent transition-all"
                         style={{ width: `${photo.progress}%` }}
@@ -179,19 +179,19 @@ export default function PhotoUploader({
           )}
         </div>
 
-        <div className="rounded-[24px] border border-cars-primary/10 bg-white p-5 shadow-[0_12px_28px_rgba(15,45,98,0.05)]">
+        <div className="rounded-[24px] border border-cars-primary/10 bg-white p-5 shadow-[0_12px_28px_rgba(15,45,98,0.05)] dark:border-cars-gray-light/35 dark:bg-slate-950/55">
           <div className="flex items-center gap-2">
             <Camera className="h-5 w-5 text-cars-accent" />
             <h3 className="text-lg font-apercu-bold text-cars-primary">Photo checklist</h3>
           </div>
           <ul className="mt-4 space-y-3 text-sm leading-6 text-cars-gray">
             {photoTips.map((tip) => (
-              <li key={tip} className="rounded-[18px] bg-cars-off-white px-4 py-3">
+              <li key={tip} className="rounded-[18px] bg-cars-off-white px-4 py-3 dark:bg-slate-900/65">
                 {tip}
               </li>
             ))}
           </ul>
-          <div className="mt-5 rounded-[20px] bg-[linear-gradient(135deg,rgba(233,241,255,0.8),rgba(255,255,255,1))] p-4 text-sm leading-6 text-cars-gray">
+          <div className="mt-5 rounded-[20px] bg-[linear-gradient(135deg,rgba(233,241,255,0.8),rgba(255,255,255,1))] p-4 text-sm leading-6 text-cars-gray dark:bg-[linear-gradient(135deg,rgba(15,26,44,0.92),rgba(8,17,31,0.98))]">
             Photos are optimized locally so previews stay fast, then uploaded to secure cloud
             storage when you publish the listing.
           </div>

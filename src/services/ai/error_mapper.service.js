@@ -96,7 +96,8 @@ export function mapAiChatErrorToResponse({
 
 export function mapAiHttpError(error, intent = "ai_request") {
   const status = Number.isInteger(error?.status) && error.status >= 400 && error.status < 500 ? error.status : 500;
-  const message = userMessageForIntent(intent, error);
+  const safeMessage = error?.safe && rawMessage(error) ? rawMessage(error) : null;
+  const message = safeMessage || userMessageForIntent(intent, error);
 
   logAiEvent(status >= 500 ? "error" : "warn", "http_error_mapped", {
     intent,

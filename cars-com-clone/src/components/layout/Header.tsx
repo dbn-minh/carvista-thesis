@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Heart, Inbox, type LucideIcon } from "lucide-react";
+import { Heart, Inbox, UserRound, type LucideIcon } from "lucide-react";
 import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
+import ThemeToggle from "@/components/theme/ThemeToggle";
 import { requestsApi } from "@/lib/carvista-api";
 import { clearStoredToken, getStoredToken } from "@/lib/api-client";
 
@@ -33,7 +34,7 @@ export default function Header() {
   const { openAuth } = useAuthModal();
   const [loggedIn, setLoggedIn] = useState(false);
   const [pendingRequestCount, setPendingRequestCount] = useState(0);
-  const protectedRoutes = new Set(["/sell", "/garage", "/my-listings", "/requests"]);
+  const protectedRoutes = new Set(["/sell", "/garage", "/my-listings", "/requests", "/profile"]);
 
   useEffect(() => {
     const refresh = () => setLoggedIn(Boolean(getStoredToken()));
@@ -59,7 +60,7 @@ export default function Header() {
         const inbox = await requestsApi.inbox();
         if (!disposed) {
           setPendingRequestCount(
-            inbox.items.filter((item) => item.status === "pending").length
+            inbox.items.filter((item) => item.status === "new").length
           );
         }
       } catch {
@@ -88,7 +89,7 @@ export default function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/70 bg-white/92 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-white/70 bg-white/92 backdrop-blur-xl dark:border-cars-gray-light/30 dark:bg-slate-950/90">
       <div className="bg-cars-primary text-white">
         <div className="container-cars flex items-center justify-between gap-4 py-2 text-xs md:text-sm">
           <p className="font-medium">
@@ -104,7 +105,7 @@ export default function Header() {
         </div>
       </div>
 
-      <div className="container-cars flex flex-col gap-4 py-4 lg:grid lg:grid-cols-[auto_1fr_auto] lg:items-center">
+        <div className="container-cars flex flex-col gap-4 py-4 lg:grid lg:grid-cols-[auto_1fr_auto] lg:items-center">
         <div className="flex items-center gap-4">
           <Link href="/" className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cars-primary text-lg font-apercu-bold text-white shadow-lg shadow-cars-primary/25">
@@ -159,6 +160,7 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-3 text-sm lg:justify-end">
+          <ThemeToggle />
           {!loggedIn ? (
             <>
               <button
@@ -177,13 +179,22 @@ export default function Header() {
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="rounded-full border border-cars-primary/15 px-4 py-2 font-medium text-cars-primary transition-colors hover:bg-cars-off-white"
-            >
-              Logout
-            </button>
+            <>
+              <Link
+                href="/profile"
+                className="inline-flex items-center gap-2 rounded-full border border-cars-primary/15 px-4 py-2 font-medium text-cars-primary transition-colors hover:bg-cars-off-white"
+              >
+                <UserRound className="h-4 w-4" />
+                Profile
+              </Link>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-full border border-cars-primary/15 px-4 py-2 font-medium text-cars-primary transition-colors hover:bg-cars-off-white"
+              >
+                Logout
+              </button>
+            </>
           )}
         </div>
       </div>

@@ -14,12 +14,12 @@ import {
   formatTransmission,
   getListingImages,
 } from "@/components/listings/listing-utils";
+import { getMarketplaceSellerType } from "@/lib/seller-profile";
 import type { Listing } from "@/lib/types";
 
 type Props = {
   item: Listing;
   saved?: boolean;
-  onRequest?: (listingId: number) => void;
   onToggleSave?: (listingId: number) => void;
 };
 
@@ -56,7 +56,6 @@ function buildSpecChips(item: Listing) {
 export default function ListingCard({
   item,
   saved = false,
-  onRequest,
   onToggleSave,
 }: Props) {
   const href = `/listings/${item.listing_id}`;
@@ -66,11 +65,11 @@ export default function ListingCard({
   const eyebrow = buildListingEyebrow(item);
   const specChips = buildSpecChips(item);
   const photoSourceLabel = formatPhotoSource(item.photo_source);
+  const sellerType = getMarketplaceSellerType(item);
   const trustSignals = [
-    item.seller_type || "Private seller",
+    sellerType,
     formatBodyType(item.body_type),
     item.status,
-    saved ? "Saved" : null,
   ].filter(Boolean);
 
   return (
@@ -155,17 +154,8 @@ export default function ListingCard({
             href={href}
             className="inline-flex flex-1 items-center justify-center rounded-full bg-cars-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-cars-accent"
           >
-            View details
+            Check availability
           </Link>
-          {onRequest ? (
-            <button
-              type="button"
-              onClick={() => onRequest(item.listing_id)}
-              className="inline-flex items-center justify-center rounded-full border border-cars-primary/15 px-4 py-3 text-sm font-semibold text-cars-primary transition hover:bg-cars-off-white"
-            >
-              Request viewing
-            </button>
-          ) : null}
         </div>
       </div>
     </article>

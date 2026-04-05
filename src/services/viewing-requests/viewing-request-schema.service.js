@@ -21,5 +21,17 @@ export function ensureViewingRequestSchema(ctx) {
       "notified_at",
       "DATETIME NULL"
     );
+    await ensureColumn(
+      sequelize,
+      "viewing_requests",
+      "preferred_contact_method",
+      "VARCHAR(40) NULL"
+    );
+    await ensureColumn(
+      sequelize,
+      "viewing_requests",
+      "follow_up_status",
+      "VARCHAR(40) NOT NULL DEFAULT 'new'"
+    );
   });
 }

@@ -658,7 +658,7 @@ export default function SellPage() {
         </p>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <div className="rounded-[24px] border border-cars-primary/10 bg-cars-off-white p-5">
+          <div className="rounded-[24px] border border-cars-primary/10 bg-cars-off-white p-5 dark:border-cars-gray-light/35 dark:bg-slate-950/45">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
               Publish summary
             </p>
@@ -670,7 +670,7 @@ export default function SellPage() {
             </ul>
           </div>
 
-          <div className="rounded-[24px] border border-cars-primary/10 bg-white p-5 shadow-[0_12px_28px_rgba(15,45,98,0.05)]">
+          <div className="rounded-[24px] border border-cars-primary/10 bg-white p-5 shadow-[0_12px_28px_rgba(15,45,98,0.05)] dark:border-cars-gray-light/35 dark:bg-slate-950/55">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
               Before you publish
             </p>
@@ -690,7 +690,7 @@ export default function SellPage() {
     <>
       <Header />
       <main className="container-cars py-8">
-        <section className="rounded-[32px] border border-cars-gray-light/70 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(241,246,255,0.96))] p-6 shadow-[0_18px_44px_rgba(15,45,98,0.08)] md:p-8">
+        <section className="rounded-[32px] border border-cars-gray-light/70 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(241,246,255,0.96))] p-6 shadow-[0_18px_44px_rgba(15,45,98,0.08)] dark:border-cars-gray-light/35 dark:bg-[linear-gradient(135deg,rgba(8,17,31,0.96),rgba(15,26,44,0.9))] md:p-8">
           <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
@@ -705,7 +705,7 @@ export default function SellPage() {
             <div className="flex flex-wrap gap-3">
               <Link
                 href="/catalog"
-                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-white"
+                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-white dark:border-cars-gray-light/35 dark:bg-slate-950/35 dark:text-white"
               >
                 Browse catalog
               </Link>
