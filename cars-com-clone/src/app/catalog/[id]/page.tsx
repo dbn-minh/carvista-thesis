@@ -168,6 +168,7 @@ export default function CatalogDetailPage() {
     if (!variant) return "/listings";
 
     const params = new URLSearchParams();
+    params.set("mode", "match");
     params.set("variantId", String(id));
     params.set("query", heading);
 

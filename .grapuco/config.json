@@ -1,0 +1,22 @@
+{
+  "repoId": "c0d2409a-9843-4222-90e4-c5bdec12f4d0",
+  "repoName": "backend",
+  "server": "https://api.grapuco.com",
+  "language": "javascript",
+  "features": {
+    "embeddings": true,
+    "dataFlowAnalysis": true
+  },
+  "ignore": [
+    "node_modules",
+    "dist",
+    ".next",
+    ".git",
+    ".grapuco",
+    "__pycache__",
+    "vendor",
+    "target",
+    "build"
+  ],
+  "lastPush": "2026-04-05T15:34:55.536Z"
+}

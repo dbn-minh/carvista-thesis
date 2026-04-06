@@ -44,6 +44,7 @@ import type {
   AiInsightCard,
   ChatResponse,
   ListingDetail,
+  VariantDetail,
   VariantListItem,
 } from "@/lib/types";
 
@@ -53,6 +54,7 @@ type SelectedVehicle = {
   query: string;
   listingId: number | null;
   listing: ListingDetail | null;
+  variantImageUrl: string | null;
   resolutionNote: string | null;
   source: "listing" | "variant" | "query" | "search";
 };
@@ -170,6 +172,16 @@ function stripLeadingYearQuery(query: string) {
   return trimmed.replace(/^(19|20)\d{2}\s+/, "").trim();
 }
 
+function getImageUrl(image: Record<string, unknown>) {
+  const value = image.url ?? image.image_url ?? image.src ?? image.image;
+  return typeof value === "string" && value ? value : null;
+}
+
+function getVariantDetailImage(detail: VariantDetail | null | undefined) {
+  if (!detail?.images?.length) return null;
+  return detail.images.map(getImageUrl).find((image): image is string => Boolean(image)) ?? null;
+}
+
 async function fetchCompareReadyVariants(query: string) {
   const qs = new URLSearchParams();
   qs.set("q", query);
@@ -180,9 +192,7 @@ async function fetchCompareReadyVariants(query: string) {
 async function fetchCompareReadyVariantDetail(variantId: number) {
   const qs = new URLSearchParams();
   qs.set("compareReady", "true");
-  return apiFetch<{ variant: Record<string, unknown> | null }>(
-    `/catalog/variants/${variantId}?${qs.toString()}`
-  );
+  return apiFetch<VariantDetail>(`/catalog/variants/${variantId}?${qs.toString()}`);
 }
 
 function pickBestVariantMatch(query: string, items: VariantListItem[]) {
@@ -238,7 +248,22 @@ async function resolveSelectionFromParams({
       };
     }
     try {
-      await fetchCompareReadyVariantDetail(resolvedVariantId);
+      const variantDetail = await fetchCompareReadyVariantDetail(resolvedVariantId);
+      return {
+        selection: {
+          variantId: resolvedVariantId,
+          label,
+          query: label,
+          listingId,
+          listing: detail,
+          variantImageUrl: getVariantDetailImage(variantDetail),
+          resolutionNote: null,
+          source: "listing",
+        },
+        status: "exact",
+        note: null,
+        searchQuery: label,
+      };
     } catch {
       return {
         selection: null,
@@ -247,20 +272,6 @@ async function resolveSelectionFromParams({
         searchQuery: "",
       };
     }
-    return {
-      selection: {
-        variantId: resolvedVariantId,
-        label,
-        query: label,
-        listingId,
-        listing: detail,
-        resolutionNote: null,
-        source: "listing",
-      },
-      status: "exact",
-      note: null,
-      searchQuery: label,
-    };
   }
 
   if (variantId) {
@@ -270,6 +281,21 @@ async function resolveSelectionFromParams({
       if (!label) {
         label = buildLabelFromVariantDetailPayload(detail.variant);
       }
+      return {
+        selection: {
+          variantId,
+          label: label || query.trim() || "Selected vehicle",
+          query: label || query.trim() || "Selected vehicle",
+          listingId: null,
+          listing: null,
+          variantImageUrl: getVariantDetailImage(detail),
+          resolutionNote: null,
+          source: "variant",
+        },
+        status: "exact",
+        note: null,
+        searchQuery: label || query.trim() || "Selected vehicle",
+      };
     } catch {
       const fallbackLabel = label || query.trim() || "This vehicle";
       return {
@@ -279,21 +305,6 @@ async function resolveSelectionFromParams({
         searchQuery: "",
       };
     }
-
-    return {
-      selection: {
-        variantId,
-        label: label || query.trim() || "Selected vehicle",
-        query: label || query.trim() || "Selected vehicle",
-        listingId: null,
-        listing: null,
-        resolutionNote: null,
-        source: "variant",
-      },
-      status: "exact",
-      note: null,
-      searchQuery: label || query.trim() || "Selected vehicle",
-    };
   }
 
   if (query.trim().length >= 2) {
@@ -301,6 +312,7 @@ async function resolveSelectionFromParams({
     const response = await fetchCompareReadyVariants(trimmedQuery);
     const exactMatch = findExactVariantMatch(trimmedQuery, response.items);
     if (exactMatch) {
+      const detail = await fetchCompareReadyVariantDetail(exactMatch.variant_id);
       return {
         selection: {
           variantId: exactMatch.variant_id,
@@ -308,6 +320,7 @@ async function resolveSelectionFromParams({
           query: buildVariantLabel(exactMatch),
           listingId: null,
           listing: null,
+          variantImageUrl: getVariantDetailImage(detail),
           resolutionNote: null,
           source: "query",
         },
@@ -318,6 +331,7 @@ async function resolveSelectionFromParams({
     }
     if (response.items.length === 1) {
       const candidate = response.items[0];
+      const detail = await fetchCompareReadyVariantDetail(candidate.variant_id);
       return {
         selection: {
           variantId: candidate.variant_id,
@@ -325,6 +339,7 @@ async function resolveSelectionFromParams({
           query: buildVariantLabel(candidate),
           listingId: null,
           listing: null,
+          variantImageUrl: getVariantDetailImage(detail),
           resolutionNote: `Matched the closest supported catalog variant for "${trimmedQuery}".`,
           source: "query",
         },
@@ -347,6 +362,7 @@ async function resolveSelectionFromParams({
       const fallbackResponse = await fetchCompareReadyVariants(fallbackQuery);
       const fallbackExact = findExactVariantMatch(fallbackQuery, fallbackResponse.items);
       if (fallbackExact) {
+        const detail = await fetchCompareReadyVariantDetail(fallbackExact.variant_id);
         return {
           selection: {
             variantId: fallbackExact.variant_id,
@@ -354,6 +370,7 @@ async function resolveSelectionFromParams({
             query: buildVariantLabel(fallbackExact),
             listingId: null,
             listing: null,
+            variantImageUrl: getVariantDetailImage(detail),
             resolutionNote: `The exact year from "${trimmedQuery}" is not in the current compare catalog. Using the supported match below instead.`,
             source: "query",
           },
@@ -364,6 +381,7 @@ async function resolveSelectionFromParams({
       }
       if (fallbackResponse.items.length === 1) {
         const candidate = fallbackResponse.items[0];
+        const detail = await fetchCompareReadyVariantDetail(candidate.variant_id);
         return {
           selection: {
             variantId: candidate.variant_id,
@@ -371,6 +389,7 @@ async function resolveSelectionFromParams({
             query: buildVariantLabel(candidate),
             listingId: null,
             listing: null,
+            variantImageUrl: getVariantDetailImage(detail),
             resolutionNote: `The exact year from "${trimmedQuery}" is not in the current compare catalog. Using the only supported variant found for ${fallbackQuery}.`,
             source: "query",
           },
@@ -406,9 +425,12 @@ async function resolveSelectionFromParams({
 }
 
 function getSelectionImage(selection: SelectedVehicle | null) {
-  if (!selection?.listing) return null;
-  const images = getListingImages(selection.listing.listing);
-  return images[0] ?? selection.listing.images[0]?.url ?? null;
+  if (!selection) return null;
+  if (selection.listing) {
+    const images = getListingImages(selection.listing.listing);
+    return images[0] ?? selection.listing.images[0]?.url ?? selection.variantImageUrl ?? null;
+  }
+  return selection.variantImageUrl ?? null;
 }
 
 function getListingStatus(selection: SelectedVehicle | null) {
@@ -856,6 +878,39 @@ function ComparePageContent() {
     setRightHelperTone("info");
   }
 
+  async function buildSearchSelection(item: VariantListItem, source: "search" | "query" = "search") {
+    const detail = await fetchCompareReadyVariantDetail(item.variant_id);
+    return {
+      variantId: item.variant_id,
+      label: buildVariantLabel(item),
+      query: buildVariantLabel(item),
+      listingId: null,
+      listing: null,
+      variantImageUrl: getVariantDetailImage(detail),
+      resolutionNote: null,
+      source,
+    } satisfies SelectedVehicle;
+  }
+
+  async function handleSearchSelection(side: "left" | "right", item: VariantListItem) {
+    try {
+      const selection = await buildSearchSelection(item);
+      updateSide(side, selection, buildVariantLabel(item));
+    } catch (error) {
+      const note =
+        error instanceof Error
+          ? error.message
+          : "Could not load this compare-ready vehicle right now.";
+      if (side === "left") {
+        setLeftHelperNote(note);
+        setLeftHelperTone("error");
+      } else {
+        setRightHelperNote(note);
+        setRightHelperTone("error");
+      }
+    }
+  }
+
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
@@ -1200,21 +1255,7 @@ function ComparePageContent() {
             selected={leftSelection}
             helperNote={leftHelperNote}
             helperTone={leftHelperTone}
-            onSelect={(item) =>
-              updateSide(
-                "left",
-                {
-                  variantId: item.variant_id,
-                  label: buildVariantLabel(item),
-                  query: buildVariantLabel(item),
-                  listingId: null,
-                  listing: null,
-                  resolutionNote: null,
-                  source: "search",
-                },
-                buildVariantLabel(item)
-              )
-            }
+            onSelect={(item) => void handleSearchSelection("left", item)}
             onClear={() => updateSide("left", null, "")}
           />
 
@@ -1232,21 +1273,7 @@ function ComparePageContent() {
             selected={rightSelection}
             helperNote={rightHelperNote}
             helperTone={rightHelperTone}
-            onSelect={(item) =>
-              updateSide(
-                "right",
-                {
-                  variantId: item.variant_id,
-                  label: buildVariantLabel(item),
-                  query: buildVariantLabel(item),
-                  listingId: null,
-                  listing: null,
-                  resolutionNote: null,
-                  source: "search",
-                },
-                buildVariantLabel(item)
-              )
-            }
+            onSelect={(item) => void handleSearchSelection("right", item)}
             onClear={() => updateSide("right", null, "")}
           />
         </section>

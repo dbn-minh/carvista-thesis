@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
+import { useEffect, useState } from "react";
 import { catalogApi } from "@/lib/carvista-api";
+import { toCurrency } from "@/lib/api-client";
 import type { VariantListItem } from "@/lib/types";
 
 type FeaturedCard = {
@@ -14,9 +14,121 @@ type FeaturedCard = {
   href: string;
 };
 
+type FeaturedTarget = {
+  make: string;
+  model: string;
+  trimIncludes?: string[];
+};
+
+const FEATURED_CARD_LIMIT = 6;
+const CURATED_FEATURED_TARGETS: FeaturedTarget[] = [
+  { make: "Ferrari", model: "F8 Tributo" },
+  { make: "McLaren", model: "720S" },
+  { make: "Lamborghini", model: "Huracan", trimIncludes: ["EVO"] },
+  { make: "Porsche", model: "911", trimIncludes: ["Turbo S"] },
+  { make: "Audi", model: "R8", trimIncludes: ["V10 Performance"] },
+  { make: "Lamborghini", model: "Urus" },
+  { make: "Aston Martin", model: "Vantage" },
+  { make: "Mercedes-Benz", model: "AMG GT", trimIncludes: ["R"] },
+  { make: "BMW", model: "M4", trimIncludes: ["Competition"] },
+  { make: "Nissan", model: "GT-R" },
+  { make: "Chevrolet", model: "Corvette", trimIncludes: ["Z06"] },
+  { make: "Lexus", model: "LC", trimIncludes: ["500"] },
+];
+
 function getImageUrl(image: Record<string, unknown>): string | null {
   const value = image.url ?? image.image_url ?? image.src ?? image.image;
   return typeof value === "string" && value ? value : null;
+}
+
+function normalizeText(value: string | null | undefined) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildFamilyKey(item: VariantListItem) {
+  return `${normalizeText(item.make_name)}::${normalizeText(item.model_name)}`;
+}
+
+function formatLabel(value: string | null | undefined, fallback: string) {
+  if (!value) return fallback;
+
+  const uppercaseTokens = new Map([
+    ["suv", "SUV"],
+    ["mpv", "MPV"],
+    ["ev", "EV"],
+  ]);
+
+  return value
+    .split(/[_-\s]+/)
+    .filter(Boolean)
+    .map((part) => {
+      const normalized = part.toLowerCase();
+      return uppercaseTokens.get(normalized) ?? `${part.charAt(0).toUpperCase()}${part.slice(1)}`;
+    })
+    .join(" ");
+}
+
+function compareFeaturedVariants(left: VariantListItem, right: VariantListItem) {
+  const leftPrice = Number(left.msrp_base ?? 0);
+  const rightPrice = Number(right.msrp_base ?? 0);
+
+  return (
+    rightPrice - leftPrice ||
+    (right.model_year ?? 0) - (left.model_year ?? 0) ||
+    (right.variant_id ?? 0) - (left.variant_id ?? 0)
+  );
+}
+
+function matchesTarget(item: VariantListItem, target: FeaturedTarget) {
+  if (normalizeText(item.make_name) !== normalizeText(target.make)) return false;
+  if (normalizeText(item.model_name) !== normalizeText(target.model)) return false;
+  if (!target.trimIncludes?.length) return true;
+
+  const normalizedTrim = normalizeText(item.trim_name);
+  return target.trimIncludes.some((token) => normalizedTrim.includes(normalizeText(token)));
+}
+
+function pickCuratedVariants(items: VariantListItem[]) {
+  const selected: VariantListItem[] = [];
+  const usedFamilies = new Set<string>();
+
+  for (const target of CURATED_FEATURED_TARGETS) {
+    const bestMatch = items
+      .filter((item) => !usedFamilies.has(buildFamilyKey(item)) && matchesTarget(item, target))
+      .sort(compareFeaturedVariants)[0];
+
+    if (!bestMatch) continue;
+
+    selected.push(bestMatch);
+    usedFamilies.add(buildFamilyKey(bestMatch));
+
+    if (selected.length === FEATURED_CARD_LIMIT) {
+      return selected;
+    }
+  }
+
+  const fallback = [...items]
+    .filter((item) => !usedFamilies.has(buildFamilyKey(item)))
+    .sort(compareFeaturedVariants);
+
+  for (const item of fallback) {
+    const familyKey = buildFamilyKey(item);
+    if (usedFamilies.has(familyKey)) continue;
+
+    selected.push(item);
+    usedFamilies.add(familyKey);
+
+    if (selected.length === FEATURED_CARD_LIMIT) {
+      break;
+    }
+  }
+
+  return selected;
 }
 
 function buildTitle(item: VariantListItem) {
@@ -24,34 +136,28 @@ function buildTitle(item: VariantListItem) {
 }
 
 function buildSubtitle(item: VariantListItem) {
-  return `${item.model_year} - ${item.body_type || "Body type pending"} - ${
-    item.fuel_type || "Fuel pending"
-  }`;
+  const meta = [
+    item.model_year ? String(item.model_year) : null,
+    formatLabel(item.body_type, "Body type pending"),
+    item.msrp_base ? toCurrency(item.msrp_base) : formatLabel(item.fuel_type, "Fuel pending"),
+  ].filter(Boolean);
+
+  return meta.join(" • ");
 }
 
 export default function FeaturedEVs() {
-  const { openAssistant } = useAiAssistant();
   const [cards, setCards] = useState<FeaturedCard[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hasElectricCars, setHasElectricCars] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     async function load() {
       setLoading(true);
       setErrorMessage("");
-      setHasElectricCars(false);
 
       try {
-        const electric = await catalogApi.variants({ fuel: "electric" });
-        let source = electric.items.slice(0, 6);
-
-        if (source.length === 0) {
-          const fallback = await catalogApi.variants();
-          source = fallback.items.slice(0, 6);
-        } else {
-          setHasElectricCars(true);
-        }
+        const response = await catalogApi.variants();
+        const source = pickCuratedVariants(response.items);
 
         const enriched = await Promise.all(
           source.map(async (item) => {
@@ -96,28 +202,6 @@ export default function FeaturedEVs() {
     void load();
   }, []);
 
-  const heading = useMemo(
-    () =>
-      hasElectricCars
-        ? {
-            eyebrow: "Featured EVs",
-            title: "Popular electric models",
-            description:
-              "Browse EVs from the catalog and jump straight to full model details.",
-            cta: "/catalog?fuel=electric",
-            ctaLabel: "View EVs",
-          }
-        : {
-            eyebrow: "Featured cars",
-            title: "Popular models right now",
-            description:
-              "Browse a few highlights from the catalog and open the full details in a click.",
-            cta: "/catalog",
-            ctaLabel: "View all models",
-          },
-    [hasElectricCars]
-  );
-
   return (
     <section className="py-10">
       <div className="container-cars">
@@ -125,19 +209,22 @@ export default function FeaturedEVs() {
           <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
-                {heading.eyebrow}
+                Featured showroom
               </p>
-              <h2 className="mt-2 text-3xl font-apercu-bold text-cars-primary">{heading.title}</h2>
+              <h2 className="mt-2 text-3xl font-apercu-bold text-cars-primary">
+                Curated standout cars
+              </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
-                {heading.description}
+                A fixed lineup of halo cars, supercars, and premium performance models currently
+                backed by the CarVista catalog.
               </p>
             </div>
 
             <Link
-              href={heading.cta}
+              href="/catalog"
               className="inline-flex rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
             >
-              {heading.ctaLabel}
+              Browse catalog
             </Link>
           </div>
 
@@ -165,12 +252,12 @@ export default function FeaturedEVs() {
                   </div>
                 ) : (
                   <div className="flex h-52 w-full items-center justify-center bg-[linear-gradient(180deg,rgba(233,241,255,0.9),rgba(255,255,255,1))] px-8 text-center text-sm font-semibold text-cars-primary">
-                    Photo unavailable
+                    Catalog placeholder image
                   </div>
                 )}
                 <div className="p-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cars-accent">
-                    Featured model
+                    Curated performance pick
                   </p>
                   <h3 className="mt-3 text-xl font-apercu-bold text-cars-primary">{item.title}</h3>
                   <p className="mt-3 text-sm leading-6 text-cars-gray">{item.subtitle}</p>
@@ -180,24 +267,6 @@ export default function FeaturedEVs() {
                 </div>
               </Link>
             ))}
-          </div>
-
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link
-              href={heading.cta}
-              className="rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white"
-            >
-              {heading.ctaLabel}
-            </Link>
-            <button
-              type="button"
-              onClick={() => {
-                openAssistant();
-              }}
-              className="rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
-            >
-              Compare with AI
-            </button>
           </div>
         </div>
       </div>

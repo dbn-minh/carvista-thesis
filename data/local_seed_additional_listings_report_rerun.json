@@ -1,0 +1,29 @@
+{
+  "variants_considered": 187,
+  "variants_seeded": 0,
+  "listings_created": 0,
+  "skipped_variants": [
+    {
+      "variant": "2013 Chevrolet Silverado 1500 LT",
+      "reason": "variant quality is too incomplete for marketplace seeding"
+    },
+    {
+      "variant": "2011 Chevrolet Silverado 1500 LT",
+      "reason": "variant quality is too incomplete for marketplace seeding"
+    },
+    {
+      "variant": "2012 Dodge Grand Caravan SXT",
+      "reason": "variant quality is too incomplete for marketplace seeding"
+    },
+    {
+      "variant": "2012 Jeep Grand Cherokee Laredo",
+      "reason": "variant quality is too incomplete for marketplace seeding"
+    },
+    {
+      "variant": "2012 Jeep Wrangler Unlimited Sahara",
+      "reason": "variant quality is too incomplete for marketplace seeding"
+    }
+  ],
+  "body_type_breakdown": {},
+  "make_breakdown": {}
+}

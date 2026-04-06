@@ -1,0 +1,109 @@
+{
+  "input_variant_count": 14,
+  "makes_created": 0,
+  "models_created": 0,
+  "variants_created": 0,
+  "variant_specs_created": 0,
+  "placeholder_images_created": 0,
+  "listings_created": 0,
+  "items": [
+    {
+      "variant": "2020 Ferrari 488 GTB Base",
+      "make_created": false,
+      "model_created": false,
+      "variant_created": false,
+      "listing_created": false
+    },
+    {
+      "variant": "2021 Ferrari F8 Tributo Base",
+      "make_created": false,
+      "model_created": false,
+      "variant_created": false,
+      "listing_created": false
+    },
+    {
+      "variant": "2021 Lamborghini Huracan EVO",
+      "make_created": false,
+      "model_created": false,
+      "variant_created": false,
+      "listing_created": false
+    },
+    {
+      "variant": "2023 Lamborghini Urus S",
+      "make_created": false,
+      "model_created": false,
+      "variant_created": false,
+      "listing_created": false
+    },
+    {
+      "variant": "2020 McLaren 720S Coupe",
+      "make_created": false,
+      "model_created": false,
+      "variant_created": false,
+      "listing_created": false
+    },
+    {
+      "variant": "2024 Porsche 911 Carrera S",
+      "make_created": false,
+      "model_created": false,
+      "variant_created": false,
+      "listing_created": false
+    },
+    {
+      "variant": "2024 Porsche 911 Turbo S",
+      "make_created": false,
+      "model_created": false,
+      "variant_created": false,
+      "listing_created": false
+    },
+    {
+      "variant": "2022 Audi R8 V10 Performance quattro",
+      "make_created": false,
+      "model_created": false,
+      "variant_created": false,
+      "listing_created": false
+    },
+    {
+      "variant": "2020 Mercedes-Benz AMG GT R",
+      "make_created": false,
+      "model_created": false,
+      "variant_created": false,
+      "listing_created": false
+    },
+    {
+      "variant": "2024 BMW M4 Competition xDrive",
+      "make_created": false,
+      "model_created": false,
+      "variant_created": false,
+      "listing_created": false
+    },
+    {
+      "variant": "2021 Nissan GT-R Premium",
+      "make_created": false,
+      "model_created": false,
+      "variant_created": false,
+      "listing_created": false
+    },
+    {
+      "variant": "2024 Chevrolet Corvette Z06",
+      "make_created": false,
+      "model_created": false,
+      "variant_created": false,
+      "listing_created": false
+    },
+    {
+      "variant": "2022 Aston Martin Vantage Coupe",
+      "make_created": false,
+      "model_created": false,
+      "variant_created": false,
+      "listing_created": false
+    },
+    {
+      "variant": "2024 Lexus LC 500",
+      "make_created": false,
+      "model_created": false,
+      "variant_created": false,
+      "listing_created": false
+    }
+  ]
+}

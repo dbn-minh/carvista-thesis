@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import { buildListingFilterOptions } from "@/components/listings/listing-utils";
 import Header from "@/components/layout/Header";
-import { listingsApi } from "@/lib/carvista-api";
+import { apiFetch } from "@/lib/api-client";
 import type { Listing } from "@/lib/types";
 
 type SearchDraft = {
@@ -178,7 +178,9 @@ function CatalogPageContent() {
       setInventoryError("");
 
       try {
-        const response = await listingsApi.list({ status: "active" });
+        const response = await apiFetch<{ items: Listing[] }>(
+          "/listings?status=active&limit=1000"
+        );
         if (cancelled) return;
         setAvailableListings(response.items);
       } catch (error) {
@@ -259,10 +261,10 @@ function CatalogPageContent() {
 
   function applyShortcut(shortcut: Shortcut) {
     const nextDraft: SearchDraft = {
-      query: shortcut.filters.query ?? draft.query,
-      make: shortcut.filters.make ?? draft.make,
-      bodyType: shortcut.filters.bodyType ?? draft.bodyType,
-      fuelType: shortcut.filters.fuelType ?? draft.fuelType,
+      query: shortcut.filters.query ?? "",
+      make: shortcut.filters.make ?? "",
+      bodyType: shortcut.filters.bodyType ?? "",
+      fuelType: shortcut.filters.fuelType ?? "",
     };
 
     setDraft(nextDraft);

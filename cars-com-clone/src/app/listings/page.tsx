@@ -17,8 +17,8 @@ import {
   type ListingFilterState,
 } from "@/components/listings/listing-utils";
 import Header from "@/components/layout/Header";
-import { listingsApi, watchlistApi } from "@/lib/carvista-api";
-import { hasToken } from "@/lib/api-client";
+import { watchlistApi } from "@/lib/carvista-api";
+import { apiFetch, hasToken } from "@/lib/api-client";
 import type { Listing } from "@/lib/types";
 
 const initialFilters: ListingFilterState = {
@@ -35,7 +35,26 @@ const initialFilters: ListingFilterState = {
   sort: "newest",
 };
 
-function parseSearchFilters(searchParams: URLSearchParams | ReadonlyURLSearchParams): ListingFilterState {
+const LISTINGS_PAGE_SIZE = 24;
+type ListingsMode = "browse" | "match";
+
+function parseListingsMode(
+  searchParams: URLSearchParams | ReadonlyURLSearchParams
+): ListingsMode {
+  return searchParams.get("mode") === "match" ? "match" : "browse";
+}
+
+function parseSearchFilters(
+  searchParams: URLSearchParams | ReadonlyURLSearchParams,
+  options?: { lockToVariant?: boolean }
+): ListingFilterState {
+  if (options?.lockToVariant) {
+    return {
+      ...initialFilters,
+      sort: (searchParams.get("sort") as ListingFilterState["sort"]) || initialFilters.sort,
+    };
+  }
+
   return {
     query: searchParams.get("query") || searchParams.get("q") || "",
     minPrice: searchParams.get("minPrice") || "",
@@ -63,6 +82,18 @@ function ListingsPageContent() {
   const [savedListingIds, setSavedListingIds] = useState<number[]>([]);
   const [filters, setFilters] = useState<ListingFilterState>(initialFilters);
   const [linkedVariantId, setLinkedVariantId] = useState<number | null>(null);
+  const [mode, setMode] = useState<ListingsMode>("browse");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  async function fetchListings(params: { status: string; variantId?: number | null }) {
+    const qs = new URLSearchParams();
+    qs.set("status", params.status);
+    qs.set("limit", "1000");
+    if (Number.isFinite(params.variantId)) {
+      qs.set("variantId", String(params.variantId));
+    }
+    return apiFetch<{ items: Listing[]; limit?: number }>(`/listings?${qs.toString()}`);
+  }
 
   async function load(activeVariantId?: number | null) {
     setLoading(true);
@@ -74,7 +105,7 @@ function ListingsPageContent() {
         : Promise.resolve({ items: [] as Array<{ listing_id: number }> });
 
       const [listings, sessionData] = await Promise.allSettled([
-        listingsApi.list({
+        fetchListings({
           status: "active",
           ...(Number.isFinite(activeVariantId) ? { variantId: Number(activeVariantId) } : {}),
         }),
@@ -85,7 +116,7 @@ function ListingsPageContent() {
         setItems(listings.value.items);
         if (Number.isFinite(activeVariantId)) {
           setTone("info");
-          setMessage("Showing listings related to the vehicle recommended by CarVista AI.");
+          setMessage("Showing listings that closely match this vehicle.");
         }
       } else {
         throw listings.reason;
@@ -105,16 +136,23 @@ function ListingsPageContent() {
   }
 
   useEffect(() => {
+    const nextMode = parseListingsMode(searchParams);
     const variantId = Number(searchParams.get("variantId"));
-    const normalizedVariantId = Number.isFinite(variantId) ? variantId : null;
+    const normalizedVariantId =
+      nextMode === "match" && Number.isFinite(variantId) ? variantId : null;
+
+    setMode(normalizedVariantId != null ? nextMode : "browse");
     setLinkedVariantId(normalizedVariantId);
-    setFilters(parseSearchFilters(searchParams));
+    setFilters(parseSearchFilters(searchParams, { lockToVariant: normalizedVariantId != null }));
+    setCurrentPage(1);
     void load(normalizedVariantId);
   }, [searchKey]);
 
   function clearMarketplaceFilters() {
     setFilters(initialFilters);
     setLinkedVariantId(null);
+    setMode("browse");
+    setCurrentPage(1);
     router.replace("/listings");
     void load(null);
   }
@@ -149,6 +187,30 @@ function ListingsPageContent() {
     () => sortListings(applyListingFilters(items, filters), filters.sort),
     [items, filters]
   );
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / LISTINGS_PAGE_SIZE));
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * LISTINGS_PAGE_SIZE;
+    return filteredItems.slice(start, start + LISTINGS_PAGE_SIZE);
+  }, [currentPage, filteredItems]);
+  const pageWindow = useMemo(() => {
+    const pages: number[] = [];
+    const start = Math.max(1, currentPage - 2);
+    const end = Math.min(totalPages, currentPage + 2);
+    for (let page = start; page <= end; page += 1) {
+      pages.push(page);
+    }
+    return pages;
+  }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, linkedVariantId]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   return (
     <>
@@ -165,7 +227,9 @@ function ListingsPageContent() {
             totalCount={items.length}
             filteredCount={filteredItems.length}
             activeFilters={
-              linkedVariantId != null ? [...activeFilters, "Recommended match"] : activeFilters
+              mode === "match" && linkedVariantId != null
+                ? [...activeFilters, "Exact match"]
+                : activeFilters
             }
             onClearFilters={clearMarketplaceFilters}
           />
@@ -223,7 +287,7 @@ function ListingsPageContent() {
 
         {!loading && filteredItems.length > 0 ? (
           <div className="mt-6 grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
-            {filteredItems.map((item) => (
+            {paginatedItems.map((item) => (
               <ListingCard
                 key={item.listing_id}
                 item={item}
@@ -231,6 +295,89 @@ function ListingsPageContent() {
                 onToggleSave={toggleSave}
               />
             ))}
+          </div>
+        ) : null}
+
+        {!loading && filteredItems.length > LISTINGS_PAGE_SIZE ? (
+          <div className="mt-8 flex flex-col gap-4 rounded-[28px] border border-cars-primary/10 bg-cars-surface px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-white/5">
+            <p className="text-sm text-cars-gray dark:text-slate-300">
+              Showing{" "}
+              <span className="font-semibold text-cars-primary dark:text-white">
+                {(currentPage - 1) * LISTINGS_PAGE_SIZE + 1}-
+                {Math.min(currentPage * LISTINGS_PAGE_SIZE, filteredItems.length)}
+              </span>{" "}
+              of{" "}
+              <span className="font-semibold text-cars-primary dark:text-white">
+                {filteredItems.length}
+              </span>{" "}
+              listings
+            </p>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                disabled={currentPage === 1}
+                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:text-white dark:hover:bg-white/10"
+              >
+                Previous
+              </button>
+
+              {pageWindow[0] > 1 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(1)}
+                    className="h-10 min-w-10 rounded-full border border-cars-primary/15 px-3 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white dark:border-white/15 dark:text-white dark:hover:bg-white/10"
+                  >
+                    1
+                  </button>
+                  {pageWindow[0] > 2 ? (
+                    <span className="px-1 text-sm text-cars-gray dark:text-slate-400">…</span>
+                  ) : null}
+                </>
+              ) : null}
+
+              {pageWindow.map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  onClick={() => setCurrentPage(page)}
+                  aria-current={page === currentPage ? "page" : undefined}
+                  className={
+                    page === currentPage
+                      ? "h-10 min-w-10 rounded-full bg-cars-primary px-3 text-sm font-semibold text-white"
+                      : "h-10 min-w-10 rounded-full border border-cars-primary/15 px-3 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white dark:border-white/15 dark:text-white dark:hover:bg-white/10"
+                  }
+                >
+                  {page}
+                </button>
+              ))}
+
+              {pageWindow[pageWindow.length - 1] < totalPages ? (
+                <>
+                  {pageWindow[pageWindow.length - 1] < totalPages - 1 ? (
+                    <span className="px-1 text-sm text-cars-gray dark:text-slate-400">…</span>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(totalPages)}
+                    className="h-10 min-w-10 rounded-full border border-cars-primary/15 px-3 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white dark:border-white/15 dark:text-white dark:hover:bg-white/10"
+                  >
+                    {totalPages}
+                  </button>
+                </>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                disabled={currentPage === totalPages}
+                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:text-white dark:hover:bg-white/10"
+              >
+                Next
+              </button>
+            </div>
           </div>
         ) : null}
       </main>

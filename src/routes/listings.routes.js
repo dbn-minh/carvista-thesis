@@ -300,6 +300,11 @@ listingsRoutes.get("/listings", async (req, res, next) => {
       CarMakes,
     } = req.ctx.models;
     const { status = "active", ownerId, variantId } = req.query;
+    const requestedLimit = Number(req.query.limit);
+    const limit =
+      Number.isInteger(requestedLimit) && requestedLimit > 0
+        ? Math.min(requestedLimit, 1000)
+        : 50;
 
     const where = { status };
     if (ownerId) where.owner_id = Number(ownerId);
@@ -308,7 +313,7 @@ listingsRoutes.get("/listings", async (req, res, next) => {
     const rows = await Listings.findAll({
       where,
       order: [["created_at", "DESC"]],
-      limit: 50,
+      limit,
       include: [
         {
           model: CarVariants,
@@ -416,7 +421,7 @@ listingsRoutes.get("/listings", async (req, res, next) => {
       };
     });
 
-    res.json({ items });
+    res.json({ items, limit });
   } catch (e) { next(e); }
 });
 

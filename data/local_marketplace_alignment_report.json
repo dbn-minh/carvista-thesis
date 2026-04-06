@@ -1,0 +1,28 @@
+{
+  "listings_scanned": 227,
+  "generated_listings_updated": 1,
+  "price_updates": 0,
+  "location_updates": 1,
+  "skipped_user_authored": 1,
+  "skipped_no_variant": 0,
+  "country_counts_before": {
+    "VN": 227
+  },
+  "country_counts_after": {
+    "VN": 227
+  },
+  "updated_by_tier": {
+    "mainstream": 1
+  },
+  "updated_listings": [
+    {
+      "listing_id": 67,
+      "vehicle": "2024 Honda Civic e:HEV RS",
+      "tier": "mainstream",
+      "old_price": "60000000.00",
+      "new_price": "60000000.00",
+      "old_location": "HCM, VN",
+      "new_location": "HCMC, VN"
+    }
+  ]
+}
