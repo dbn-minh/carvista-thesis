@@ -32,11 +32,13 @@ const BODY_TYPE_SYNONYMS = new Map([
   ["crossover", "cuv"],
   ["cuv", "cuv"],
   ["suv", "suv"],
+  ["xe gam cao", "suv"],
   ["sedan", "sedan"],
   ["hatchback", "hatchback"],
   ["mpv", "mpv"],
   ["minivan", "mpv"],
   ["pickup", "pickup"],
+  ["ban tai", "pickup"],
   ["truck", "pickup"],
   ["wagon", "wagon"],
   ["coupe", "coupe"],
@@ -46,15 +48,18 @@ const BODY_TYPE_SYNONYMS = new Map([
 const FUEL_TYPE_SYNONYMS = new Map([
   ["ev", "ev"],
   ["electric", "ev"],
+  ["xe dien", "ev"],
   ["bev", "ev"],
   ["hybrid", "hybrid"],
   ["plug in hybrid", "phev"],
   ["plug-in hybrid", "phev"],
   ["phev", "phev"],
   ["diesel", "diesel"],
+  ["dau", "diesel"],
   ["petrol", "gasoline"],
   ["gasoline", "gasoline"],
   ["gas", "gasoline"],
+  ["xang", "gasoline"],
 ]);
 
 const FEATURE_ALIASES = new Map([
@@ -174,6 +179,7 @@ function hasOwn(obj, key) {
 }
 
 function toInteger(value) {
+  if (value == null || value === "") return null;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? Math.round(numeric) : null;
 }
@@ -238,14 +244,19 @@ function detectBudgetRange(message) {
 
   return {
     budget_target: values.length === 1 ? values[0] : Math.round((min + max) / 2),
-    budget_ceiling: normalized.includes("ceiling") || normalized.includes("max") || normalized.includes("under") ? max : values.length > 1 ? max : null,
+    budget_ceiling:
+      /\b(ceiling|max|under|duoi|toi da|tran|khong qua)\b/.test(normalized)
+        ? max
+        : values.length > 1
+          ? max
+          : null,
   };
 }
 
 function detectPassengerSignals(message) {
   const normalized = normalizeText(message);
-  const familyMatch = normalized.match(/family of (\d+)/);
-  const passengerMatch = normalized.match(/(\d+)\s*(people|person|passengers|seats?|adults|kids|children)/);
+  const familyMatch = normalized.match(/(?:family of|gia dinh|nha minh|nha toi)\s*(\d+)/);
+  const passengerMatch = normalized.match(/(\d+)\s*(people|person|passengers|seats?|adults|kids|children|nguoi|cho|ghe|con|tre em)/);
   const count = familyMatch ? Number(familyMatch[1]) : passengerMatch ? Number(passengerMatch[1]) : null;
 
   return {
@@ -254,15 +265,17 @@ function detectPassengerSignals(message) {
     needs_7_seats:
       normalized.includes("7 seats") ||
       normalized.includes("seven seats") ||
+      normalized.includes("7 cho") ||
+      normalized.includes("bay cho") ||
       normalized.includes("third row") ||
       (Number.isFinite(count) && count >= 6)
         ? true
         : null,
-    child_present: /\b(kid|kids|child|children|baby|babies)\b/.test(normalized) ? true : null,
-    elderly_present: /\b(elderly|older parents|grandparents|senior)\b/.test(normalized) ? true : null,
-    cargo_needs: /\b(luggage|cargo|stroller|gear|golf|carry a lot|boot space)\b/.test(normalized)
+    child_present: /\b(kid|kids|child|children|baby|babies|tre em|em be|con nho|con)\b/.test(normalized) ? true : null,
+    elderly_present: /\b(elderly|older parents|grandparents|senior|nguoi lon tuoi|ong ba|bo me)\b/.test(normalized) ? true : null,
+    cargo_needs: /\b(luggage|cargo|stroller|gear|golf|carry a lot|boot space|hanh ly|do dac|xe day|do tre em)\b/.test(normalized)
       ? "high"
-      : /\b(a few bags|light cargo)\b/.test(normalized)
+      : /\b(a few bags|light cargo|it hanh ly)\b/.test(normalized)
         ? "medium"
         : null,
   };
@@ -271,18 +284,21 @@ function detectPassengerSignals(message) {
 function detectDrivingConditions(message) {
   const normalized = normalizeText(message);
   let cityVsHighway = null;
-  if (/\b(city|urban|traffic|commute|downtown|hcm|hanoi)\b/.test(normalized) && /\b(highway|long trip|road trip|interstate)\b/.test(normalized)) {
+  const cityPattern = /\b(city|urban|traffic|commute|downtown|hcm|hanoi|ha noi|sai gon|saigon|tphcm|thanh pho|noi do|duong pho|di pho|ket xe|di lam)\b/;
+  const highwayPattern = /\b(highway|long trip|road trip|interstate|cao toc|duong dai|di xa|di tinh|duong truong)\b/;
+  const roughRoadPattern = /\b(bad road|rough road|pothole|rural|country road|mountain|slope|hill|duong xau|duong de|duong nui|deo|doc|nong thon|duong que)\b/;
+  if (cityPattern.test(normalized) && highwayPattern.test(normalized)) {
     cityVsHighway = "mixed";
-  } else if (/\b(city|urban|traffic|commute|downtown|hcm|hanoi)\b/.test(normalized)) {
+  } else if (cityPattern.test(normalized)) {
     cityVsHighway = "mostly_city";
-  } else if (/\b(highway|long trip|road trip|interstate)\b/.test(normalized)) {
+  } else if (highwayPattern.test(normalized)) {
     cityVsHighway = "mostly_highway";
   }
 
   const roadConditions = unique([
-    /\b(city|traffic|urban|downtown|commute)\b/.test(normalized) ? "city_traffic" : null,
-    /\b(highway|road trip|expressway|motorway)\b/.test(normalized) ? "highway" : null,
-    /\b(bad road|rough road|pothole|rural|country road|mountain|slope|hill)\b/.test(normalized) ? "rough_roads" : null,
+    cityPattern.test(normalized) ? "city_traffic" : null,
+    /\b(highway|road trip|expressway|motorway|cao toc|duong dai|di xa|duong truong)\b/.test(normalized) ? "highway" : null,
+    roughRoadPattern.test(normalized) ? "rough_roads" : null,
     /\b(flood|flooded|ngap)\b/.test(normalized) ? "flood_risk" : null,
   ]);
 
@@ -290,9 +306,9 @@ function detectDrivingConditions(message) {
     city_vs_highway_ratio: cityVsHighway,
     road_conditions: roadConditions,
     flood_risk: roadConditions.includes("flood_risk") ? true : null,
-    parking_constraints: /\b(tight parking|small garage|basement|narrow alley|tight space|easy to park)\b/.test(normalized)
+    parking_constraints: /\b(tight parking|small garage|basement|narrow alley|tight space|easy to park|bai dau chat|ham|ham xe|ngo hep|hem nho)\b/.test(normalized)
       ? "tight"
-      : /\b(easy parking|large parking|wide parking)\b/.test(normalized)
+      : /\b(easy parking|large parking|wide parking|dau xe rong|bai dau rong|de dau xe)\b/.test(normalized)
         ? "relaxed"
         : null,
   };
@@ -301,21 +317,21 @@ function detectDrivingConditions(message) {
 function detectUseCases(message) {
   const normalized = normalizeText(message);
   const primary = unique([
-    /\b(commute|go to work|daily drive|daily commute)\b/.test(normalized) ? "daily_commute" : null,
-    /\b(city|urban|traffic)\b/.test(normalized) ? "city_driving" : null,
-    /\b(family|kids|children|parents)\b/.test(normalized) ? "family" : null,
-    /\b(client|business|office|meeting|company)\b/.test(normalized) ? "business" : null,
-    /\b(travel|trip|weekend|getaway|touring|holiday)\b/.test(normalized) ? "road_trip" : null,
-    /\b(service|grab|taxi|ride hailing|commercial)\b/.test(normalized) ? "commercial_service" : null,
-    /\b(cargo|load|goods|carry equipment)\b/.test(normalized) ? "cargo" : null,
-    /\b(offroad|off-road|mountain|trail)\b/.test(normalized) ? "offroad" : null,
-    /\b(style|image|look good|fun|passion|weekend toy|dream car)\b/.test(normalized) ? "lifestyle" : null,
+    /\b(commute|go to work|daily drive|daily commute|di lam|di hang ngay|di moi ngay)\b/.test(normalized) ? "daily_commute" : null,
+    /\b(city|urban|traffic|thanh pho|noi do|di pho|ket xe)\b/.test(normalized) ? "city_driving" : null,
+    /\b(family|kids|children|parents|gia dinh|con nho|tre em|bo me|ong ba)\b/.test(normalized) ? "family" : null,
+    /\b(client|business|office|meeting|company|cong viec|khach hang|di gap khach|doanh nhan)\b/.test(normalized) ? "business" : null,
+    /\b(travel|trip|weekend|getaway|touring|holiday|du lich|di xa|duong dai|cuoi tuan|di tinh)\b/.test(normalized) ? "road_trip" : null,
+    /\b(service|grab|taxi|ride hailing|commercial|chay dich vu|kinh doanh|taxi cong nghe)\b/.test(normalized) ? "commercial_service" : null,
+    /\b(cargo|load|goods|carry equipment|cho hang|hang hoa|do nghe|cho do)\b/.test(normalized) ? "cargo" : null,
+    /\b(offroad|off-road|mountain|trail|di duong xau|duong nui|leo deo)\b/.test(normalized) ? "offroad" : null,
+    /\b(style|image|look good|fun|passion|weekend toy|dream car|kieu dang|phong cach|dep|the thao)\b/.test(normalized) ? "lifestyle" : null,
   ]);
 
   return {
     primary_use_cases: primary.slice(0, 3),
     secondary_use_cases: primary.slice(3, 5),
-    usage_frequency: /\b(daily|every day)\b/.test(normalized) ? "daily" : /\b(weekend|occasionally|sometimes)\b/.test(normalized) ? "occasional" : null,
+    usage_frequency: /\b(daily|every day|hang ngay|moi ngay)\b/.test(normalized) ? "daily" : /\b(weekend|occasionally|sometimes|cuoi tuan|thinh thoang)\b/.test(normalized) ? "occasional" : null,
     daily_distance_km: (() => {
       const match = normalized.match(/(\d+(?:[.,]\d+)?)\s*km/);
       return match ? Math.round(parseFlexibleNumber(match[1])) : null;
@@ -326,8 +342,8 @@ function detectUseCases(message) {
 function detectPreferences(message) {
   const normalized = normalizeText(message);
   const brands = KNOWN_BRANDS.filter((brand) => normalized.includes(brand));
-  const preferredBrands = /\b(prefer|like|love|want|lean toward)\b/.test(normalized) ? brands : [];
-  const rejectedBrands = /\b(avoid|hate|don't want|do not want|no)\b/.test(normalized) ? brands : [];
+  const preferredBrands = /\b(prefer|like|love|want|lean toward|thich|muon|uu tien|nghieng ve)\b/.test(normalized) ? brands : [];
+  const rejectedBrands = /\b(avoid|hate|don't want|do not want|no|tranh|khong thich|khong muon|khong chon)\b/.test(normalized) ? brands : [];
 
   return {
     preferred_body_types: normalizeArray([...BODY_TYPE_SYNONYMS.keys()].filter((key) => normalized.includes(key)), normalizeBodyType),
@@ -367,25 +383,25 @@ function detectOwnershipSignals(message) {
       else if (unit === "usd") amount *= 25_000;
       return Number.isFinite(amount) ? amount : null;
     })(),
-    charging_availability: /\b(home charger|charge at home|have charging)\b/.test(normalized)
+    charging_availability: /\b(home charger|charge at home|have charging|sac tai nha|co cho sac)\b/.test(normalized)
       ? "home"
-      : /\b(public charging|public charger)\b/.test(normalized)
+      : /\b(public charging|public charger|tram sac cong cong)\b/.test(normalized)
         ? "public"
-        : /\b(no charger|cannot charge|no charging)\b/.test(normalized)
+        : /\b(no charger|cannot charge|no charging|khong co cho sac|khong sac duoc)\b/.test(normalized)
           ? "none"
           : null,
-    buying_timeline: /\b(this month|soon|immediately|right away)\b/.test(normalized)
+    buying_timeline: /\b(this month|soon|immediately|right away|thang nay|mua som|mua ngay)\b/.test(normalized)
       ? "buying_soon"
-      : /\b(this quarter|next few months)\b/.test(normalized)
+      : /\b(this quarter|next few months|vai thang toi)\b/.test(normalized)
         ? "near_term"
-        : /\b(research|just looking|exploring)\b/.test(normalized)
+        : /\b(research|just looking|exploring|dang tim hieu|tham khao)\b/.test(normalized)
           ? "researching"
           : null,
-    consideration_stage: /\b(compare|shortlist|deciding)\b/.test(normalized)
+    consideration_stage: /\b(compare|shortlist|deciding|so sanh|chot|lua chon)\b/.test(normalized)
       ? "comparing"
-      : /\b(buy soon|book|deposit)\b/.test(normalized)
+      : /\b(buy soon|book|deposit|dat coc|mua som)\b/.test(normalized)
         ? "ready_to_buy"
-        : /\b(research|exploring)\b/.test(normalized)
+        : /\b(research|exploring|tim hieu|tham khao)\b/.test(normalized)
           ? "researching"
           : null,
   };
@@ -394,15 +410,15 @@ function detectOwnershipSignals(message) {
 function detectPrioritySignals(message) {
   const normalized = normalizeText(message);
   return {
-    performance_priority: /\b(performance|fast|quick|power|sporty|fun to drive)\b/.test(normalized) ? 0.95 : null,
-    fuel_saving_priority: /\b(fuel economy|efficient|save fuel|economy|cheap to run)\b/.test(normalized) ? 0.95 : null,
-    comfort_priority: /\b(comfort|smooth|quiet|refined|rear seat)\b/.test(normalized) ? 0.9 : null,
-    tech_priority: /\b(technology|tech|apple carplay|android auto|360 camera|screen|features)\b/.test(normalized) ? 0.9 : null,
-    safety_priority: /\b(safe|safety|adas|blind spot|lane keep|family safety)\b/.test(normalized) ? 0.95 : null,
-    maintenance_cost_priority: /\b(low maintenance|easy to maintain|cheap to maintain|simple ownership)\b/.test(normalized) ? 0.95 : null,
-    resale_value_priority: /\b(resale|sell later|keep value|hold value)\b/.test(normalized) ? 0.92 : null,
-    reliability_priority: /\b(reliable|durable|dependable|bền)\b/.test(normalized) ? 0.95 : null,
-    style_priority: /\b(style|design|look good|premium image|impressive)\b/.test(normalized) ? 0.88 : null,
+    performance_priority: /\b(performance|fast|quick|power|sporty|fun to drive|van hanh|cam giac lai|boc|manh|the thao)\b/.test(normalized) ? 0.95 : null,
+    fuel_saving_priority: /\b(fuel economy|efficient|save fuel|economy|cheap to run|tiet kiem xang|tiet kiem nhien lieu|it hao xang|chi phi xang)\b/.test(normalized) ? 0.95 : null,
+    comfort_priority: /\b(comfort|smooth|quiet|refined|rear seat|tien nghi|em ai|yen tinh|rong rai|hang ghe sau)\b/.test(normalized) ? 0.9 : null,
+    tech_priority: /\b(technology|tech|apple carplay|android auto|360 camera|screen|features|cong nghe|man hinh|camera 360|tinh nang)\b/.test(normalized) ? 0.9 : null,
+    safety_priority: /\b(safe|safety|adas|blind spot|lane keep|family safety|an toan|ho tro lai|diem mu)\b/.test(normalized) ? 0.95 : null,
+    maintenance_cost_priority: /\b(low maintenance|easy to maintain|cheap to maintain|simple ownership|it bao duong|de bao duong|de nuoi|chi phi bao duong)\b/.test(normalized) ? 0.95 : null,
+    resale_value_priority: /\b(resale|sell later|keep value|hold value|giu gia|ban lai|thanh khoan)\b/.test(normalized) ? 0.92 : null,
+    style_priority: /\b(style|design|look good|premium image|impressive|kieu dang|thiet ke|dep|sang|hinh anh)\b/.test(normalized) ? 0.88 : null,
+    reliability_priority: /\b(reliable|durable|dependable|ben|ben bi|lanh|it hong)\b/.test(normalized) ? 0.95 : null,
     must_have_features: normalizeArray([...FEATURE_ALIASES.keys()].filter((key) => normalized.includes(key)), normalizeFeature),
     deal_breakers: unique([
       /\b(no manual|avoid manual)\b/.test(normalized) ? "manual_transmission" : null,
@@ -410,11 +426,11 @@ function detectPrioritySignals(message) {
       /\b(no big suv|too big)\b/.test(normalized) ? "oversized_vehicle" : null,
     ]),
     tradeoff_preferences: unique([
-      /\b(space over performance|space matters more)\b/.test(normalized) ? "space_over_performance" : null,
-      /\b(brand over features|badge over equipment)\b/.test(normalized) ? "brand_over_features" : null,
-      /\b(efficiency over power|fuel economy over performance)\b/.test(normalized) ? "efficiency_over_performance" : null,
-      /\b(comfort over sporty|comfort over handling)\b/.test(normalized) ? "comfort_over_performance" : null,
-      /\b(easy ownership over fancy tech|reliability over tech)\b/.test(normalized) ? "reliability_over_tech" : null,
+      /\b(space over performance|space matters more|rong rai hon van hanh|khong gian hon suc manh)\b/.test(normalized) ? "space_over_performance" : null,
+      /\b(brand over features|badge over equipment|thuong hieu hon option|thuong hieu hon tinh nang)\b/.test(normalized) ? "brand_over_features" : null,
+      /\b(efficiency over power|fuel economy over performance|tiet kiem hon suc manh|tiet kiem xang hon van hanh)\b/.test(normalized) ? "efficiency_over_performance" : null,
+      /\b(comfort over sporty|comfort over handling|tien nghi hon the thao|em ai hon cam giac lai)\b/.test(normalized) ? "comfort_over_performance" : null,
+      /\b(easy ownership over fancy tech|reliability over tech|de nuoi hon cong nghe|ben hon option)\b/.test(normalized) ? "reliability_over_tech" : null,
     ]),
   };
 }
@@ -571,15 +587,15 @@ function isQuestionAnswered(profile, key) {
     case "primary_use_cases": return (profile.primary_use_cases?.length ?? 0) > 0;
     case "budget_range": return profile.budget_target != null || profile.budget_ceiling != null;
     case "passenger_setup": return profile.regular_passenger_count != null || profile.family_size != null || profile.needs_7_seats != null;
-    case "driving_conditions": return profile.city_vs_highway_ratio != null || (profile.road_conditions?.length ?? 0) > 0 || profile.parking_constraints != null;
+    case "driving_conditions": return Boolean(profile.city_vs_highway_ratio) || (profile.road_conditions?.length ?? 0) > 0 || Boolean(profile.parking_constraints);
     case "top_priorities": return Object.keys(profile.inferred_priority_weights || {}).length > 0 && (profile.performance_priority || profile.fuel_saving_priority || profile.comfort_priority || profile.tech_priority || profile.safety_priority || profile.reliability_priority || profile.style_priority);
     case "tradeoff_preferences": return (profile.tradeoff_preferences?.length ?? 0) > 0;
     case "preferred_body_types": return (profile.preferred_body_types?.length ?? 0) > 0 || profile.preferred_body_type === "any";
     case "preferred_fuel_types": return (profile.preferred_fuel_types?.length ?? 0) > 0 || profile.preferred_fuel_type === "any";
     case "brand_preferences": return (profile.brand_preferences?.length ?? 0) > 0 || (profile.brand_rejections?.length ?? 0) > 0 || profile.brand_openness === "open";
     case "must_have_features": return (profile.must_have_features?.length ?? 0) > 0 || (profile.deal_breakers?.length ?? 0) > 0;
-    case "buying_timeline": return profile.buying_timeline != null || profile.consideration_stage != null;
-    default: return profile?.[key] != null;
+    case "buying_timeline": return Boolean(profile.buying_timeline) || Boolean(profile.consideration_stage);
+    default: return profile?.[key] != null && profile?.[key] !== "";
   }
 }
 
@@ -592,22 +608,34 @@ export function getQuestionByKey(key) {
   return ADVISOR_DISCOVERY_QUESTIONS.find((question) => question.key === key) ?? null;
 }
 
-export function pickNextDiscoveryQuestion(profile = {}, questions = ADVISOR_DISCOVERY_QUESTIONS, mode = "required") {
+function discoveryQuestionPriority(question, normalized) {
+  if (question.key === "tradeoff_preferences" && countAnsweredProfileQuestions(normalized) < 4) return 5;
+  if (question.key === "preferred_fuel_types" && normalized.charging_availability === "none") return 35;
+  if (question.key === "must_have_features" && normalized.tech_priority >= 0.7) return 70;
+  if (question.key === "brand_preferences" && normalized.style_priority >= 0.7) return 65;
+  return question.required ? 100 : 40;
+}
+
+export function pickNextDiscoveryQuestions(profile = {}, questions = ADVISOR_DISCOVERY_QUESTIONS, mode = "required", limit = 3) {
   const normalized = normalizePreferenceProfile(profile);
   const candidates = questions
     .filter((question) => (mode === "required" ? question.required : !question.required))
     .filter((question) => !isQuestionAnswered(normalized, question.key));
-  if (!candidates.length) return null;
+  if (!candidates.length) return [];
 
-  const priority = (question) => {
-    if (question.key === "tradeoff_preferences" && countAnsweredProfileQuestions(normalized) < 4) return 5;
-    if (question.key === "preferred_fuel_types" && normalized.charging_availability === "none") return 35;
-    if (question.key === "must_have_features" && normalized.tech_priority >= 0.7) return 70;
-    if (question.key === "brand_preferences" && normalized.style_priority >= 0.7) return 65;
-    return question.required ? 100 : 40;
-  };
+  const normalizedLimit = Math.max(1, Math.min(4, Number(limit) || 3));
+  return candidates
+    .map((question) => ({
+      question,
+      priority: discoveryQuestionPriority(question, normalized),
+    }))
+    .sort((left, right) => right.priority - left.priority)
+    .slice(0, normalizedLimit)
+    .map((item) => item.question);
+}
 
-  return candidates.sort((left, right) => priority(right) - priority(left))[0] ?? null;
+export function pickNextDiscoveryQuestion(profile = {}, questions = ADVISOR_DISCOVERY_QUESTIONS, mode = "required") {
+  return pickNextDiscoveryQuestions(profile, questions, mode, 1)[0] ?? null;
 }
 
 export function buildProfileSnapshot(profile = {}) {

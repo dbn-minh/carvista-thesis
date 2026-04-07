@@ -12,6 +12,7 @@ import {
   getQuestionByKey,
   mergePreferenceProfiles,
   pickNextDiscoveryQuestion as pickNextDiscoveryQuestionFromProfile,
+  pickNextDiscoveryQuestions as pickNextDiscoveryQuestionsFromProfile,
 } from "./advisor_profile.service.js";
 import {
   buildActiveTopic,
@@ -481,6 +482,13 @@ function nextAdvisorQuestion(profile, mode = "required") {
   return pickNextDiscoveryQuestionFromProfile(profile, candidates, mode);
 }
 
+function nextAdvisorQuestions(profile, mode = "required", limit = 3) {
+  const candidates = (mode === "required" ? REQUIRED_QUESTION_KEYS : OPTIONAL_QUESTION_KEYS)
+    .map((key) => QUESTION_BY_KEY[key])
+    .filter(Boolean);
+  return pickNextDiscoveryQuestionsFromProfile(profile, candidates, mode, limit);
+}
+
 function mergeAdvisorProfile(currentProfile, patch) {
   return mergePreferenceProfiles(currentProfile, patch);
 }
@@ -493,25 +501,60 @@ function buildProfileSnapshot(profile) {
   return buildAdvisorProfileSnapshot(profile);
 }
 
+function wantsTemporaryShortlist(message) {
+  const normalized = normalizeText(message);
+  return /\b(no more questions|dont ask|don't ask|stop asking|just recommend|give me a shortlist|temporary shortlist|shortlist tam|goi y tam|tam thoi|dung hoi nhieu|khong hoi nhieu|khong muon tra loi nhieu)\b/.test(normalized);
+}
+
+function hasDirectionalShortlistProfile(profile = {}) {
+  return (
+    countAnsweredQuestions(profile) >= 2 &&
+    Boolean(
+      profile.budget_max ||
+        profile.budget_target ||
+        profile.budget_ceiling ||
+        profile.primary_use_cases?.length ||
+        profile.regular_passenger_count ||
+        profile.passenger_count ||
+        profile.city_vs_highway_ratio ||
+        profile.preferred_body_type ||
+        profile.preferred_fuel_type
+    )
+  );
+}
+
 function buildQuestionPrompt(question) {
   if (!question) return "";
   return `${question.question} You can answer with something like ${question.examples.map((item) => `"${item}"`).join(", ")}.`;
 }
 
+function normalizeQuestionList(questionOrQuestions) {
+  if (!questionOrQuestions) return [];
+  return Array.isArray(questionOrQuestions) ? questionOrQuestions.filter(Boolean) : [questionOrQuestions];
+}
+
+function buildQuestionListPrompt(questionOrQuestions) {
+  const questions = normalizeQuestionList(questionOrQuestions).slice(0, 4);
+  if (questions.length === 0) return "";
+  if (questions.length === 1) return buildQuestionPrompt(questions[0]);
+
+  const numbered = questions.map((question, index) => `${index + 1}. ${question.question}`).join(" ");
+  return `I still need a few details before recommending cars responsibly: ${numbered} You can answer all of them in one short message.`;
+}
+
 function buildProfileProgressCards(profile, nextQuestion) {
+  const nextQuestions = normalizeQuestionList(nextQuestion).slice(0, 4);
   return [
     {
       title: "Profile so far",
       value: `${countAnsweredQuestions(profile)} answers saved`,
       description: buildProfileSnapshot(profile),
     },
-    nextQuestion
-      ? {
-          title: "Still needed",
-          value: humanizeQuestionKey(nextQuestion.key),
-          description: buildQuestionPrompt(nextQuestion),
-        }
-      : null,
+    ...nextQuestions.map((question, index) => ({
+      title: nextQuestions.length === 1 ? "Still needed" : `Still needed ${index + 1}`,
+      value: humanizeQuestionKey(question.key),
+      description: buildQuestionPrompt(question),
+    })),
   ].filter(Boolean);
 }
 
@@ -725,12 +768,12 @@ async function loadFocusedVariant(ctx, variant_id, market_id) {
 
 function buildClarificationAnswer(question, profile) {
   const snapshot = buildProfileSnapshot(profile);
-  return `I want to make sure I understood your last reply correctly. Right now I know ${snapshot}. ${buildQuestionPrompt(question)}`;
+  return `I want to make sure I understood your last reply correctly. Right now I know ${snapshot}. ${buildQuestionListPrompt(question)}`;
 }
 
 function buildProgressAnswer(profile, nextQuestion) {
   const snapshot = buildProfileSnapshot(profile);
-  return `Got it. So far I understand ${snapshot}. ${buildQuestionPrompt(nextQuestion)}`;
+  return `Got it. So far I understand ${snapshot}. ${buildQuestionListPrompt(nextQuestion)}`;
 }
 
 function buildRecommendationAnswer(recommendations, profile, nextOptionalQuestion) {
@@ -889,6 +932,8 @@ function buildCardsFromStructuredResult(intent, structuredResult, advisor_profil
         item.reasons?.length > 0
           ? item.reasons.join(", ")
           : "This car still ranks well, but the structured reasons are limited.",
+        item.caveats?.length > 0 ? `Watch-out: ${compactInsight(item.caveats[0])}` : "Watch-out: verify trim-level equipment before deciding.",
+        item.best_for?.length > 0 ? `Best for: ${item.best_for.join(", ")}` : "Best for: buyers with the same practical profile.",
         item.links?.detail_page_url ? "Open the vehicle detail page to review specs and ownership insights." : null,
         item.links?.related_listings_url
           ? item.links.related_listings_count > 0
@@ -1576,15 +1621,27 @@ export async function chatAdvisor(ctx, input) {
     });
   }
 
+  const allowDirectionalShortlist =
+    forced_intent == null &&
+    classifierPreview.intent === "recommend_car" &&
+    wantsTemporaryShortlist(message) &&
+    hasDirectionalShortlistProfile(advisor_profile);
+
   if (forced_intent == null && classifierPreview.intent === "recommend_car") {
-    const nextRequiredQuestion = nextAdvisorQuestion(advisor_profile, "required");
+    const nextRequiredQuestions = nextAdvisorQuestions(advisor_profile, "required", 3);
+    const nextRequiredQuestion = nextRequiredQuestions[0] ?? null;
     const nextOptionalQuestion = nextAdvisorQuestion(advisor_profile, "optional");
 
     if (pendingQuestion && !recognizedPendingQuestion && Object.keys(profilePatch).length === 0) {
+      const pendingQuestions = [
+        pendingQuestion,
+        ...nextRequiredQuestions.filter((question) => question.key !== pendingQuestion.key),
+      ].slice(0, 3);
+      const pendingQuestionKeys = pendingQuestions.map((question) => question.key);
       const recommendationPendingFlow = buildPendingFlow({
         id: activeFlowId,
         intent: "recommend_car",
-        missing_fields: [pendingQuestion.key],
+        missing_fields: pendingQuestionKeys,
         context_snapshot: {
           market_id,
           focus_variant_id,
@@ -1629,11 +1686,11 @@ export async function chatAdvisor(ctx, input) {
           session_id: session.session_id,
           flow_id: activeFlowId,
           intent: "recommend_car",
-          answer: buildClarificationAnswer(pendingQuestion, advisor_profile),
-          cards: buildProfileProgressCards(advisor_profile, pendingQuestion),
+          answer: buildClarificationAnswer(pendingQuestions, advisor_profile),
+          cards: buildProfileProgressCards(advisor_profile, pendingQuestions),
           advisor_profile,
           suggested_actions: [{ type: "continue_profile", payload: { question_key: pendingQuestion.key } }],
-          follow_up_questions: [pendingQuestion.question],
+          follow_up_questions: pendingQuestions.map((question) => question.question),
           facts_used: [],
           market_id,
           sources: [],
@@ -1653,18 +1710,19 @@ export async function chatAdvisor(ctx, input) {
             fallback_used: false,
             latency_ms: 0,
             route_service: "RecommendationClarification",
-            missing_fields: [pendingQuestion.key],
+            missing_fields: pendingQuestionKeys,
             turn_type: turn.turn_type,
           },
         },
       });
     }
 
-    if (nextRequiredQuestion) {
+    if (nextRequiredQuestion && !allowDirectionalShortlist) {
+      const nextRequiredQuestionKeys = nextRequiredQuestions.map((question) => question.key);
       const recommendationPendingFlow = buildPendingFlow({
         id: activeFlowId,
         intent: "recommend_car",
-        missing_fields: [nextRequiredQuestion.key],
+        missing_fields: nextRequiredQuestionKeys,
         context_snapshot: {
           market_id,
           focus_variant_id,
@@ -1709,11 +1767,11 @@ export async function chatAdvisor(ctx, input) {
           session_id: session.session_id,
           flow_id: activeFlowId,
           intent: "recommend_car",
-          answer: buildProgressAnswer(advisor_profile, nextRequiredQuestion),
-          cards: buildProfileProgressCards(advisor_profile, nextRequiredQuestion),
+          answer: buildProgressAnswer(advisor_profile, nextRequiredQuestions),
+          cards: buildProfileProgressCards(advisor_profile, nextRequiredQuestions),
           advisor_profile,
           suggested_actions: [{ type: "continue_profile", payload: { question_key: nextRequiredQuestion.key } }],
-          follow_up_questions: [nextRequiredQuestion.question],
+          follow_up_questions: nextRequiredQuestions.map((question) => question.question),
           facts_used: [],
           market_id,
           sources: [],
@@ -1736,7 +1794,7 @@ export async function chatAdvisor(ctx, input) {
             fallback_used: false,
             latency_ms: 0,
             route_service: "RecommendationClarification",
-            missing_fields: [nextRequiredQuestion.key],
+            missing_fields: nextRequiredQuestionKeys,
             turn_type: turn.turn_type,
           },
         },
@@ -1766,6 +1824,7 @@ export async function chatAdvisor(ctx, input) {
         turn_type: turn.turn_type,
         follow_up_dimension: turn.follow_up_dimension ?? null,
         active_intent: activeTopic?.intent ?? null,
+        directional_shortlist: allowDirectionalShortlist,
       },
     });
 

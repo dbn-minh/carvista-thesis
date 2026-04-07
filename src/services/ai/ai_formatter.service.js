@@ -252,9 +252,9 @@ function formatKnowledge(structuredResult) {
   };
 }
 
-function formatRecommendation(structuredResult) {
-  const top = structuredResult.ranked_vehicles?.[0];
-  const second = structuredResult.ranked_vehicles?.[1];
+function formatRecommendation(structuredResult, turnContext = {}) {
+  const ranked = (structuredResult.ranked_vehicles ?? []).slice(0, 5);
+  const top = ranked[0];
 
   if (!top) {
     return {
@@ -263,15 +263,34 @@ function formatRecommendation(structuredResult) {
     };
   }
 
+  const profileSummary = structuredResult.profile_summary;
+  const limitation = turnContext.directional_shortlist
+    ? "This is a temporary shortlist based on the details you gave, so treat the assumptions as important."
+    : /partial/i.test(profileSummary || "")
+      ? "This is a directional shortlist because the buyer profile is still partial."
+      : null;
+  const vehicleLines = ranked.map((item, index) => {
+    const why =
+      trimInsight(item.reasons?.[0], 120) ||
+      trimInsight(item.market_summary, 120) ||
+      "it matches the profile fields available so far";
+    const caveat =
+      trimInsight(item.caveats?.[0], 120) ||
+      trimInsight(item.top_mismatches?.[0], 120) ||
+      "verify trim-level equipment and live listing availability before deciding";
+    const bestFor =
+      trimInsight((item.best_for ?? []).join(" and "), 90) ||
+      "buyers with the same practical profile";
+    const label = item.fit_label ? ` (${item.fit_label.toLowerCase()})` : "";
+    return `${index + 1}. ${item.name}${label}. Why it fits: ${why}. Watch-out: ${caveat}. Best for: ${bestFor}.`;
+  });
+
   return {
     final_answer: [
-      `Top pick: ${top.name}${top.fit_label ? ` (${top.fit_label.toLowerCase()})` : ""}.`,
-      top.reasons.length > 0 ? `Why it fits: ${top.reasons.slice(0, 2).join("; ")}.` : null,
-      top.caveats?.length > 0 ? `Watch-out: ${top.caveats[0]}.` : null,
-      second
-        ? `Alternative: ${second.name}${second.why_this_over_alternatives ? ` if you care more about ${second.why_this_over_alternatives.replace(/^looks better if you care more about /, "")}` : second.reasons?.[0] ? ` if you want ${second.reasons[0]}` : ""}.`
-        : null,
-      structuredResult.profile_summary ? `Profile used: ${structuredResult.profile_summary}.` : null,
+      profileSummary ? `Profile used: ${profileSummary}.` : null,
+      limitation,
+      ...vehicleLines,
+      "Next step: compare the top two, filter by budget or seats, or estimate ownership cost.",
     ]
       .filter(Boolean)
       .join(" "),
@@ -299,7 +318,7 @@ export function formatFinalAnswer({ intent, structured_result, policy_response, 
   if (intent === "market_trend_analysis") return formatForecast(structured_result);
   if (intent === "calculate_tco") return formatTco(structured_result);
   if (intent === "vehicle_general_qa") return formatKnowledge(structured_result);
-  if (intent === "recommend_car") return formatRecommendation(structured_result);
+  if (intent === "recommend_car") return formatRecommendation(structured_result, turn_context);
 
   return {
     final_answer: "I can help best with vehicle questions, comparison, pricing, forecasting, and ownership costs.",

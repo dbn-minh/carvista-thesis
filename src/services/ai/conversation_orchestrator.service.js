@@ -26,6 +26,11 @@ const AUTOMOTIVE_SIGNAL_PATTERNS = [
   /\b(xe|oto|o to|mau xe|dong xe|dong co|hop so|gia xe|lan banh)\b/i,
 ];
 
+const RECOMMENDATION_PATTERNS = [
+  /\b(recommend|suggest|find me|looking for|need a car|want a car|buy a car|which car should i buy)\b/i,
+  /\b(tu van|chon xe|mua xe|can mua xe|muon mua xe|nen mua xe|xe nao phu hop|phu hop voi toi|goi y xe|tim xe)\b/i,
+];
+
 export function normalizeConversationText(value) {
   return String(value || "")
     .normalize("NFD")
@@ -56,6 +61,7 @@ export function classifyConversationRoute(message, options = {}) {
   if (OFF_TOPIC_PATTERNS.some((pattern) => pattern.test(normalized)) && !isAutomotiveMessage(normalized)) {
     return "off_topic";
   }
+  if (RECOMMENDATION_PATTERNS.some((pattern) => pattern.test(normalized))) return "advisor";
   if (hasQuestionShape && GENERAL_AUTOMOTIVE_QA_PATTERNS.some((pattern) => pattern.test(normalized)) && isAutomotiveMessage(normalized)) {
     return "vehicle_question";
   }
