@@ -7,6 +7,7 @@ import { Building2, CheckCheck, Clock3, Mail, MapPin, Phone, ShieldCheck } from 
 import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import PageIntelligencePanel from "@/components/ai/PageIntelligencePanel";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
+import PriceHistoryChart from "@/components/catalog/PriceHistoryChart";
 import StatusBanner from "@/components/common/StatusBanner";
 import Header from "@/components/layout/Header";
 import {
@@ -20,7 +21,7 @@ import {
 } from "@/components/listings/listing-utils";
 import CompleteProfileDialog from "@/components/requests/CompleteProfileDialog";
 import StarRating from "@/components/reviews/StarRating";
-import { authApi, listingsApi, requestsApi, reviewsApi, watchlistApi } from "@/lib/carvista-api";
+import { authApi, catalogApi, listingsApi, requestsApi, reviewsApi, watchlistApi } from "@/lib/carvista-api";
 import { ApiError, hasToken, toDateTime } from "@/lib/api-client";
 import type { ListingDetail, SellerReview, User, ViewingRequest } from "@/lib/types";
 import { buildMarketplaceSellerProfile } from "@/lib/seller-profile";
@@ -49,6 +50,8 @@ export default function ListingDetailPage() {
   const [tone, setTone] = useState<"success" | "error" | "info">("info");
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [priceHistoryRows, setPriceHistoryRows] = useState<Array<Record<string, unknown>>>([]);
+  const [priceHistoryLoading, setPriceHistoryLoading] = useState(false);
 
   const [profile, setProfile] = useState<User | null>(null);
   const [activeRequest, setActiveRequest] = useState<ViewingRequest | null>(null);
@@ -119,6 +122,33 @@ export default function ListingDetailPage() {
   useEffect(() => {
     setSelectedImage(gallery[0] || null);
   }, [gallery]);
+
+  useEffect(() => {
+    const rawVariantId = detail?.listing?.variant_id;
+    const variantId = Number(rawVariantId);
+    if (!Number.isFinite(variantId) || variantId <= 0) {
+      setPriceHistoryRows([]);
+      return;
+    }
+
+    let cancelled = false;
+    async function loadPriceHistory() {
+      setPriceHistoryLoading(true);
+      try {
+        const priceResponse = await catalogApi.variantPriceHistory(variantId, 1, 60);
+        if (!cancelled) setPriceHistoryRows(priceResponse.items ?? []);
+      } catch {
+        if (!cancelled) setPriceHistoryRows([]);
+      } finally {
+        if (!cancelled) setPriceHistoryLoading(false);
+      }
+    }
+
+    void loadPriceHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [detail?.listing?.variant_id, id]);
 
   useEffect(() => {
     if (!profile) return;
@@ -598,9 +628,32 @@ export default function ListingDetailPage() {
             subjectType="listing"
             subjectId={id}
             marketId={1}
-            title="AI price, ownership, and buyer-fit preview"
+            title="AI price and ownership snapshot"
             className="mb-8"
+            compactLayout
+            hiddenSectionKeys={["listing_value_position", "fit_for_you"]}
+            showActionPaths={false}
+            showSectionCaveats={false}
+            showSectionSources={false}
           />
+        ) : null}
+
+        {detail?.listing?.variant_id ? (
+          <section className="mb-8 section-shell p-6">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h2 className="text-2xl font-apercu-bold text-cars-primary">Price history</h2>
+                <p className="mt-3 text-sm leading-6 text-cars-gray">
+                  Review the recent market trail for this exact vehicle before you decide whether the asking price feels fair.
+                </p>
+              </div>
+              {priceHistoryLoading ? (
+                <p className="text-sm text-cars-gray">Loading history...</p>
+              ) : null}
+            </div>
+
+            <PriceHistoryChart rows={priceHistoryRows} />
+          </section>
         ) : null}
 
         <section className="mb-8 grid gap-6 xl:grid-cols-2">

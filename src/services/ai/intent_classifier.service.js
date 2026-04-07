@@ -11,6 +11,12 @@ const KNOWN_COUNTRIES = [
 ];
 
 const FOCUS_REFERENCE_PATTERN = /\b(this car|this vehicle|this one|that car|that vehicle|that one|current car|current vehicle|xe nay|xe do|mau nay|mau do)\b/i;
+const COMPARE_FOLLOW_UP_PATTERN =
+  /\b(which is better|which one is better|which one|better for|best for|cheaper to own|pros and cons|resale|value for money|ownership cost|city driving|long trips|long-distance|comfort first|family of|family use|cargo|practical|fuel economy|plain english|short verdict|smarter buy|should i choose|hidden cost|confidence is lower)\b/i;
+
+function hasCompareContext(context = {}) {
+  return Array.isArray(context.compare_variant_ids) && context.compare_variant_ids.filter((value) => Number.isInteger(value)).length >= 2;
+}
 
 function extractBudget(message) {
   const normalized = normalizeConversationText(message);
@@ -79,7 +85,17 @@ function extractVehicleMentions(message, context = {}) {
 }
 
 function mapRouteToIntent(route, message, context) {
+  const normalized = normalizeConversationText(message);
+  const compareContextActive = hasCompareContext(context);
+
   if (route === "compare") return "compare_car";
+  if (
+    compareContextActive &&
+    ["advisor", "vehicle_question"].includes(route) &&
+    COMPARE_FOLLOW_UP_PATTERN.test(normalized)
+  ) {
+    return "compare_car";
+  }
   if (route === "predict_price") {
     return /\b(trend|market|xu huong)\b/i.test(message) ? "market_trend_analysis" : "predict_vehicle_value";
   }
@@ -88,14 +104,13 @@ function mapRouteToIntent(route, message, context) {
   if (route === "small_talk") return "small_talk";
   if (route === "off_topic") return "out_of_scope";
 
-  const normalized = normalizeConversationText(message);
   if (context.focus_variant_id && /\b(this car|this vehicle|xe nay)\b/i.test(normalized)) return "vehicle_general_qa";
   return "recommend_car";
 }
 
 function buildMissingFields(intent, entities, context) {
   const missing = [];
-  if (intent === "compare_car" && entities.vehicles.length < 2 && !context.focus_variant_id) missing.push("vehicles");
+  if (intent === "compare_car" && entities.vehicles.length < 2 && !context.focus_variant_id && !hasCompareContext(context)) missing.push("vehicles");
   if (intent === "predict_vehicle_value" && entities.vehicles.length < 1 && !context.focus_variant_id) missing.push("vehicle");
   if (intent === "market_trend_analysis" && entities.vehicles.length < 1 && !context.focus_variant_id) missing.push("vehicle");
   if (intent === "calculate_tco") {

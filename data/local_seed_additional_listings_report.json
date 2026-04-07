@@ -1,7 +1,7 @@
 {
-  "variants_considered": 187,
-  "variants_seeded": 0,
-  "listings_created": 0,
+  "variants_considered": 186,
+  "variants_seeded": 145,
+  "listings_created": 145,
   "skipped_variants": [
     {
       "variant": "2013 Chevrolet Silverado 1500 LT",
@@ -24,6 +24,32 @@
       "reason": "variant quality is too incomplete for marketplace seeding"
     }
   ],
-  "body_type_breakdown": {},
-  "make_breakdown": {}
+  "body_type_breakdown": {
+    "hatchback": 9,
+    "mpv": 8,
+    "pickup": 10,
+    "sedan": 57,
+    "suv": 55,
+    "wagon": 6
+  },
+  "make_breakdown": {
+    "Toyota": 24,
+    "Ford": 18,
+    "Chevrolet": 13,
+    "Honda": 12,
+    "Nissan": 12,
+    "BMW": 9,
+    "Hyundai": 9,
+    "Kia": 9,
+    "Lexus": 6,
+    "Mercedes-Benz": 6,
+    "Subaru": 6,
+    "Jeep": 4,
+    "Audi": 3,
+    "GMC": 3,
+    "Mazda": 3,
+    "Ram": 3,
+    "Volkswagen": 3,
+    "Dodge": 2
+  }
 }

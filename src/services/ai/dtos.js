@@ -149,6 +149,10 @@ export const recommendationResultSchema = z.object({
       caveats: z.array(z.string()).default([]),
       market_summary: z.string().nullable().optional(),
       links: recommendationLinkSchema.nullable().optional(),
+      fit_scores: z.record(z.string(), z.number()).default({}).optional(),
+      top_mismatches: z.array(z.string()).default([]).optional(),
+      best_for: z.array(z.string()).default([]).optional(),
+      why_this_over_alternatives: z.string().nullable().optional(),
     })
   ),
   profile_summary: z.string(),

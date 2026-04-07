@@ -33,6 +33,10 @@ function uniqueIntegers(values) {
   return [...new Set((values ?? []).filter((value) => Number.isInteger(value)))];
 }
 
+function getContextCompareVariantIds(context = {}) {
+  return uniqueIntegers(context.compare_variant_ids).slice(0, 5);
+}
+
 async function resolveVehicleByMention(ctx, mention) {
   if (!mention) return null;
   const matches = await searchVariantsByText(ctx, mention, 3);
@@ -107,6 +111,7 @@ async function resolveMarketContext(ctx, entities, context) {
 }
 
 async function validateCompareRequest(ctx, intentResult, context) {
+  const contextCompareIds = getContextCompareVariantIds(context);
   const explicitIds = extractVariantIds(context.message);
   if (explicitIds.length >= 2) {
     return {
@@ -123,6 +128,24 @@ async function validateCompareRequest(ctx, intentResult, context) {
   }
 
   const explicitMentions = filterContextMentions(intentResult.entities.vehicles, context.focus_variant_label);
+  if (contextCompareIds.length >= 2 && explicitMentions.length === 0) {
+    return {
+      ok: true,
+      payload: {
+        variant_ids: contextCompareIds,
+        market_id: context.market_id ?? 1,
+        buyer_profile: context.advisor_profile,
+      },
+      context_updates: {
+        compare_variant_ids: contextCompareIds,
+        ...(Number.isInteger(context.focus_variant_id)
+          ? { focus_variant_id: context.focus_variant_id }
+          : {}),
+        ...(context.focus_variant_label ? { focus_variant_label: context.focus_variant_label } : {}),
+      },
+    };
+  }
+
   if (explicitMentions.length >= 2) {
     const resolvedVehicles = await Promise.all(explicitMentions.slice(0, 2).map((mention) => resolveVehicleByMention(ctx, mention)));
     const variantIds = uniqueIntegers(resolvedVehicles.map((vehicle) => vehicle?.variant_id));
@@ -142,6 +165,23 @@ async function validateCompareRequest(ctx, intentResult, context) {
         },
       };
     }
+    if (contextCompareIds.length >= 2) {
+      return {
+        ok: true,
+        payload: {
+          variant_ids: contextCompareIds,
+          market_id: context.market_id ?? 1,
+          buyer_profile: context.advisor_profile,
+        },
+        context_updates: {
+          compare_variant_ids: contextCompareIds,
+          ...(Number.isInteger(context.focus_variant_id)
+            ? { focus_variant_id: context.focus_variant_id }
+            : {}),
+          ...(context.focus_variant_label ? { focus_variant_label: context.focus_variant_label } : {}),
+        },
+      };
+    }
   }
 
   if (explicitMentions.length === 1 && Number.isInteger(context.focus_variant_id)) {
@@ -157,6 +197,21 @@ async function validateCompareRequest(ctx, intentResult, context) {
         },
         context_updates: {
           compare_variant_ids: variantIds,
+          focus_variant_id: context.focus_variant_id,
+          ...(context.focus_variant_label ? { focus_variant_label: context.focus_variant_label } : {}),
+        },
+      };
+    }
+    if (contextCompareIds.length >= 2) {
+      return {
+        ok: true,
+        payload: {
+          variant_ids: contextCompareIds,
+          market_id: context.market_id ?? 1,
+          buyer_profile: context.advisor_profile,
+        },
+        context_updates: {
+          compare_variant_ids: contextCompareIds,
           focus_variant_id: context.focus_variant_id,
           ...(context.focus_variant_label ? { focus_variant_label: context.focus_variant_label } : {}),
         },
@@ -182,6 +237,23 @@ async function validateCompareRequest(ctx, intentResult, context) {
     right?.variant_id,
     ...(hasExplicitVehicleMentions(intentResult.entities, context) ? [] : context.compare_variant_ids ?? []),
   ]).slice(0, 5);
+  if (variantIds.length < 2 && contextCompareIds.length >= 2) {
+    return {
+      ok: true,
+      payload: {
+        variant_ids: contextCompareIds,
+        market_id: context.market_id ?? 1,
+        buyer_profile: context.advisor_profile,
+      },
+      context_updates: {
+        compare_variant_ids: contextCompareIds,
+        ...(Number.isInteger(context.focus_variant_id)
+          ? { focus_variant_id: context.focus_variant_id }
+          : {}),
+        ...(context.focus_variant_label ? { focus_variant_label: context.focus_variant_label } : {}),
+      },
+    };
+  }
   if (variantIds.length < 2) {
     return buildClarification(
       "compare_car",

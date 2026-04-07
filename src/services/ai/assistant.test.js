@@ -821,8 +821,139 @@ test("chat advisor keeps compare follow-ups inside the same pair and focuses the
     assert.equal(response.intent, "compare_car");
     assert.equal(response.meta?.turn_type, "follow_up");
     assert.match(response.answer.toLowerCase(), /resale/);
+    assert.ok((response.answer || "").length < 320);
+    assert.ok((response.cards || []).every((card) => !String(card.value || "").includes("Variant #")));
     assert.deepEqual(sessions[0].context_json.compare_variant_ids, [1, 2]);
     assert.equal(sessions[0].context_json.conversation_state.last_user_turn_type, "follow_up");
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("chat advisor uses provided compare context for fresh follow-up sessions without asking for a second car", async () => {
+  const originalFetch = global.fetch;
+  global.fetch = mockFetchFactory();
+  const sessions = [];
+  const messages = [];
+  let sessionIdCounter = 41;
+
+  const ctx = {
+    sequelize: {
+      async query(sql) {
+        if (sql.includes("FROM car_variants cv") && sql.includes("WHERE cv.variant_id IN")) {
+          return [[
+            {
+              variant_id: 1,
+              model_id: 21,
+              model_year: 2024,
+              trim_name: "Competition xDrive",
+              body_type: "coupe",
+              fuel_type: "gasoline",
+              engine: "3.0L Twin Turbo",
+              transmission: "AT",
+              drivetrain: "AWD",
+              seats: 4,
+              doors: 2,
+              msrp_base: 3706839139,
+              model_name: "M4",
+              make_name: "BMW",
+            },
+            {
+              variant_id: 2,
+              model_id: 22,
+              model_year: 2012,
+              trim_name: "328i",
+              body_type: "sedan",
+              fuel_type: "gasoline",
+              engine: "2.0L Turbo",
+              transmission: "AT",
+              drivetrain: "RWD",
+              seats: 5,
+              doors: 4,
+              msrp_base: 220118176,
+              model_name: "3 Series",
+              make_name: "BMW",
+            },
+          ]];
+        }
+
+        if (sql.includes("FROM car_reviews")) {
+          return [[
+            { variant_id: 1, avg_rating: 4.8, review_count: 18 },
+            { variant_id: 2, avg_rating: 4.2, review_count: 11 },
+          ]];
+        }
+
+        if (sql.includes("FROM variant_price_history")) {
+          return [[
+            { variant_id: 1, price: 3650000000 },
+            { variant_id: 2, price: 235000000 },
+          ]];
+        }
+
+        throw new Error(`Unexpected SQL in compare-context follow-up test: ${sql}`);
+      },
+    },
+    models: {
+      AiChatSessions: {
+        async create(payload) {
+          const row = {
+            session_id: sessionIdCounter++,
+            ...payload,
+            async update(next) {
+              Object.assign(this, next);
+            },
+          };
+          sessions.push(row);
+          return row;
+        },
+        async findByPk(id) {
+          return sessions.find((item) => item.session_id === id) ?? null;
+        },
+      },
+      AiChatMessages: {
+        async create(payload) {
+          messages.push(payload);
+          return payload;
+        },
+      },
+      VariantSpecs: {
+        async findAll() {
+          return [
+            { variant_id: 1, toJSON: () => ({ power_hp: 503, safety_rating: 5 }) },
+            { variant_id: 2, toJSON: () => ({ power_hp: 240, safety_rating: 4 }) },
+          ];
+        },
+      },
+      VariantSpecKv: {
+        async findAll() {
+          return [];
+        },
+      },
+    },
+  };
+
+  try {
+    const response = await chatAdvisor(ctx, {
+      user_id: 8,
+      message: "Which is better for a family of 5?",
+      context: {
+        market_id: 1,
+        focus_variant_id: 1,
+        focus_variant_label: "2024 BMW M4 Competition xDrive",
+        compare_variant_ids: [1, 2],
+        compare_variant_labels: ["2024 BMW M4 Competition xDrive", "2012 BMW 3 Series 328i"],
+      },
+    });
+
+    assert.equal(response.intent, "compare_car");
+    assert.equal(response.needs_clarification, false);
+    assert.equal(response.meta?.route_service, "ComparisonService");
+    assert.doesNotMatch(response.answer.toLowerCase(), /second car|second vehicle|tell me/i);
+    assert.ok((response.answer || "").length < 320);
+    assert.ok((response.cards || []).every((card) => !String(card.value || "").includes("Variant #")));
+    assert.deepEqual(sessions[0].context_json.compare_variant_ids, [1, 2]);
+    assert.equal(messages[0].role, "user");
   } finally {
     global.fetch = originalFetch;
   }

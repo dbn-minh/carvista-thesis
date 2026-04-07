@@ -1,0 +1,9 @@
+{
+  "input_csv": "data\\domain_variant_image_manifest.csv",
+  "input_row_count": 171,
+  "inserted": 20,
+  "replaced_placeholder": 151,
+  "updated_existing_url": 0,
+  "unchanged": 0,
+  "skipped": []
+}

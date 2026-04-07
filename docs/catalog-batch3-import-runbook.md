@@ -165,6 +165,56 @@ Fill `data/variant_image_links.csv`, then run:
 python scripts/catalog_batch3_import_variant_images.py --csv data/variant_image_links.csv
 ```
 
+### Easier workflow: export a manifest first
+
+If you do not want to guess `variant_id` values or manually type make/model/year/trim from scratch, export a helper CSV from the current database first:
+
+```powershell
+python scripts/export_variant_image_manifest.py --only-missing
+```
+
+This creates:
+
+- `data/variant_image_manifest.csv`
+
+The manifest includes:
+
+- `variant_id`
+- `make_name`
+- `model_name`
+- `model_year`
+- `trim_name`
+- `body_type`
+- `fuel_type`
+- `transmission`
+- `msrp_base`
+- `current_image_count`
+- `current_primary_image_url`
+- `image_status`
+
+You only need to fill:
+
+- `image_url`
+- optionally `sort_order`
+- optionally `notes`
+
+Then either:
+
+1. copy the filled rows into `data/variant_image_links.csv`, or
+2. save a trimmed CSV with the importer columns:
+   - `make_name`
+   - `model_name`
+   - `model_year`
+   - `trim_name`
+   - `image_url`
+   - `sort_order`
+
+and import it with:
+
+```powershell
+python scripts/catalog_batch3_import_variant_images.py --csv data/variant_image_links.csv
+```
+
 ## Actual Batch 3 Result
 
 The catalog import was run successfully once, then rerun to verify idempotency.

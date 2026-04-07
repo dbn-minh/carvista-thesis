@@ -1,28 +1,1967 @@
 {
-  "listings_scanned": 227,
-  "generated_listings_updated": 1,
-  "price_updates": 0,
-  "location_updates": 1,
-  "skipped_user_authored": 1,
+  "listings_scanned": 225,
+  "generated_listings_updated": 216,
+  "price_updates": 216,
+  "location_updates": 66,
+  "skipped_user_authored": 0,
   "skipped_no_variant": 0,
   "country_counts_before": {
-    "VN": 227
+    "VN": 190,
+    "US": 35
   },
   "country_counts_after": {
-    "VN": 227
+    "VN": 225
   },
   "updated_by_tier": {
-    "mainstream": 1
+    "exotic": 8,
+    "mainstream": 158,
+    "performance": 6,
+    "premium": 44
   },
   "updated_listings": [
     {
-      "listing_id": 67,
+      "listing_id": 1,
+      "vehicle": "2023 Lexus NX NX250 Luxury",
+      "tier": "premium",
+      "old_price": "2003241000.00",
+      "new_price": "3060075290",
+      "old_location": "Lake Debbie, VN",
+      "new_location": "Hai Phong, VN"
+    },
+    {
+      "listing_id": 2,
+      "vehicle": "2024 Kia Carnival 3.5G Signature",
+      "tier": "premium",
+      "old_price": "1717504000.00",
+      "new_price": "2316330263",
+      "old_location": "Williamview, VN",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 3,
+      "vehicle": "2023 Honda Civic RS",
+      "tier": "mainstream",
+      "old_price": "753739000.00",
+      "new_price": "905659991",
+      "old_location": "North Charlesberg, VN",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 4,
+      "vehicle": "2024 Hyundai Tucson 2.0 Diesel Special",
+      "tier": "mainstream",
+      "old_price": "903070000.00",
+      "new_price": "1095741416",
+      "old_location": "Dicksonberg, US",
+      "new_location": "Hai Phong, VN"
+    },
+    {
+      "listing_id": 5,
+      "vehicle": "2023 Hyundai Tucson 1.6 Turbo",
+      "tier": "mainstream",
+      "old_price": "828820000.00",
+      "new_price": "892917786",
+      "old_location": "East Andrew, VN",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 6,
+      "vehicle": "2023 Mercedes-Benz C-Class C200 Avantgarde",
+      "tier": "premium",
+      "old_price": "1364695000.00",
+      "new_price": "2207061426",
+      "old_location": "Samuelhaven, VN",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 7,
+      "vehicle": "2023 Lexus NX NX250 Luxury",
+      "tier": "premium",
+      "old_price": "1874415000.00",
+      "new_price": "2725564882",
+      "old_location": "Angelaborough, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 8,
+      "vehicle": "2024 BMW X5 xDrive40i",
+      "tier": "premium",
+      "old_price": "3448335000.00",
+      "new_price": "3547772329",
+      "old_location": "Clarencebury, VN",
+      "new_location": "Binh Duong, VN"
+    },
+    {
+      "listing_id": 9,
+      "vehicle": "2023 Kia Carnival 2.2D Signature",
+      "tier": "mainstream",
+      "old_price": "1325690000.00",
+      "new_price": "1131164651",
+      "old_location": "Sancheztown, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 10,
+      "vehicle": "2023 Honda Civic RS",
+      "tier": "mainstream",
+      "old_price": "786793000.00",
+      "new_price": "921928219",
+      "old_location": "Port Dana, US",
+      "new_location": "Hai Phong, VN"
+    },
+    {
+      "listing_id": 11,
+      "vehicle": "2024 Mercedes-Benz C-Class C300 AMG Line",
+      "tier": "premium",
+      "old_price": "1780075000.00",
+      "new_price": "2623346232",
+      "old_location": "Port Robert, US",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 12,
+      "vehicle": "2023 Hyundai Tucson 1.6 Turbo",
+      "tier": "mainstream",
+      "old_price": "779274000.00",
+      "new_price": "967808265",
+      "old_location": "Port Tanner, US",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 13,
+      "vehicle": "2024 BYD Seal Premium",
+      "tier": "mainstream",
+      "old_price": "1054650000.00",
+      "new_price": "1064916381",
+      "old_location": "Kathleenfurt, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 14,
+      "vehicle": "2023 Lexus NX NX250 Luxury",
+      "tier": "premium",
+      "old_price": "1906831000.00",
+      "new_price": "2738052745",
+      "old_location": "East David, VN",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 15,
       "vehicle": "2024 Honda Civic e:HEV RS",
       "tier": "mainstream",
-      "old_price": "60000000.00",
-      "new_price": "60000000.00",
-      "old_location": "HCM, VN",
+      "old_price": "894699000.00",
+      "new_price": "972748179",
+      "old_location": "North Heidi, VN",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 16,
+      "vehicle": "2024 Lexus NX NX350h Premium",
+      "tier": "premium",
+      "old_price": "2445092000.00",
+      "new_price": "2663232813",
+      "old_location": "Marcusbury, US",
       "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 17,
+      "vehicle": "2024 BYD Seal Premium",
+      "tier": "mainstream",
+      "old_price": "941150000.00",
+      "new_price": "1183362296",
+      "old_location": "Lake Richard, VN",
+      "new_location": "Hai Phong, VN"
+    },
+    {
+      "listing_id": 18,
+      "vehicle": "2024 Lexus NX NX350h Premium",
+      "tier": "premium",
+      "old_price": "2388194000.00",
+      "new_price": "2514120867",
+      "old_location": "Nelsonview, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 19,
+      "vehicle": "2024 BYD Seal Performance AWD",
+      "tier": "mainstream",
+      "old_price": "1181595000.00",
+      "new_price": "1344058726",
+      "old_location": "West Alexis, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 20,
+      "vehicle": "2024 BMW X5 xDrive50e",
+      "tier": "premium",
+      "old_price": "4048944000.00",
+      "new_price": "4041769571",
+      "old_location": "East Edwardshire, VN",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 21,
+      "vehicle": "2023 Toyota Corolla Cross 1.8V",
+      "tier": "mainstream",
+      "old_price": "732358000.00",
+      "new_price": "819130722",
+      "old_location": "New Susanville, US",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 22,
+      "vehicle": "2024 Hyundai Tucson 2.0 Diesel Special",
+      "tier": "mainstream",
+      "old_price": "916481000.00",
+      "new_price": "1003313285",
+      "old_location": "West Kristin, US",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 23,
+      "vehicle": "2024 Mazda Mazda3 Signature",
+      "tier": "mainstream",
+      "old_price": "759133000.00",
+      "new_price": "898074001",
+      "old_location": "New Billchester, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 24,
+      "vehicle": "2023 Toyota Camry 2.0Q",
+      "tier": "mainstream",
+      "old_price": "924340000.00",
+      "new_price": "1064617508",
+      "old_location": "Baileymouth, US",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 25,
+      "vehicle": "2023 VinFast VF 8 Eco",
+      "tier": "mainstream",
+      "old_price": "1078147000.00",
+      "new_price": "1243340600",
+      "old_location": "West Samuel, US",
+      "new_location": "Hai Phong, VN"
+    },
+    {
+      "listing_id": 26,
+      "vehicle": "2024 BMW X5 xDrive50e",
+      "tier": "premium",
+      "old_price": "3774632000.00",
+      "new_price": "3885331073",
+      "old_location": "Arnoldfurt, US",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 27,
+      "vehicle": "2024 BMW X5 xDrive40i",
+      "tier": "premium",
+      "old_price": "3384408000.00",
+      "new_price": "3674156753",
+      "old_location": "Ryanstad, US",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 28,
+      "vehicle": "2024 Hyundai Tucson 2.0 Diesel Special",
+      "tier": "mainstream",
+      "old_price": "943980000.00",
+      "new_price": "1078433312",
+      "old_location": "Smithberg, VN",
+      "new_location": "Hai Phong, VN"
+    },
+    {
+      "listing_id": 29,
+      "vehicle": "2023 Mazda Mazda3 Luxury",
+      "tier": "mainstream",
+      "old_price": "642627000.00",
+      "new_price": "791446625",
+      "old_location": "South Garrettport, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 30,
+      "vehicle": "2024 Kia Carnival 3.5G Signature",
+      "tier": "premium",
+      "old_price": "1678350000.00",
+      "new_price": "2368722924",
+      "old_location": "Stevetown, US",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 31,
+      "vehicle": "2023 Toyota Camry 2.0Q",
+      "tier": "mainstream",
+      "old_price": "1003507000.00",
+      "new_price": "1161888198",
+      "old_location": "Hillshire, US",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 32,
+      "vehicle": "2024 Lexus NX NX350h Premium",
+      "tier": "premium",
+      "old_price": "2487929000.00",
+      "new_price": "2562677533",
+      "old_location": "Thompsonberg, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 33,
+      "vehicle": "2023 Hyundai Tucson 1.6 Turbo",
+      "tier": "mainstream",
+      "old_price": "754087000.00",
+      "new_price": "892515962",
+      "old_location": "West Amandamouth, US",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 34,
+      "vehicle": "2023 Kia Carnival 2.2D Signature",
+      "tier": "mainstream",
+      "old_price": "1474196000.00",
+      "new_price": "1222983795",
+      "old_location": "North Kevinfort, US",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 35,
+      "vehicle": "2023 Toyota Corolla Cross 1.8V",
+      "tier": "mainstream",
+      "old_price": "693680000.00",
+      "new_price": "844410117",
+      "old_location": "Jeffmouth, VN",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 36,
+      "vehicle": "2024 Honda Civic e:HEV RS",
+      "tier": "mainstream",
+      "old_price": "927524000.00",
+      "new_price": "1068302980",
+      "old_location": "North Kristinbury, US",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 37,
+      "vehicle": "2023 Toyota Camry 2.0Q",
+      "tier": "mainstream",
+      "old_price": "901664000.00",
+      "new_price": "1075521478",
+      "old_location": "West Kristybury, US",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 38,
+      "vehicle": "2023 Mercedes-Benz C-Class C200 Avantgarde",
+      "tier": "premium",
+      "old_price": "1452212000.00",
+      "new_price": "1968704498",
+      "old_location": "Charleneland, US",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 39,
+      "vehicle": "2024 BYD Seal Performance AWD",
+      "tier": "mainstream",
+      "old_price": "1265284000.00",
+      "new_price": "1379595502",
+      "old_location": "Blairmouth, US",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 40,
+      "vehicle": "2024 Toyota Camry 2.5 Hybrid",
+      "tier": "mainstream",
+      "old_price": "1294362000.00",
+      "new_price": "1266670838",
+      "old_location": "Michaelshire, US",
+      "new_location": "Binh Duong, VN"
+    },
+    {
+      "listing_id": 41,
+      "vehicle": "2023 VinFast VF 8 Eco",
+      "tier": "mainstream",
+      "old_price": "1037969000.00",
+      "new_price": "1113910816",
+      "old_location": "Sandrastad, VN",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 42,
+      "vehicle": "2023 Mazda Mazda3 Luxury",
+      "tier": "mainstream",
+      "old_price": "614214000.00",
+      "new_price": "759740049",
+      "old_location": "East Karen, US",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 43,
+      "vehicle": "2023 Toyota Corolla Cross 1.8V",
+      "tier": "mainstream",
+      "old_price": "702557000.00",
+      "new_price": "867790389",
+      "old_location": "West Erikashire, US",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 44,
+      "vehicle": "2023 VinFast VF 8 Eco",
+      "tier": "mainstream",
+      "old_price": "1046743000.00",
+      "new_price": "1172367480",
+      "old_location": "Berrychester, VN",
+      "new_location": "Hai Phong, VN"
+    },
+    {
+      "listing_id": 45,
+      "vehicle": "2024 Toyota Camry 2.5 Hybrid",
+      "tier": "mainstream",
+      "old_price": "1319748000.00",
+      "new_price": "1182092686",
+      "old_location": "South Monicamouth, US",
+      "new_location": "Hai Phong, VN"
+    },
+    {
+      "listing_id": 46,
+      "vehicle": "2024 Mazda Mazda3 Signature",
+      "tier": "mainstream",
+      "old_price": "732538000.00",
+      "new_price": "874912749",
+      "old_location": "Port Katherine, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 47,
+      "vehicle": "2024 BMW X5 xDrive50e",
+      "tier": "premium",
+      "old_price": "3634939000.00",
+      "new_price": "4190738453",
+      "old_location": "West Steventon, US",
+      "new_location": "Binh Duong, VN"
+    },
+    {
+      "listing_id": 48,
+      "vehicle": "2024 Mercedes-Benz C-Class C300 AMG Line",
+      "tier": "premium",
+      "old_price": "1936792000.00",
+      "new_price": "2706271701",
+      "old_location": "Lake Samuel, US",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 49,
+      "vehicle": "2024 Toyota Corolla Cross Hybrid Premium",
+      "tier": "mainstream",
+      "old_price": "807672000.00",
+      "new_price": "972668551",
+      "old_location": "Andersonland, US",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 50,
+      "vehicle": "2024 BYD Seal Performance AWD",
+      "tier": "mainstream",
+      "old_price": "1263540000.00",
+      "new_price": "1397100922",
+      "old_location": "Henryborough, VN",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 51,
+      "vehicle": "2023 Honda Civic RS",
+      "tier": "mainstream",
+      "old_price": "762106000.00",
+      "new_price": "946580314",
+      "old_location": "South Cheryl, VN",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 52,
+      "vehicle": "2023 Mercedes-Benz C-Class C200 Avantgarde",
+      "tier": "premium",
+      "old_price": "1536204000.00",
+      "new_price": "2160497374",
+      "old_location": "Port Ethanmouth, US",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 53,
+      "vehicle": "2024 Mercedes-Benz C-Class C300 AMG Line",
+      "tier": "premium",
+      "old_price": "1854744000.00",
+      "new_price": "2481519759",
+      "old_location": "North Justin, VN",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 54,
+      "vehicle": "2024 Mazda Mazda3 Signature",
+      "tier": "mainstream",
+      "old_price": "806071000.00",
+      "new_price": "838617704",
+      "old_location": "Brownfort, VN",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 55,
+      "vehicle": "2024 BMW X5 xDrive40i",
+      "tier": "premium",
+      "old_price": "3552885000.00",
+      "new_price": "3645512399",
+      "old_location": "West Amyburgh, US",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 56,
+      "vehicle": "2024 Kia Carnival 3.5G Signature",
+      "tier": "premium",
+      "old_price": "1697020000.00",
+      "new_price": "2412678701",
+      "old_location": "Port Dianaview, VN",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 57,
+      "vehicle": "2023 Mazda Mazda3 Luxury",
+      "tier": "mainstream",
+      "old_price": "657558000.00",
+      "new_price": "759269353",
+      "old_location": "North Markport, US",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 58,
+      "vehicle": "2024 Toyota Corolla Cross Hybrid Premium",
+      "tier": "mainstream",
+      "old_price": "894815000.00",
+      "new_price": "943127118",
+      "old_location": "North Douglas, US",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 59,
+      "vehicle": "2024 VinFast VF 8 Plus",
+      "tier": "mainstream",
+      "old_price": "1168743000.00",
+      "new_price": "1292278776",
+      "old_location": "East Melissamouth, US",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 60,
+      "vehicle": "2024 BYD Seal Premium",
+      "tier": "mainstream",
+      "old_price": "1008372000.00",
+      "new_price": "1194589362",
+      "old_location": "West Angelastad, VN",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 61,
+      "vehicle": "2024 VinFast VF 8 Plus",
+      "tier": "mainstream",
+      "old_price": "1254898000.00",
+      "new_price": "1339749396",
+      "old_location": "West Fred, US",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 62,
+      "vehicle": "2024 VinFast VF 8 Plus",
+      "tier": "mainstream",
+      "old_price": "1185545000.00",
+      "new_price": "1392397630",
+      "old_location": "Dawnport, VN",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 63,
+      "vehicle": "2024 Toyota Corolla Cross Hybrid Premium",
+      "tier": "mainstream",
+      "old_price": "846899000.00",
+      "new_price": "979693759",
+      "old_location": "North Brent, US",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 64,
+      "vehicle": "2024 Toyota Camry 2.5 Hybrid",
+      "tier": "mainstream",
+      "old_price": "1275642000.00",
+      "new_price": "1208663528",
+      "old_location": "Kathrynstad, US",
+      "new_location": "Hai Phong, VN"
+    },
+    {
+      "listing_id": 65,
+      "vehicle": "2024 Honda Civic e:HEV RS",
+      "tier": "mainstream",
+      "old_price": "869545000.00",
+      "new_price": "1035592249",
+      "old_location": "New William, US",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 66,
+      "vehicle": "2023 Kia Carnival 2.2D Signature",
+      "tier": "mainstream",
+      "old_price": "1322552000.00",
+      "new_price": "1225430979",
+      "old_location": "South Brandytown, VN",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 68,
+      "vehicle": "2020 Ferrari 488 GTB Base",
+      "tier": "exotic",
+      "old_price": "11861313719.00",
+      "new_price": "11772416230",
+      "old_location": "Da Nang, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 69,
+      "vehicle": "2021 Ferrari F8 Tributo Base",
+      "tier": "exotic",
+      "old_price": "14049255581.00",
+      "new_price": "14296972817",
+      "old_location": "Hai Phong, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 70,
+      "vehicle": "2021 Lamborghini Huracan EVO",
+      "tier": "exotic",
+      "old_price": "12721093221.00",
+      "new_price": "13334057773",
+      "old_location": "Da Nang, VN",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 71,
+      "vehicle": "2023 Lamborghini Urus S",
+      "tier": "exotic",
+      "old_price": "11682219658.00",
+      "new_price": "11303989551",
+      "old_location": "Hai Phong, VN",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 72,
+      "vehicle": "2020 McLaren 720S Coupe",
+      "tier": "exotic",
+      "old_price": "13379741009.00",
+      "new_price": "12204217610",
+      "old_location": "Hanoi, VN",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 73,
+      "vehicle": "2024 Porsche 911 Carrera S",
+      "tier": "exotic",
+      "old_price": "7902554896.00",
+      "new_price": "7885237416",
+      "old_location": "Nha Trang, VN",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 74,
+      "vehicle": "2024 Porsche 911 Turbo S",
+      "tier": "exotic",
+      "old_price": "12751692742.00",
+      "new_price": "11400674544",
+      "old_location": "Can Tho, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 75,
+      "vehicle": "2022 Audi R8 V10 Performance quattro",
+      "tier": "performance",
+      "old_price": "10276321294.00",
+      "new_price": "10055080423",
+      "old_location": "Nha Trang, VN",
+      "new_location": "Hai Phong, VN"
+    },
+    {
+      "listing_id": 76,
+      "vehicle": "2020 Mercedes-Benz AMG GT R",
+      "tier": "performance",
+      "old_price": "6571112829.00",
+      "new_price": "6810005420",
+      "old_location": "Bien Hoa, VN",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 77,
+      "vehicle": "2024 BMW M4 Competition xDrive",
+      "tier": "performance",
+      "old_price": "4169967522.00",
+      "new_price": "4069541584",
+      "old_location": "Hai Phong, VN",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 78,
+      "vehicle": "2021 Nissan GT-R Premium",
+      "tier": "performance",
+      "old_price": "4343649428.00",
+      "new_price": "4304795097",
+      "old_location": "Bien Hoa, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 79,
+      "vehicle": "2024 Chevrolet Corvette Z06",
+      "tier": "performance",
+      "old_price": "6241620888.00",
+      "new_price": "6511848042",
+      "old_location": "Vung Tau, VN",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 80,
+      "vehicle": "2022 Aston Martin Vantage Coupe",
+      "tier": "exotic",
+      "old_price": "8444950725.00",
+      "new_price": "7819516756",
+      "old_location": "Can Tho, VN",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 81,
+      "vehicle": "2024 Lexus LC 500",
+      "tier": "performance",
+      "old_price": "5554105253.00",
+      "new_price": "5623676574",
+      "old_location": "Vung Tau, VN",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 82,
+      "vehicle": "2013 Audi A4 2.0T Premium quattro",
+      "tier": "premium",
+      "old_price": "716132325.00",
+      "new_price": "690488547",
+      "old_location": "Bien Hoa, VN",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 83,
+      "vehicle": "2012 Audi A4 2.0T Premium quattro",
+      "tier": "premium",
+      "old_price": "588554817.00",
+      "new_price": "650494072",
+      "old_location": "Da Nang, VN",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 84,
+      "vehicle": "2009 Audi A4 2.0T Premium quattro",
+      "tier": "premium",
+      "old_price": "374171469.00",
+      "new_price": "360166333",
+      "old_location": "Can Tho, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 85,
+      "vehicle": "2012 BMW 3 Series 328i",
+      "tier": "premium",
+      "old_price": "678217138.00",
+      "new_price": "749143860",
+      "old_location": "Hue, VN",
+      "new_location": "Binh Duong, VN"
+    },
+    {
+      "listing_id": 86,
+      "vehicle": "2011 BMW 3 Series 328i",
+      "tier": "premium",
+      "old_price": "559566179.00",
+      "new_price": "582510744",
+      "old_location": "Nha Trang, VN",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 87,
+      "vehicle": "2011 BMW 3 Series 328i xDrive",
+      "tier": "premium",
+      "old_price": "582600920.00",
+      "new_price": "609911182",
+      "old_location": "Hanoi, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 88,
+      "vehicle": "2008 BMW X3 3.0si",
+      "tier": "premium",
+      "old_price": "653265932.00",
+      "new_price": "627553144",
+      "old_location": "Hanoi, VN",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 89,
+      "vehicle": "2007 BMW X3 3.0si",
+      "tier": "premium",
+      "old_price": "650733075.00",
+      "new_price": "622681055",
+      "old_location": "HCMC, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 90,
+      "vehicle": "2006 BMW X3 3.0i",
+      "tier": "premium",
+      "old_price": "632177344.00",
+      "new_price": "617000650",
+      "old_location": "Bien Hoa, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 91,
+      "vehicle": "2013 BMW X5 xDrive35i",
+      "tier": "premium",
+      "old_price": "1063043821.00",
+      "new_price": "1108141030",
+      "old_location": "Nha Trang, VN",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 92,
+      "vehicle": "2012 BMW X5 xDrive35d",
+      "tier": "premium",
+      "old_price": "1009498352.00",
+      "new_price": "1035310157",
+      "old_location": "HCMC, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 93,
+      "vehicle": "2012 BMW X5 xDrive35i Premium",
+      "tier": "premium",
+      "old_price": "1029795538.00",
+      "new_price": "1047398287",
+      "old_location": "Nha Trang, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 94,
+      "vehicle": "2014 Chevrolet Cruze 1LT",
+      "tier": "mainstream",
+      "old_price": "319535448.00",
+      "new_price": "301857930",
+      "old_location": "Nha Trang, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 95,
+      "vehicle": "2014 Chevrolet Cruze 2LT",
+      "tier": "mainstream",
+      "old_price": "316894866.00",
+      "new_price": "333636413",
+      "old_location": "Bien Hoa, VN",
+      "new_location": "Binh Duong, VN"
+    },
+    {
+      "listing_id": 96,
+      "vehicle": "2013 Chevrolet Cruze 1LT",
+      "tier": "mainstream",
+      "old_price": "269404094.00",
+      "new_price": "255326474",
+      "old_location": "Binh Duong, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 97,
+      "vehicle": "2013 Chevrolet Equinox LT",
+      "tier": "mainstream",
+      "old_price": "407379164.00",
+      "new_price": "406840976",
+      "old_location": "Hai Phong, VN",
+      "new_location": "Hai Phong, VN"
+    },
+    {
+      "listing_id": 98,
+      "vehicle": "2012 Chevrolet Equinox LS",
+      "tier": "mainstream",
+      "old_price": "360273513.00",
+      "new_price": "349600000",
+      "old_location": "Hai Phong, VN",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 100,
+      "vehicle": "2014 Chevrolet Silverado 1500 LT",
+      "tier": "mainstream",
+      "old_price": "674822951.00",
+      "new_price": "671274506",
+      "old_location": "Da Nang, VN",
+      "new_location": "Binh Duong, VN"
+    },
+    {
+      "listing_id": 101,
+      "vehicle": "2014 Chevrolet Traverse LT",
+      "tier": "mainstream",
+      "old_price": "588054342.00",
+      "new_price": "654571881",
+      "old_location": "Da Nang, VN",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 102,
+      "vehicle": "2012 Chevrolet Traverse LS",
+      "tier": "mainstream",
+      "old_price": "374072915.00",
+      "new_price": "349600000",
+      "old_location": "Hanoi, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 103,
+      "vehicle": "2012 Chevrolet Traverse LT",
+      "tier": "mainstream",
+      "old_price": "442062010.00",
+      "new_price": "417350384",
+      "old_location": "Bien Hoa, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 104,
+      "vehicle": "2013 Chevrolet Volt Base",
+      "tier": "mainstream",
+      "old_price": "337482033.00",
+      "new_price": "360197270",
+      "old_location": "Binh Duong, VN",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 105,
+      "vehicle": "2012 Chevrolet Volt Base",
+      "tier": "mainstream",
+      "old_price": "288549982.00",
+      "new_price": "283085900",
+      "old_location": "Hanoi, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 106,
+      "vehicle": "2011 Chevrolet Volt Base",
+      "tier": "mainstream",
+      "old_price": "307658289.00",
+      "new_price": "325975023",
+      "old_location": "Binh Duong, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 107,
+      "vehicle": "2014 Dodge Grand Caravan SXT",
+      "tier": "mainstream",
+      "old_price": "423200000.00",
+      "new_price": "427613399",
+      "old_location": "Da Nang, VN",
+      "new_location": "Hai Phong, VN"
+    },
+    {
+      "listing_id": 109,
+      "vehicle": "2013 Ford Escape SE",
+      "tier": "mainstream",
+      "old_price": "389547242.00",
+      "new_price": "349600000",
+      "old_location": "Binh Duong, VN",
+      "new_location": "Binh Duong, VN"
+    },
+    {
+      "listing_id": 110,
+      "vehicle": "2013 Ford Escape SEL",
+      "tier": "mainstream",
+      "old_price": "449981857.00",
+      "new_price": "459339467",
+      "old_location": "Binh Duong, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 111,
+      "vehicle": "2012 Ford Escape XLT",
+      "tier": "mainstream",
+      "old_price": "349600000.00",
+      "new_price": "365693772",
+      "old_location": "Binh Duong, VN",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 112,
+      "vehicle": "2014 Ford Explorer Limited",
+      "tier": "mainstream",
+      "old_price": "645405813.00",
+      "new_price": "678865548",
+      "old_location": "HCMC, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 113,
+      "vehicle": "2013 Ford Explorer XLT",
+      "tier": "mainstream",
+      "old_price": "635569272.00",
+      "new_price": "641989960",
+      "old_location": "Da Nang, VN",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 114,
+      "vehicle": "2012 Ford Explorer XLT",
+      "tier": "mainstream",
+      "old_price": "520493443.00",
+      "new_price": "535074953",
+      "old_location": "Hai Phong, VN",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 115,
+      "vehicle": "2014 Ford F-150 XLT",
+      "tier": "mainstream",
+      "old_price": "613954998.00",
+      "new_price": "622357856",
+      "old_location": "Hai Phong, VN",
+      "new_location": "Binh Duong, VN"
+    },
+    {
+      "listing_id": 116,
+      "vehicle": "2013 Ford F-150 XLT",
+      "tier": "mainstream",
+      "old_price": "567858975.00",
+      "new_price": "617152717",
+      "old_location": "Hanoi, VN",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 117,
+      "vehicle": "2011 Ford F-150 XLT",
+      "tier": "mainstream",
+      "old_price": "507475643.00",
+      "new_price": "495427112",
+      "old_location": "Hanoi, VN",
+      "new_location": "Binh Duong, VN"
+    },
+    {
+      "listing_id": 118,
+      "vehicle": "2014 Ford Focus SE",
+      "tier": "mainstream",
+      "old_price": "309152469.00",
+      "new_price": "308986297",
+      "old_location": "HCMC, VN",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 119,
+      "vehicle": "2013 Ford Focus SE",
+      "tier": "mainstream",
+      "old_price": "270496255.00",
+      "new_price": "273659408",
+      "old_location": "Can Tho, VN",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 120,
+      "vehicle": "2012 Ford Focus SE",
+      "tier": "mainstream",
+      "old_price": "219243604.00",
+      "new_price": "218583754",
+      "old_location": "Nha Trang, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 121,
+      "vehicle": "2014 Ford Fusion SE",
+      "tier": "mainstream",
+      "old_price": "345466965.00",
+      "new_price": "365333336",
+      "old_location": "HCMC, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 122,
+      "vehicle": "2013 Ford Fusion SE",
+      "tier": "mainstream",
+      "old_price": "349201229.00",
+      "new_price": "339828460",
+      "old_location": "HCMC, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 123,
+      "vehicle": "2012 Ford Fusion SE",
+      "tier": "mainstream",
+      "old_price": "260933460.00",
+      "new_price": "245235238",
+      "old_location": "Hanoi, VN",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 124,
+      "vehicle": "2014 Ford Fusion Hybrid SE",
+      "tier": "mainstream",
+      "old_price": "395091396.00",
+      "new_price": "425371702",
+      "old_location": "Can Tho, VN",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 125,
+      "vehicle": "2014 Ford Fusion Hybrid Titanium",
+      "tier": "mainstream",
+      "old_price": "465317116.00",
+      "new_price": "473713904",
+      "old_location": "Hanoi, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 126,
+      "vehicle": "2013 Ford Fusion Hybrid SE",
+      "tier": "mainstream",
+      "old_price": "387951751.00",
+      "new_price": "395278805",
+      "old_location": "Vung Tau, VN",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 127,
+      "vehicle": "2012 GMC Acadia Denali",
+      "tier": "mainstream",
+      "old_price": "730185588.00",
+      "new_price": "697807411",
+      "old_location": "HCMC, VN",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 128,
+      "vehicle": "2012 GMC Acadia SLT-1",
+      "tier": "mainstream",
+      "old_price": "563206807.00",
+      "new_price": "587566570",
+      "old_location": "Hanoi, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 129,
+      "vehicle": "2008 GMC Acadia SLT-1",
+      "tier": "mainstream",
+      "old_price": "349600000.00",
+      "new_price": "357720731",
+      "old_location": "Hue, VN",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 130,
+      "vehicle": "2012 Honda Accord EX-L",
+      "tier": "mainstream",
+      "old_price": "352252291.00",
+      "new_price": "355372400",
+      "old_location": "Nha Trang, VN",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 131,
+      "vehicle": "2012 Honda Accord LX",
+      "tier": "mainstream",
+      "old_price": "306030074.00",
+      "new_price": "303684352",
+      "old_location": "Vung Tau, VN",
+      "new_location": "Binh Duong, VN"
+    },
+    {
+      "listing_id": 132,
+      "vehicle": "2012 Honda Accord SE",
+      "tier": "mainstream",
+      "old_price": "320662395.00",
+      "new_price": "316944182",
+      "old_location": "Bien Hoa, VN",
+      "new_location": "Binh Duong, VN"
+    },
+    {
+      "listing_id": 133,
+      "vehicle": "2013 Honda Civic LX",
+      "tier": "mainstream",
+      "old_price": "323650563.00",
+      "new_price": "318123375",
+      "old_location": "Can Tho, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 134,
+      "vehicle": "2012 Honda Civic EX",
+      "tier": "mainstream",
+      "old_price": "289883986.00",
+      "new_price": "300953553",
+      "old_location": "HCMC, VN",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 135,
+      "vehicle": "2012 Honda Civic LX",
+      "tier": "mainstream",
+      "old_price": "249986626.00",
+      "new_price": "280063534",
+      "old_location": "Binh Duong, VN",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 136,
+      "vehicle": "2013 Honda CR-V LX",
+      "tier": "mainstream",
+      "old_price": "443091657.00",
+      "new_price": "397337755",
+      "old_location": "HCMC, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 137,
+      "vehicle": "2012 Honda CR-V EX",
+      "tier": "mainstream",
+      "old_price": "407683619.00",
+      "new_price": "450808205",
+      "old_location": "Bien Hoa, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 138,
+      "vehicle": "2012 Honda CR-V EX-L",
+      "tier": "mainstream",
+      "old_price": "490730487.00",
+      "new_price": "513241517",
+      "old_location": "Vung Tau, VN",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 139,
+      "vehicle": "2012 Honda Odyssey EX",
+      "tier": "mainstream",
+      "old_price": "444939807.00",
+      "new_price": "423200000",
+      "old_location": "Vung Tau, VN",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 140,
+      "vehicle": "2012 Honda Odyssey EX-L",
+      "tier": "mainstream",
+      "old_price": "499198280.00",
+      "new_price": "512571570",
+      "old_location": "Hanoi, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 142,
+      "vehicle": "2014 Hyundai Elantra SE",
+      "tier": "mainstream",
+      "old_price": "316023902.00",
+      "new_price": "328360960",
+      "old_location": "Can Tho, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 143,
+      "vehicle": "2013 Hyundai Elantra GLS",
+      "tier": "mainstream",
+      "old_price": "271145218.00",
+      "new_price": "277843763",
+      "old_location": "Hai Phong, VN",
+      "new_location": "Hai Phong, VN"
+    },
+    {
+      "listing_id": 144,
+      "vehicle": "2012 Hyundai Elantra GLS",
+      "tier": "mainstream",
+      "old_price": "239301675.00",
+      "new_price": "268227295",
+      "old_location": "Hanoi, VN",
+      "new_location": "Binh Duong, VN"
+    },
+    {
+      "listing_id": 145,
+      "vehicle": "2013 Hyundai Santa Fe Sport",
+      "tier": "mainstream",
+      "old_price": "415628357.00",
+      "new_price": "409493107",
+      "old_location": "Vung Tau, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 146,
+      "vehicle": "2010 Hyundai Santa Fe GLS",
+      "tier": "mainstream",
+      "old_price": "349600000.00",
+      "new_price": "360365477",
+      "old_location": "Hai Phong, VN",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 148,
+      "vehicle": "2014 Hyundai Sonata GLS",
+      "tier": "mainstream",
+      "old_price": "356770095.00",
+      "new_price": "337924376",
+      "old_location": "Can Tho, VN",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 149,
+      "vehicle": "2013 Hyundai Sonata GLS",
+      "tier": "mainstream",
+      "old_price": "285378768.00",
+      "new_price": "300269962",
+      "old_location": "Can Tho, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 150,
+      "vehicle": "2012 Hyundai Sonata GLS",
+      "tier": "mainstream",
+      "old_price": "284549246.00",
+      "new_price": "301070981",
+      "old_location": "Can Tho, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 151,
+      "vehicle": "2014 Jeep Grand Cherokee Limited",
+      "tier": "mainstream",
+      "old_price": "753289078.00",
+      "new_price": "716650711",
+      "old_location": "Nha Trang, VN",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 152,
+      "vehicle": "2011 Jeep Grand Cherokee Laredo",
+      "tier": "mainstream",
+      "old_price": "499592722.00",
+      "new_price": "496030339",
+      "old_location": "Hanoi, VN",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 153,
+      "vehicle": "2014 Jeep Wrangler Unlimited Sahara",
+      "tier": "mainstream",
+      "old_price": "709431275.00",
+      "new_price": "698954244",
+      "old_location": "Nha Trang, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 154,
+      "vehicle": "2013 Jeep Wrangler Unlimited Sport",
+      "tier": "mainstream",
+      "old_price": "622562990.00",
+      "new_price": "613799585",
+      "old_location": "Bien Hoa, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 155,
+      "vehicle": "2014 Kia Optima LX",
+      "tier": "mainstream",
+      "old_price": "381663567.00",
+      "new_price": "379390883",
+      "old_location": "Da Nang, VN",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 156,
+      "vehicle": "2013 Kia Optima LX",
+      "tier": "mainstream",
+      "old_price": "285801638.00",
+      "new_price": "288425598",
+      "old_location": "Hai Phong, VN",
+      "new_location": "Binh Duong, VN"
+    },
+    {
+      "listing_id": 157,
+      "vehicle": "2012 Kia Optima LX",
+      "tier": "mainstream",
+      "old_price": "293375265.00",
+      "new_price": "273530658",
+      "old_location": "Hai Phong, VN",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 158,
+      "vehicle": "2015 Kia Sorento LX",
+      "tier": "mainstream",
+      "old_price": "502012495.00",
+      "new_price": "501121670",
+      "old_location": "Binh Duong, VN",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 159,
+      "vehicle": "2014 Kia Sorento LX",
+      "tier": "mainstream",
+      "old_price": "382143964.00",
+      "new_price": "389977287",
+      "old_location": "Hanoi, VN",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 160,
+      "vehicle": "2013 Kia Sorento LX",
+      "tier": "mainstream",
+      "old_price": "376354142.00",
+      "new_price": "356902014",
+      "old_location": "Da Nang, VN",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 161,
+      "vehicle": "2014 Kia Soul +",
+      "tier": "mainstream",
+      "old_price": "328145183.00",
+      "new_price": "348183567",
+      "old_location": "Nha Trang, VN",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 162,
+      "vehicle": "2013 Kia Soul +",
+      "tier": "mainstream",
+      "old_price": "303891359.00",
+      "new_price": "294931590",
+      "old_location": "HCMC, VN",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 163,
+      "vehicle": "2013 Kia Soul Base",
+      "tier": "mainstream",
+      "old_price": "294400000.00",
+      "new_price": "296598429",
+      "old_location": "Hue, VN",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 164,
+      "vehicle": "2013 Lexus ES 350 Base",
+      "tier": "premium",
+      "old_price": "889356939.00",
+      "new_price": "826649010",
+      "old_location": "Bien Hoa, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 165,
+      "vehicle": "2012 Lexus ES 350 Base",
+      "tier": "premium",
+      "old_price": "685695171.00",
+      "new_price": "667732181",
+      "old_location": "Can Tho, VN",
+      "new_location": "Binh Duong, VN"
+    },
+    {
+      "listing_id": 167,
+      "vehicle": "2013 Lexus RX 350 Base",
+      "tier": "premium",
+      "old_price": "999291264.00",
+      "new_price": "950142553",
+      "old_location": "Nha Trang, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 168,
+      "vehicle": "2012 Lexus RX 350 Base",
+      "tier": "premium",
+      "old_price": "882610257.00",
+      "new_price": "800687485",
+      "old_location": "Can Tho, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 169,
+      "vehicle": "2011 Lexus RX 350 Base",
+      "tier": "premium",
+      "old_price": "678693453.00",
+      "new_price": "695669376",
+      "old_location": "Bien Hoa, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 170,
+      "vehicle": "2013 Mazda Mazda3 i Sport",
+      "tier": "mainstream",
+      "old_price": "260699992.00",
+      "new_price": "237809375",
+      "old_location": "Can Tho, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 171,
+      "vehicle": "2012 Mazda Mazda3 i Sport",
+      "tier": "mainstream",
+      "old_price": "217556505.00",
+      "new_price": "217695346",
+      "old_location": "Hanoi, VN",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 172,
+      "vehicle": "2012 Mazda Mazda3 i Touring",
+      "tier": "mainstream",
+      "old_price": "262579939.00",
+      "new_price": "265875078",
+      "old_location": "HCMC, VN",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 173,
+      "vehicle": "2013 Mercedes-Benz C-Class C250 Sport",
+      "tier": "premium",
+      "old_price": "686787068.00",
+      "new_price": "692031488",
+      "old_location": "Nha Trang, VN",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 174,
+      "vehicle": "2012 Mercedes-Benz C-Class C250 Sport",
+      "tier": "premium",
+      "old_price": "604927150.00",
+      "new_price": "661979567",
+      "old_location": "Hai Phong, VN",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 175,
+      "vehicle": "2012 Mercedes-Benz C-Class C300 Luxury 4MATIC",
+      "tier": "premium",
+      "old_price": "627432218.00",
+      "new_price": "645955170",
+      "old_location": "Da Nang, VN",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 176,
+      "vehicle": "2012 Mercedes-Benz M-Class ML350 4MATIC",
+      "tier": "premium",
+      "old_price": "1033093749.00",
+      "new_price": "954102094",
+      "old_location": "Hanoi, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 177,
+      "vehicle": "2011 Mercedes-Benz M-Class ML350 4MATIC",
+      "tier": "premium",
+      "old_price": "767722935.00",
+      "new_price": "756173637",
+      "old_location": "Binh Duong, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 178,
+      "vehicle": "2006 Mercedes-Benz M-Class ML350",
+      "tier": "premium",
+      "old_price": "658004375.00",
+      "new_price": "656963305",
+      "old_location": "Hanoi, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 179,
+      "vehicle": "2014 Nissan Altima 2.5 S",
+      "tier": "mainstream",
+      "old_price": "370160869.00",
+      "new_price": "373772863",
+      "old_location": "Hai Phong, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 180,
+      "vehicle": "2013 Nissan Altima 2.5",
+      "tier": "mainstream",
+      "old_price": "297842729.00",
+      "new_price": "324038410",
+      "old_location": "Vung Tau, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 181,
+      "vehicle": "2012 Nissan Altima 2.5 S",
+      "tier": "mainstream",
+      "old_price": "304310181.00",
+      "new_price": "287535413",
+      "old_location": "Binh Duong, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 182,
+      "vehicle": "2013 Nissan Leaf S",
+      "tier": "mainstream",
+      "old_price": "212252278.00",
+      "new_price": "215242780",
+      "old_location": "Nha Trang, VN",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 183,
+      "vehicle": "2013 Nissan Leaf SV",
+      "tier": "mainstream",
+      "old_price": "223645060.00",
+      "new_price": "235676796",
+      "old_location": "Binh Duong, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 184,
+      "vehicle": "2012 Nissan Leaf SL",
+      "tier": "mainstream",
+      "old_price": "259440847.00",
+      "new_price": "272168736",
+      "old_location": "Bien Hoa, VN",
+      "new_location": "Hai Phong, VN"
+    },
+    {
+      "listing_id": 186,
+      "vehicle": "2012 Nissan Rogue SV",
+      "tier": "mainstream",
+      "old_price": "376766275.00",
+      "new_price": "349600000",
+      "old_location": "Can Tho, VN",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 187,
+      "vehicle": "2011 Nissan Rogue SV",
+      "tier": "mainstream",
+      "old_price": "355024640.00",
+      "new_price": "367142998",
+      "old_location": "Vung Tau, VN",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 188,
+      "vehicle": "2014 Nissan Sentra SV",
+      "tier": "mainstream",
+      "old_price": "290846991.00",
+      "new_price": "316330031",
+      "old_location": "Binh Duong, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 189,
+      "vehicle": "2013 Nissan Sentra SV",
+      "tier": "mainstream",
+      "old_price": "276844844.00",
+      "new_price": "284360875",
+      "old_location": "Vung Tau, VN",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 190,
+      "vehicle": "2012 Nissan Sentra 2.0 SR",
+      "tier": "mainstream",
+      "old_price": "236892581.00",
+      "new_price": "250837093",
+      "old_location": "Hanoi, VN",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 191,
+      "vehicle": "2014 Ram 1500 SLT",
+      "tier": "mainstream",
+      "old_price": "646541236.00",
+      "new_price": "612250521",
+      "old_location": "Bien Hoa, VN",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 192,
+      "vehicle": "2013 Ram 1500 Tradesman",
+      "tier": "mainstream",
+      "old_price": "569181586.00",
+      "new_price": "565026319",
+      "old_location": "Vung Tau, VN",
+      "new_location": "Binh Duong, VN"
+    },
+    {
+      "listing_id": 193,
+      "vehicle": "2012 Ram 1500 ST",
+      "tier": "mainstream",
+      "old_price": "464575690.00",
+      "new_price": "469206500",
+      "old_location": "Bien Hoa, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 194,
+      "vehicle": "2015 Subaru Forester 2.5i Premium PZEV",
+      "tier": "mainstream",
+      "old_price": "551418652.00",
+      "new_price": "554346645",
+      "old_location": "Vung Tau, VN",
+      "new_location": "Hai Phong, VN"
+    },
+    {
+      "listing_id": 195,
+      "vehicle": "2014 Subaru Forester 2.5i Premium PZEV",
+      "tier": "mainstream",
+      "old_price": "532741422.00",
+      "new_price": "496069461",
+      "old_location": "HCMC, VN",
+      "new_location": "Hai Phong, VN"
+    },
+    {
+      "listing_id": 196,
+      "vehicle": "2011 Subaru Forester 2.5X Premium",
+      "tier": "mainstream",
+      "old_price": "418766778.00",
+      "new_price": "407945659",
+      "old_location": "Hai Phong, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 197,
+      "vehicle": "2014 Subaru Outback 2.5i Limited PZEV",
+      "tier": "mainstream",
+      "old_price": "633227484.00",
+      "new_price": "663834970",
+      "old_location": "Hai Phong, VN",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 198,
+      "vehicle": "2014 Subaru Outback 2.5i Premium PZEV",
+      "tier": "mainstream",
+      "old_price": "543788081.00",
+      "new_price": "576978208",
+      "old_location": "Bien Hoa, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 199,
+      "vehicle": "2011 Subaru Outback 2.5i Premium",
+      "tier": "mainstream",
+      "old_price": "349601796.00",
+      "new_price": "340409949",
+      "old_location": "Nha Trang, VN",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 200,
+      "vehicle": "2011 Toyota 4Runner SR5",
+      "tier": "mainstream",
+      "old_price": "555242763.00",
+      "new_price": "574692018",
+      "old_location": "Vung Tau, VN",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 203,
+      "vehicle": "2014 Toyota Camry LE",
+      "tier": "mainstream",
+      "old_price": "367334632.00",
+      "new_price": "358828459",
+      "old_location": "Nha Trang, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 204,
+      "vehicle": "2014 Toyota Camry SE",
+      "tier": "mainstream",
+      "old_price": "380381402.00",
+      "new_price": "414220547",
+      "old_location": "Binh Duong, VN",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 205,
+      "vehicle": "2012 Toyota Camry LE",
+      "tier": "mainstream",
+      "old_price": "309508455.00",
+      "new_price": "320729700",
+      "old_location": "HCMC, VN",
+      "new_location": "Hai Phong, VN"
+    },
+    {
+      "listing_id": 206,
+      "vehicle": "2014 Toyota Corolla LE",
+      "tier": "mainstream",
+      "old_price": "334969321.00",
+      "new_price": "312597556",
+      "old_location": "Binh Duong, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 207,
+      "vehicle": "2013 Toyota Corolla LE",
+      "tier": "mainstream",
+      "old_price": "279457306.00",
+      "new_price": "288254364",
+      "old_location": "Hai Phong, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 208,
+      "vehicle": "2012 Toyota Corolla LE",
+      "tier": "mainstream",
+      "old_price": "257188189.00",
+      "new_price": "246096799",
+      "old_location": "Da Nang, VN",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 209,
+      "vehicle": "2012 Toyota Highlander Base",
+      "tier": "mainstream",
+      "old_price": "504363409.00",
+      "new_price": "520069639",
+      "old_location": "Nha Trang, VN",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 210,
+      "vehicle": "2012 Toyota Highlander Limited",
+      "tier": "mainstream",
+      "old_price": "683983236.00",
+      "new_price": "678928976",
+      "old_location": "Hue, VN",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 211,
+      "vehicle": "2003 Toyota Highlander Base",
+      "tier": "mainstream",
+      "old_price": "351118594.00",
+      "new_price": "349600000",
+      "old_location": "Hue, VN",
+      "new_location": "Vung Tau, VN"
+    },
+    {
+      "listing_id": 212,
+      "vehicle": "2013 Toyota Prius Two",
+      "tier": "mainstream",
+      "old_price": "354721783.00",
+      "new_price": "356168697",
+      "old_location": "Vung Tau, VN",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 213,
+      "vehicle": "2012 Toyota Prius Three",
+      "tier": "mainstream",
+      "old_price": "321155723.00",
+      "new_price": "344079643",
+      "old_location": "HCMC, VN",
+      "new_location": "Hai Phong, VN"
+    },
+    {
+      "listing_id": 214,
+      "vehicle": "2011 Toyota Prius Three",
+      "tier": "mainstream",
+      "old_price": "340171204.00",
+      "new_price": "317550125",
+      "old_location": "HCMC, VN",
+      "new_location": "Bien Hoa, VN"
+    },
+    {
+      "listing_id": 215,
+      "vehicle": "2013 Toyota RAV4 LE",
+      "tier": "mainstream",
+      "old_price": "396787280.00",
+      "new_price": "414799834",
+      "old_location": "Hue, VN",
+      "new_location": "Hanoi, VN"
+    },
+    {
+      "listing_id": 216,
+      "vehicle": "2012 Toyota RAV4 Base",
+      "tier": "mainstream",
+      "old_price": "349600000.00",
+      "new_price": "372920677",
+      "old_location": "HCMC, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 218,
+      "vehicle": "2014 Toyota Sienna LE 7-Passenger Mobility Auto Access",
+      "tier": "mainstream",
+      "old_price": "521155451.00",
+      "new_price": "540600842",
+      "old_location": "Hue, VN",
+      "new_location": "Da Nang, VN"
+    },
+    {
+      "listing_id": 219,
+      "vehicle": "2013 Toyota Sienna LE 7-Passenger Mobility Auto Access",
+      "tier": "mainstream",
+      "old_price": "423200000.00",
+      "new_price": "432459804",
+      "old_location": "Hanoi, VN",
+      "new_location": "Binh Duong, VN"
+    },
+    {
+      "listing_id": 220,
+      "vehicle": "2012 Toyota Sienna LE 8-Passenger",
+      "tier": "mainstream",
+      "old_price": "440377014.00",
+      "new_price": "423200000",
+      "old_location": "HCMC, VN",
+      "new_location": "Can Tho, VN"
+    },
+    {
+      "listing_id": 221,
+      "vehicle": "2013 Toyota Tacoma PreRunner V6",
+      "tier": "mainstream",
+      "old_price": "587871026.00",
+      "new_price": "579949672",
+      "old_location": "Can Tho, VN",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 222,
+      "vehicle": "2013 Toyota Tacoma V6",
+      "tier": "mainstream",
+      "old_price": "648255791.00",
+      "new_price": "625644339",
+      "old_location": "HCMC, VN",
+      "new_location": "HCMC, VN"
+    },
+    {
+      "listing_id": 223,
+      "vehicle": "2011 Toyota Tacoma V6",
+      "tier": "mainstream",
+      "old_price": "547998822.00",
+      "new_price": "574194016",
+      "old_location": "Nha Trang, VN",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 224,
+      "vehicle": "2014 Volkswagen Jetta SE PZEV",
+      "tier": "mainstream",
+      "old_price": "299537299.00",
+      "new_price": "291381011",
+      "old_location": "Da Nang, VN",
+      "new_location": "Nha Trang, VN"
+    },
+    {
+      "listing_id": 225,
+      "vehicle": "2013 Volkswagen Jetta SE PZEV",
+      "tier": "mainstream",
+      "old_price": "269741248.00",
+      "new_price": "278960583",
+      "old_location": "HCMC, VN",
+      "new_location": "Hue, VN"
+    },
+    {
+      "listing_id": 226,
+      "vehicle": "2012 Volkswagen Jetta SE PZEV",
+      "tier": "mainstream",
+      "old_price": "229811819.00",
+      "new_price": "251866539",
+      "old_location": "Hanoi, VN",
+      "new_location": "Vung Tau, VN"
     }
   ]
 }

@@ -21,7 +21,7 @@ export const editorialArticles: EditorialArticle[] = [
       "Look for easy-to-own models with strong reliability, simple controls, and a price point that leaves room for insurance and maintenance.",
     readTime: "4 min read",
     image:
-      "https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=1200&q=80",
+      "https://img.freepik.com/premium-photo/cars-parking-lot-evening-light-sun_150893-219.jpg",
     takeaways: [
       "Choose a car with wide parts availability and a strong service network.",
       "Prioritize visibility, safety tech, and predictable running costs over extra power.",
@@ -129,7 +129,7 @@ export const editorialArticles: EditorialArticle[] = [
       "A new car is not always the cheaper choice, but it can be the better one when financing, warranty, and resale all line up.",
     readTime: "3 min read",
     image:
-      "https://images.unsplash.com/photo-1549924231-f129b911e442?auto=format&fit=crop&w=1200&q=80",
+      "https://www.cashforcars.com/content/uploads/2019/02/man-handing-woman-car-keys-700x460-main-min.jpg",
     takeaways: [
       "Low financing rates can narrow the gap between new and lightly used.",
       "Factory warranty matters more if you want predictable ownership costs.",

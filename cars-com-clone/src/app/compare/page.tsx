@@ -1195,7 +1195,7 @@ function ComparePageContent() {
     openAssistant({
       marketId,
       variantId: recommendedItem?.variant_id ?? leftSelection?.variantId ?? undefined,
-      variantLabel: compareTitle,
+      variantLabel: recommendedItem ? buildCompareItemLabel(recommendedItem) : vehicleLabels[0] ?? undefined,
       compareVariantIds: [leftSelection?.variantId ?? 0, rightSelection?.variantId ?? 0].filter((value) =>
         Number.isInteger(value) && value > 0
       ),

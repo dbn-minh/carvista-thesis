@@ -4,7 +4,15 @@ import { mapAiChatErrorToResponse } from "./error_mapper.service.js";
 import { orchestrateChatRequest } from "./chat_orchestrator.service.js";
 import { classifyIntent } from "./intent_classifier.service.js";
 import { logAiEvent } from "./logger.service.js";
-import { pickNextDiscoveryQuestion } from "./question_policy.service.js";
+import {
+  ADVISOR_DISCOVERY_QUESTIONS,
+  buildProfileSnapshot as buildAdvisorProfileSnapshot,
+  countAnsweredProfileQuestions,
+  extractAdvisorProfilePatch as extractAdvisorProfilePatchFromProfile,
+  getQuestionByKey,
+  mergePreferenceProfiles,
+  pickNextDiscoveryQuestion as pickNextDiscoveryQuestionFromProfile,
+} from "./advisor_profile.service.js";
 import {
   buildActiveTopic,
   buildConversationState,
@@ -13,64 +21,9 @@ import {
   pruneConversationContext,
 } from "./conversation_state.service.js";
 
-const PROFILE_QUESTIONS = [
-  {
-    key: "budget_max",
-    question: "What budget are you targeting for the car itself?",
-    examples: ["under 1 billion VND", "around 30,000 USD", "800 million VND"],
-    required: true,
-  },
-  {
-    key: "environment",
-    question: "Do you mostly drive in a city, mixed area, or rural roads?",
-    examples: ["mostly city traffic", "mixed city and highway", "mainly rural roads"],
-    required: true,
-  },
-  {
-    key: "long_trip_habit",
-    question: "Do you often take long highway or weekend trips?",
-    examples: ["yes, almost every weekend", "sometimes", "rarely"],
-    required: true,
-  },
-  {
-    key: "passenger_count",
-    question: "How many people do you usually carry in one trip?",
-    examples: ["just me", "2 to 4 people", "family of 6"],
-    required: true,
-  },
-  {
-    key: "preferred_body_type",
-    question: "Do you already prefer a body style such as sedan, SUV, hatchback, MPV, or pickup?",
-    examples: ["SUV", "sedan", "no strong preference"],
-    required: false,
-  },
-  {
-    key: "preferred_fuel_type",
-    question: "Would you rather own gasoline, hybrid, plug-in hybrid, or EV?",
-    examples: ["hybrid", "EV", "no strong preference"],
-    required: false,
-  },
-  {
-    key: "new_vs_used",
-    question: "Are you looking for something close to new, definitely used, or are you open to either?",
-    examples: ["new only", "used is fine", "either works"],
-    required: false,
-  },
-  {
-    key: "maintenance_sensitivity",
-    question: "How sensitive are you to maintenance cost and repair complexity?",
-    examples: ["very sensitive", "I want the simplest ownership path", "I can accept some complexity"],
-    required: false,
-  },
-  {
-    key: "brand_openness",
-    question: "Are you open to any brand, or do you already have a shortlist?",
-    examples: ["open to any brand", "Japanese brands only", "I prefer BMW or Mercedes"],
-    required: false,
-  },
-];
+const PROFILE_QUESTIONS = ADVISOR_DISCOVERY_QUESTIONS;
 
-const QUESTION_BY_KEY = Object.fromEntries(PROFILE_QUESTIONS.map((item) => [item.key, item]));
+const QUESTION_BY_KEY = Object.fromEntries(PROFILE_QUESTIONS.map((item) => [item.key, getQuestionByKey(item.key) ?? item]));
 const REQUIRED_QUESTION_KEYS = PROFILE_QUESTIONS.filter((item) => item.required).map((item) => item.key);
 const OPTIONAL_QUESTION_KEYS = PROFILE_QUESTIONS.filter((item) => !item.required).map((item) => item.key);
 
@@ -171,15 +124,17 @@ function formatCompactMoney(value) {
 
 function humanizeQuestionKey(key) {
   const map = {
-    budget_max: "Budget",
-    environment: "Driving environment",
-    long_trip_habit: "Trip habit",
-    passenger_count: "Passenger count",
-    preferred_body_type: "Body style",
-    preferred_fuel_type: "Fuel type",
-    new_vs_used: "New or used",
-    maintenance_sensitivity: "Maintenance sensitivity",
-    brand_openness: "Brand openness",
+    primary_use_cases: "Main use case",
+    budget_range: "Budget range",
+    passenger_setup: "Passenger and seating needs",
+    driving_conditions: "Driving conditions",
+    top_priorities: "Top priorities",
+    tradeoff_preferences: "Trade-off preference",
+    preferred_body_types: "Body style preference",
+    preferred_fuel_types: "Fuel preference",
+    brand_preferences: "Brand preference",
+    must_have_features: "Must-have features",
+    buying_timeline: "Buying timeline",
   };
 
   return map[key] || key;
@@ -515,87 +470,27 @@ function extractAnswerForQuestion(questionKey, message) {
   }
 }
 
-function extractAdvisorProfilePatch(message, expectedQuestionKey = null) {
-  const patch = {};
-
-  if (expectedQuestionKey) {
-    setIfPresent(patch, expectedQuestionKey, extractAnswerForQuestion(expectedQuestionKey, message));
-  }
-
-  setIfPresent(patch, "budget_max", extractBudget(message));
-  setIfPresent(patch, "environment", extractEnvironment(message));
-  setIfPresent(patch, "long_trip_habit", extractLongTripHabit(message));
-  setIfPresent(patch, "passenger_count", extractPassengerCount(message));
-  setIfPresent(patch, "preferred_body_type", extractBodyTypePreference(message));
-  setIfPresent(patch, "preferred_fuel_type", extractFuelPreference(message));
-  setIfPresent(patch, "favorite_color", extractFavoriteColor(message));
-  setIfPresent(patch, "personality", extractPersonality(message));
-  setIfPresent(patch, "new_vs_used", extractNewVsUsed(message));
-  setIfPresent(patch, "maintenance_sensitivity", extractMaintenanceSensitivity(message));
-  setIfPresent(patch, "brand_openness", extractBrandOpenness(message));
-
-  return patch;
+function extractAdvisorProfilePatch(message, expectedQuestionKey = null, currentProfile = {}) {
+  return extractAdvisorProfilePatchFromProfile(message, expectedQuestionKey, currentProfile);
 }
 
 function nextAdvisorQuestion(profile, mode = "required") {
   const candidates = (mode === "required" ? REQUIRED_QUESTION_KEYS : OPTIONAL_QUESTION_KEYS)
     .map((key) => QUESTION_BY_KEY[key])
     .filter(Boolean);
-  return pickNextDiscoveryQuestion(profile, candidates, mode);
+  return pickNextDiscoveryQuestionFromProfile(profile, candidates, mode);
 }
 
 function mergeAdvisorProfile(currentProfile, patch) {
-  return {
-    ...(currentProfile || {}),
-    ...(patch || {}),
-  };
+  return mergePreferenceProfiles(currentProfile, patch);
 }
 
 function countAnsweredQuestions(profile) {
-  return PROFILE_QUESTIONS.filter((item) => profile?.[item.key] != null).length;
+  return countAnsweredProfileQuestions(profile);
 }
 
 function buildProfileSnapshot(profile) {
-  const parts = [];
-
-  if (profile?.budget_max != null) parts.push(`budget around ${formatCompactMoney(profile.budget_max)}`);
-  if (profile?.environment) {
-    const environmentMap = {
-      city: "mostly city driving",
-      mixed: "a mix of city and highway driving",
-      rural: "mostly rural or rougher roads",
-    };
-    parts.push(environmentMap[profile.environment] || profile.environment);
-  }
-  if (profile?.long_trip_habit) {
-    const tripMap = {
-      frequent: "frequent long trips",
-      occasional: "occasional longer trips",
-      rare: "mostly shorter local trips",
-    };
-    parts.push(tripMap[profile.long_trip_habit] || profile.long_trip_habit);
-  }
-  if (profile?.passenger_count != null) {
-    parts.push(`usually ${profile.passenger_count} passenger${profile.passenger_count === 1 ? "" : "s"}`);
-  }
-  if (profile?.preferred_body_type && profile.preferred_body_type !== "any") parts.push(`leans toward ${profile.preferred_body_type} body styles`);
-  if (profile?.preferred_fuel_type && profile.preferred_fuel_type !== "any") parts.push(`prefers ${profile.preferred_fuel_type} powertrains`);
-  if (profile?.preferred_body_type === "any") parts.push("no strong body-style preference");
-  if (profile?.preferred_fuel_type === "any") parts.push("no strong fuel-type preference");
-  if (profile?.new_vs_used && profile.new_vs_used !== "either") parts.push(`${profile.new_vs_used} vehicle preference`);
-  if (profile?.new_vs_used === "either") parts.push("open to both new and used options");
-  if (profile?.maintenance_sensitivity) {
-    const maintenanceMap = {
-      high: "cares a lot about keeping maintenance simple",
-      medium: "wants a balanced ownership-cost profile",
-      low: "is open to a more complex ownership path if the car is worth it",
-    };
-    parts.push(maintenanceMap[profile.maintenance_sensitivity] || profile.maintenance_sensitivity);
-  }
-  if (profile?.brand_openness === "open") parts.push("open to different brands");
-  if (profile?.brand_openness === "shortlist") parts.push("already leans toward a shortlist of brands");
-
-  return parts.length > 0 ? parts.join(", ") : "I am still collecting your driving profile";
+  return buildAdvisorProfileSnapshot(profile);
 }
 
 function buildQuestionPrompt(question) {
@@ -862,6 +757,17 @@ function formatCardValue(value, currency = "") {
   }`;
 }
 
+function compactInsight(value, maxLength = 88) {
+  const text = String(value || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[|]+/g, ", ");
+  if (!text) return null;
+  const normalized = text.replace(/[.]+$/g, "");
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
 function buildCardsFromStructuredResult(intent, structuredResult, advisor_profile, nextQuestion = null) {
   if (!structuredResult) {
     return intent === "recommend_car" ? buildProfileProgressCards(advisor_profile, nextQuestion) : [];
@@ -874,17 +780,17 @@ function buildCardsFromStructuredResult(intent, structuredResult, advisor_profil
             title: "Verdict",
             value: structuredResult.recommendation?.winner || "Comparison ready",
             description:
-              structuredResult.recommendation?.reason ||
-              "Use the side-by-side strengths and weaknesses below as the decision anchor.",
+              compactInsight(structuredResult.recommendation?.reason) ||
+              "Use this as the main decision anchor.",
           }
         : null;
 
     const vehicleCards = (structuredResult.vehicles ?? []).map((vehicle) => ({
       title: vehicle.name,
-      value: vehicle.variant_id != null ? `Variant #${vehicle.variant_id}` : "Compared vehicle",
+      value: null,
       description: [
-        vehicle.pros?.length ? `Pros: ${vehicle.pros.slice(0, 2).join(", ")}` : null,
-        vehicle.cons?.length ? `Cons: ${vehicle.cons.slice(0, 2).join(", ")}` : null,
+        vehicle.pros?.length ? `Strength: ${compactInsight(vehicle.pros[0])}` : null,
+        vehicle.cons?.length ? `Watch-out: ${compactInsight(vehicle.cons[0])}` : null,
       ]
         .filter(Boolean)
         .join(" | "),
@@ -1159,7 +1065,10 @@ function buildFollowUpQuestions(intent, structuredResult, { focus_variant_id, ne
     return [nextOptionalQuestion.question];
   }
   if (intent === "recommend_car") {
-    return ["Want me to compare the top recommendation with another car or explain the ownership cost?"];
+    return [
+      "Want me to narrow this down by comfort, ownership cost, or family use?",
+      "Want me to compare the top two options side by side?",
+    ];
   }
   return ["If you want, I can help with car comparison, price outlook, or ownership costs next."];
 }
@@ -1416,7 +1325,7 @@ export async function chatAdvisor(ctx, input) {
       ? persistedContext.pending_flow
       : pendingFlowFromState;
   const existingProfile = persistedContext.advisor_profile || {};
-  const profilePatch = extractAdvisorProfilePatch(message, initialPendingQuestion?.key ?? null);
+  const profilePatch = extractAdvisorProfilePatch(message, initialPendingQuestion?.key ?? null, existingProfile);
   const recognizedPendingQuestion = initialPendingQuestion ? hasOwn(profilePatch, initialPendingQuestion.key) : false;
   const advisor_profile = mergeAdvisorProfile(existingProfile, profilePatch);
   const legacyIntent = detectIntent(message);

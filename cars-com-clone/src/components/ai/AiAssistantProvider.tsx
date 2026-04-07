@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Loader2, MessageCircleMore, Scale, SendHorizonal, Sparkles, X } from "lucide-react";
+import { Loader2, MessageCircleMore, RotateCcw, Scale, SendHorizonal, Sparkles, X } from "lucide-react";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import {
   Dialog,
@@ -96,6 +96,13 @@ const starterPrompts = [
   "Help me understand whether this car fits my needs.",
 ];
 
+const compareStarterPrompts = [
+  "Which is better for a family of 5?",
+  "Which one is cheaper to own over 5 years?",
+  "Which one is better for resale?",
+  "Give me the pros and cons only.",
+];
+
 const emptyCompareState: CompareState = {
   open: false,
   variantId: null,
@@ -121,12 +128,29 @@ function buildId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function isProfileProgressCard(card: AiInsightCard) {
+  const title = String(card.title || "").trim().toLowerCase();
+  const value = String(card.value || "").trim().toLowerCase();
+
+  return (
+    title === "buyer profile" ||
+    title === "profile so far" ||
+    value.includes("answers saved")
+  );
+}
+
+function sanitizeInsightCards(cards?: AiInsightCard[]) {
+  if (!cards || cards.length === 0) return [];
+  return cards.filter((card) => !isProfileProgressCard(card));
+}
+
 function InsightCards({ cards }: { cards?: AiInsightCard[] }) {
-  if (!cards || cards.length === 0) return null;
+  const visibleCards = sanitizeInsightCards(cards);
+  if (visibleCards.length === 0) return null;
 
   return (
     <div className="mt-3 grid gap-3">
-      {cards.map((card, index) => (
+      {visibleCards.map((card, index) => (
         <article
           key={`${card.title}-${index}`}
           className="rounded-[22px] border border-cars-gray-light/70 bg-white px-4 py-4 shadow-sm"
@@ -249,18 +273,24 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
   const [queuedPrompt, setQueuedPrompt] = useState("");
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const conversationVersionRef = useRef(0);
 
   useEffect(() => {
     if (!open || messages.length > 0) return;
+    const hasComparePair = compareContext.labels.length >= 2;
+    const comparePairLabel = hasComparePair
+      ? buildComparePairLabel(compareContext.labels)
+      : null;
     setMessages([
       {
         id: buildId("assistant"),
         role: "assistant",
-        content:
-          "Hi, I am your CarVista advisor. Tell me about your budget, how you drive, and what kind of car you like, and I will guide you through the best fit.",
+        content: hasComparePair
+          ? `I have ${comparePairLabel} loaded and ready to compare. Ask about family use, resale, ownership cost, comfort, or tell me what matters most to you.`
+          : "Hi, I am your CarVista advisor. Tell me about your budget, how you drive, and what kind of car you like, and I will guide you through the best fit.",
       },
     ]);
-  }, [open, messages.length]);
+  }, [compareContext.labels, messages.length, open]);
 
   useEffect(() => {
     if (!transcriptRef.current) return;
@@ -327,20 +357,52 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
     openAuth({ mode: "login", next: nextPath || pathname || "/" });
   }
 
+  function resetConversationState({ clearProfile = false }: { clearProfile?: boolean } = {}) {
+    conversationVersionRef.current += 1;
+    setSessionId(null);
+    setMessages([]);
+    setInput("");
+    setQueuedPrompt("");
+    setChatError("");
+    setSending(false);
+    if (clearProfile) {
+      setStoredAdvisorProfile({});
+    }
+  }
+
   function launchAssistant(options?: AssistantOptions) {
+    const nextCompareVariantIds = (options?.compareVariantIds ?? []).filter((value) =>
+      Number.isInteger(value)
+    );
+    const nextCompareVariantLabels = (options?.compareVariantLabels ?? [])
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+    const isCompareLaunch = nextCompareVariantIds.length >= 2;
+    const contextChanged =
+      (options?.variantId ?? null) !== focusVariantId ||
+      nextCompareVariantIds.join(",") !== compareContext.variantIds.join(",");
+
     setOpen(true);
     if (options?.marketId) setMarketId(String(options.marketId));
     setFocusVariantId(options?.variantId ?? null);
     setFocusVariantLabel(options?.variantLabel || "");
     setCompareContext({
-      variantIds: (options?.compareVariantIds ?? []).filter((value) => Number.isInteger(value)),
-      labels: (options?.compareVariantLabels ?? []).map((value) => String(value || "").trim()).filter(Boolean),
+      variantIds: nextCompareVariantIds,
+      labels: nextCompareVariantLabels,
     });
+
+    if (isCompareLaunch || contextChanged) {
+      resetConversationState();
+    }
 
     if (options?.prompt) {
       setInput(options.prompt);
       setQueuedPrompt(options.prompt);
     }
+  }
+
+  function startNewConversation() {
+    resetConversationState({ clearProfile: true });
   }
 
   function launchCompare(options: CompareOptions) {
@@ -398,6 +460,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
     setMessages((prev) => [...prev, { id: buildId("user"), role: "user", content: text }]);
     setInput("");
     setSending(true);
+    const requestVersion = conversationVersionRef.current;
 
     try {
       const compareAwareText =
@@ -420,6 +483,8 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
         },
       });
 
+      if (requestVersion !== conversationVersionRef.current) return;
+
       setSessionId(response.session_id);
       setStoredAdvisorProfile(response.advisor_profile ?? {});
       setMessages((prev) => [
@@ -428,7 +493,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
           id: buildId("assistant"),
           role: "assistant",
           content: response.answer,
-          cards: response.cards,
+          cards: sanitizeInsightCards(response.cards),
           followUps: response.follow_up_questions,
           confidence: response.confidence ?? null,
           sources: response.sources ?? [],
@@ -438,9 +503,12 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
         },
       ]);
     } catch (error) {
+      if (requestVersion !== conversationVersionRef.current) return;
       setChatError(error instanceof Error ? error.message : "Chat failed.");
     } finally {
-      setSending(false);
+      if (requestVersion === conversationVersionRef.current) {
+        setSending(false);
+      }
     }
   }
 
@@ -516,6 +584,9 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
     [authenticated, focusVariantId, focusVariantLabel, marketId, pathname]
   );
 
+  const activeStarterPrompts =
+    compareContext.labels.length >= 2 ? compareStarterPrompts : starterPrompts;
+
   return (
     <AiAssistantContext.Provider value={contextValue}>
       {children}
@@ -534,13 +605,23 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                     Ask for recommendations, compare cars, forecast pricing, or understand TCO.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={startNewConversation}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    New chat
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    className="rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="mt-4 flex items-center gap-3 text-xs text-white/80">
@@ -631,7 +712,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
 
               {messages.length <= 1 ? (
                 <div className="flex flex-wrap gap-2">
-                  {starterPrompts.map((prompt) => (
+                  {activeStarterPrompts.map((prompt) => (
                     <button
                       key={prompt}
                       type="button"
