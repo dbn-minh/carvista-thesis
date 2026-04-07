@@ -8,6 +8,7 @@ import PageIntelligencePanel from "@/components/ai/PageIntelligencePanel";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import PriceHistoryChart from "@/components/catalog/PriceHistoryChart";
 import Header from "@/components/layout/Header";
+import StarRating from "@/components/reviews/StarRating";
 import StatusBanner from "@/components/common/StatusBanner";
 import { catalogApi, reviewsApi, watchlistApi } from "@/lib/carvista-api";
 import { hasToken, toCurrency } from "@/lib/api-client";
@@ -28,7 +29,7 @@ export default function CatalogDetailPage() {
   const { openAuth } = useAuthModal();
   const id = Number(params.id);
 
-  const [marketId, setMarketId] = useState("1");
+  const [marketId] = useState("1");
   const [ownershipYears, setOwnershipYears] = useState("5");
   const [detail, setDetail] = useState<VariantDetail | null>(null);
   const [priceHistory, setPriceHistory] = useState<Array<Record<string, unknown>>>([]);
@@ -40,7 +41,7 @@ export default function CatalogDetailPage() {
   const [tone, setTone] = useState<"success" | "error" | "info">("info");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  const [rating, setRating] = useState("5");
+  const [rating, setRating] = useState(5);
   const [title, setTitle] = useState("Good car");
   const [comment, setComment] = useState("Solid value for money.");
 
@@ -99,11 +100,6 @@ export default function CatalogDetailPage() {
     setSelectedImage(gallery[0] || null);
   }, [gallery]);
 
-  async function reloadHistory(e: FormEvent) {
-    e.preventDefault();
-    await load(Number(marketId), Number(ownershipYears));
-  }
-
   async function saveVariant() {
     if (!hasToken()) {
       openAuth({ mode: "login", next: `/catalog/${id}` });
@@ -130,7 +126,7 @@ export default function CatalogDetailPage() {
     try {
       await reviewsApi.createCarReview({
         variant_id: id,
-        rating: Number(rating),
+        rating,
         title,
         comment,
       });
@@ -142,6 +138,11 @@ export default function CatalogDetailPage() {
       setTone("error");
       setMessage(error instanceof Error ? error.message : "Review failed");
     }
+  }
+
+  async function changeOwnershipYears(nextValue: string) {
+    setOwnershipYears(nextValue);
+    await load(Number(marketId), Number(nextValue));
   }
 
   const heading = useMemo(() => {
@@ -287,8 +288,14 @@ export default function CatalogDetailPage() {
             subjectId={id}
             marketId={Number(marketId) || 1}
             ownershipYears={Number(ownershipYears) || 5}
-            title="AI ownership, fit, and market preview"
+            title="AI ownership and buyer-fit preview"
             className="mb-8"
+            compactLayout
+            hiddenSectionKeys={["price_outlook"]}
+            allowedActionPathTypes={["related_listings"]}
+            showSectionCaveats={false}
+            showSectionSources={false}
+            showCompactSourceSummary={false}
           />
         ) : null}
 
@@ -298,50 +305,10 @@ export default function CatalogDetailPage() {
               <div>
                 <h2 className="text-2xl font-apercu-bold text-cars-primary">Price history</h2>
                 <p className="mt-3 text-sm leading-6 text-cars-gray">
-                  Review the recent market trail, then let AI turn it into a buyer-friendly price
-                  outlook for this exact vehicle.
+                  Review the recent market trail for this exact vehicle before judging the current
+                  market position.
                 </p>
               </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  openAssistant({
-                    prompt: `Predict the future price of ${heading} over the next 6 months.`,
-                    marketId: Number(marketId) || 1,
-                    variantId: id,
-                    variantLabel: heading,
-                  })
-                }
-                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
-              >
-                Get AI price outlook
-              </button>
-            </div>
-            <form onSubmit={reloadHistory} className="mt-5 flex gap-3">
-              <input
-                value={marketId}
-                onChange={(e) => setMarketId(e.target.value)}
-                className="h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
-                placeholder="Market ID"
-              />
-              <button
-                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary"
-                type="submit"
-              >
-                Refresh data
-              </button>
-            </form>
-            <div className="mt-3">
-              <select
-                value={ownershipYears}
-                onChange={(e) => setOwnershipYears(e.target.value)}
-                className="h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm text-cars-primary"
-              >
-                <option value="3">3-year ownership</option>
-                <option value="5">5-year ownership</option>
-                <option value="7">7-year ownership</option>
-              </select>
             </div>
             <PriceHistoryChart rows={priceHistory} />
           </div>
@@ -356,20 +323,31 @@ export default function CatalogDetailPage() {
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() =>
-                  openAssistant({
-                    prompt: `Explain the ownership cost of ${heading} and the biggest cost drivers.`,
-                    marketId: Number(marketId) || 1,
-                    variantId: id,
-                    variantLabel: heading,
-                  })
-                }
-                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
-              >
-                Discuss this estimate with AI
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={ownershipYears}
+                  onChange={(e) => void changeOwnershipYears(e.target.value)}
+                  className="h-10 rounded-full border border-cars-gray-light px-3 text-sm text-cars-primary"
+                >
+                  <option value="3">3 years</option>
+                  <option value="5">5 years</option>
+                  <option value="7">7 years</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() =>
+                    openAssistant({
+                      prompt: `Explain the ownership-cost estimate for ${heading}. Use the loaded catalog variant context. Keep it short and buyer-friendly. Explain the simple formula: drive-away estimate plus recurring ownership costs over ${ownershipYears} years. Mention only the biggest assumptions and avoid raw source names, dates, or technical audit details.`,
+                      marketId: Number(marketId) || 1,
+                      variantId: id,
+                      variantLabel: heading,
+                    })
+                  }
+                  className="rounded-full border border-cars-primary/15 px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+                >
+                  Discuss estimate
+                </button>
+              </div>
             </div>
 
             {ownershipSummary?.estimate ? (
@@ -424,12 +402,12 @@ export default function CatalogDetailPage() {
             Reviews require login and help build the user-generated feedback layer of CarVista.
           </p>
           <form onSubmit={submitReview} className="mt-5 space-y-3">
-            <input
-              className="h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
-              value={rating}
-              onChange={(e) => setRating(e.target.value)}
-              placeholder="rating 1-5"
-            />
+            <div className="rounded-[24px] border border-cars-gray-light/70 bg-cars-off-white/60 px-4 py-4 dark:bg-slate-950/40">
+              <p className="text-sm font-semibold text-cars-primary">Your rating</p>
+              <div className="mt-3">
+                <StarRating value={rating} onChange={setRating} size="lg" showValue={false} />
+              </div>
+            </div>
             <input
               className="h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
               value={title}
@@ -460,10 +438,10 @@ export default function CatalogDetailPage() {
                 key={review.car_review_id || index}
                 className="rounded-[22px] border border-cars-gray-light/70 p-4 text-sm"
               >
-                <p className="font-medium text-cars-primary">
-                  {review.title || `Rating ${review.rating}/5`}
-                </p>
-                <p className="mt-2 text-cars-gray">Rating: {review.rating}/5</p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="font-medium text-cars-primary">{review.title || "Car review"}</p>
+                  <StarRating value={Number(review.rating || 0)} size="sm" showValue={false} />
+                </div>
                 <p className="mt-2 text-cars-gray">{review.comment || "-"}</p>
               </div>
             ))}

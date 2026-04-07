@@ -7,6 +7,7 @@ type Props = {
   onChange?: (value: number) => void;
   size?: "sm" | "md" | "lg";
   label?: string;
+  showValue?: boolean;
 };
 
 const sizeClasses = {
@@ -20,6 +21,7 @@ export default function StarRating({
   onChange,
   size = "md",
   label,
+  showValue = false,
 }: Props) {
   return (
     <div className="flex items-center gap-2">
@@ -59,7 +61,7 @@ export default function StarRating({
           );
         })}
       </div>
-      <span className="text-sm font-medium text-cars-gray">{value}/5</span>
+      {showValue ? <span className="text-sm font-medium text-cars-gray">{value}/5</span> : null}
     </div>
   );
 }

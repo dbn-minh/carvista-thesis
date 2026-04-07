@@ -419,7 +419,7 @@ test("recommendation service returns deep links into vehicle detail and related 
 
   assert.equal(result.intent, "recommend_car");
   assert.ok(result.ranked_vehicles[0].links?.detail_page_url?.includes("/catalog/7"));
-  assert.ok(result.ranked_vehicles[0].links?.related_listings_url?.includes("/listings?variantId=7"));
+  assert.ok(result.ranked_vehicles[0].links?.related_listings_url?.includes("/listings?mode=match&variantId=7"));
   assert.deepEqual(result.ranked_vehicles[0].links?.related_listing_ids, [101, 102]);
   assert.ok(result.ranked_vehicles[0].reasons.some((reason) => /owner sentiment|market/i.test(reason)));
   assert.ok(result.ranked_vehicles[0].market_summary?.includes("live-style"));

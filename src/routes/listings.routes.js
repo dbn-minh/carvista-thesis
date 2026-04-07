@@ -733,23 +733,115 @@ const UpdateListingSchema = z.object({
   params: z.any(),
 });
 
+const SOLD_LISTING_MARKET_ID = 1;
+const SOLD_LISTING_PRICE_TYPE = "avg_market";
+
+function toFinitePrice(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+}
+
+async function recordSoldListingMarketPrice({
+  VariantPriceHistory,
+  listingId,
+  variantId,
+  price,
+  soldAt,
+  transaction,
+}) {
+  const soldPrice = toFinitePrice(price);
+  const resolvedVariantId = Number(variantId);
+  if (!Number.isInteger(resolvedVariantId) || !soldPrice) return null;
+
+  const source = `seller_sold_listing:${listingId}`;
+  const existing = await VariantPriceHistory.findOne({
+    where: {
+      variant_id: resolvedVariantId,
+      market_id: SOLD_LISTING_MARKET_ID,
+      price_type: SOLD_LISTING_PRICE_TYPE,
+      source,
+    },
+    transaction,
+  });
+
+  if (existing) {
+    await existing.update(
+      {
+        price: soldPrice,
+        captured_at: soldAt,
+      },
+      { transaction }
+    );
+    return existing;
+  }
+
+  return VariantPriceHistory.create(
+    {
+      variant_id: resolvedVariantId,
+      market_id: SOLD_LISTING_MARKET_ID,
+      price_type: SOLD_LISTING_PRICE_TYPE,
+      price: soldPrice,
+      captured_at: soldAt,
+      source,
+    },
+    { transaction }
+  );
+}
+
 listingsRoutes.put("/listings/:id", requireAuth, validate(UpdateListingSchema), async (req, res, next) => {
+  let transaction = null;
   try {
-    const { Listings, ListingPriceHistory } = req.ctx.models;
+    transaction = await req.ctx.sequelize.transaction();
+    const { Listings, ListingPriceHistory, VariantPriceHistory } = req.ctx.models;
     const id = Number(req.params.id);
 
-    const listing = await Listings.findByPk(id);
-    if (!listing) return next({ status: 404, message: "Listing not found" });
-    if (listing.owner_id !== req.user.userId) return next({ status: 403, message: "Forbidden" });
+    const listing = await Listings.findByPk(id, { transaction });
+    if (!listing) {
+      await transaction.rollback();
+      transaction = null;
+      return next({ status: 404, message: "Listing not found" });
+    }
+    if (listing.owner_id !== req.user.userId) {
+      await transaction.rollback();
+      transaction = null;
+      return next({ status: 403, message: "Forbidden" });
+    }
 
     const b = req.validated.body;
+    const previousStatus = listing.status;
+    const nextStatus = b.status ?? previousStatus;
+    const salePrice = b.asking_price != null ? b.asking_price : listing.asking_price;
+    const shouldRecordSoldMarketPrice =
+      nextStatus === "sold" &&
+      (previousStatus !== "sold" ||
+        (b.asking_price != null && Number(b.asking_price) !== Number(listing.asking_price)));
 
     // record price history if price changes
     if (b.asking_price != null && Number(b.asking_price) !== Number(listing.asking_price)) {
-      await ListingPriceHistory.create({ listing_id: id, price: b.asking_price, note: "user_update" });
+      await ListingPriceHistory.create(
+        { listing_id: id, price: b.asking_price, note: "user_update" },
+        { transaction }
+      );
     }
 
-    await listing.update(b);
+    await listing.update(b, { transaction });
+
+    if (shouldRecordSoldMarketPrice) {
+      await recordSoldListingMarketPrice({
+        VariantPriceHistory,
+        listingId: id,
+        variantId: listing.variant_id,
+        price: salePrice,
+        soldAt: new Date(),
+        transaction,
+      });
+    }
+
+    await transaction.commit();
+    transaction = null;
     res.json({ ok: true });
-  } catch (e) { next(e); }
+  } catch (e) {
+    if (transaction) await transaction.rollback();
+    next(e);
+  }
 });

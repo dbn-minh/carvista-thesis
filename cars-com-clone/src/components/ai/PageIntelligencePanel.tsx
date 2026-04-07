@@ -24,6 +24,8 @@ type PageIntelligencePanelProps = {
   showActionPaths?: boolean;
   showSectionCaveats?: boolean;
   showSectionSources?: boolean;
+  showCompactSourceSummary?: boolean;
+  allowedActionPathTypes?: string[];
 };
 
 function formatCardValue(title: string, value: string | number | null | undefined) {
@@ -40,6 +42,12 @@ function formatCardValue(title: string, value: string | number | null | undefine
   }
 
   return new Intl.NumberFormat("vi-VN").format(value);
+}
+
+function compactText(value: string, maxLength = 170) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength).trimEnd()}...`;
 }
 
 function ActionLink({ path }: { path: AiActionPath }) {
@@ -77,6 +85,8 @@ export default function PageIntelligencePanel({
   showActionPaths = true,
   showSectionCaveats = true,
   showSectionSources = true,
+  showCompactSourceSummary = true,
+  allowedActionPathTypes,
 }: PageIntelligencePanelProps) {
   const [data, setData] = useState<AiPageIntelligenceResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,6 +106,19 @@ export default function PageIntelligencePanel({
     () => (data?.sections ?? []).filter((section) => !hiddenSectionKeys.includes(section.key)),
     [data?.sections, hiddenSectionKeys]
   );
+  const compactActionPaths = useMemo(() => {
+    const seen = new Set<string>();
+    return visibleSections
+      .flatMap((section) => section.action_paths ?? [])
+      .filter((path) => !allowedActionPathTypes || allowedActionPathTypes.includes(path.type))
+      .filter((path) => {
+        const key = `${path.type}-${path.url}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 3);
+  }, [allowedActionPathTypes, visibleSections]);
   const compactSourceSummary = useMemo(() => {
     const sourceProviders = [
       ...new Set(
@@ -169,7 +192,7 @@ export default function PageIntelligencePanel({
   }, [subjectType, subjectId, marketId, ownershipYears, kmPerYear, profileSignature]);
 
   return (
-    <section className={`section-shell p-6 ${className}`.trim()}>
+    <section className={`section-shell ${compactLayout ? "p-5 md:p-6" : "p-6"} ${className}`.trim()}>
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cars-accent">
@@ -177,8 +200,9 @@ export default function PageIntelligencePanel({
           </p>
           <h2 className="mt-2 text-2xl font-apercu-bold text-cars-primary">{title}</h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-cars-gray">
-            Helpful previews from the same recommendation, pricing, and ownership engines used by
-            the CarVista advisor.
+            {compactLayout
+              ? "Short, buyer-friendly signals from CarVista's pricing and ownership engines."
+              : "Helpful previews from the same recommendation, pricing, and ownership engines used by the CarVista advisor."}
           </p>
         </div>
 
@@ -213,11 +237,11 @@ export default function PageIntelligencePanel({
 
       {!loading && !error && visibleSections.length ? (
         <>
-          <div className={`mt-6 grid gap-4 ${compactLayout ? "md:grid-cols-2 xl:grid-cols-2" : "xl:grid-cols-3"}`}>
+          <div className={`mt-6 grid gap-4 ${compactLayout ? "lg:grid-cols-2" : "xl:grid-cols-3"}`}>
             {visibleSections.map((section) => (
             <article
               key={section.key}
-              className={`rounded-[26px] border border-cars-gray-light/70 bg-white px-5 py-5 shadow-sm ${
+              className={`rounded-[26px] border border-cars-gray-light/70 bg-white px-5 py-5 shadow-sm dark:border-cars-gray-light/25 dark:bg-slate-950/45 ${
                 compactLayout ? "h-full" : ""
               }`}
             >
@@ -234,14 +258,14 @@ export default function PageIntelligencePanel({
                 </div>
               </div>
 
-              <p className={`mt-4 text-sm text-cars-primary ${compactLayout ? "line-clamp-3 leading-6" : "leading-7"}`}>
-                {section.assistant_message}
+              <p className={`mt-4 text-sm text-cars-primary ${compactLayout ? "leading-6" : "leading-7"}`}>
+                {compactLayout ? compactText(section.assistant_message) : section.assistant_message}
               </p>
 
               {section.insight_cards?.length ? (
                 <div className={`mt-4 grid gap-3 ${compactLayout ? "md:grid-cols-2" : ""}`}>
                   {section.insight_cards.slice(0, compactLayout ? 1 : 2).map((card, index) => (
-                    <div key={`${card.title}-${index}`} className="rounded-[20px] bg-cars-off-white px-4 py-4">
+                    <div key={`${card.title}-${index}`} className="rounded-[20px] bg-cars-off-white px-4 py-4 dark:bg-slate-900/70">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cars-accent">
                         {card.title}
                       </p>
@@ -250,7 +274,9 @@ export default function PageIntelligencePanel({
                           {formatCardValue(card.title, card.value)}
                         </p>
                       ) : null}
-                      <p className="mt-2 text-sm leading-6 text-cars-gray">{card.description}</p>
+                      <p className="mt-2 text-sm leading-6 text-cars-gray">
+                        {compactLayout ? compactText(card.description, 130) : card.description}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -258,23 +284,33 @@ export default function PageIntelligencePanel({
 
               {section.highlights?.length ? (
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {section.highlights.slice(0, compactLayout ? 2 : 3).map((highlight) => (
+                  {section.highlights.slice(0, compactLayout ? 1 : 3).map((highlight) => (
                     <span
                       key={highlight}
-                      className="rounded-full bg-cars-off-white px-3 py-2 text-xs font-medium text-cars-primary"
+                      className="rounded-full bg-cars-off-white px-3 py-2 text-xs font-medium text-cars-primary dark:bg-slate-900/70"
                     >
-                      {highlight}
+                      {compactLayout ? compactText(highlight, 90) : highlight}
                     </span>
                   ))}
                 </div>
               ) : null}
 
-              {showActionPaths && section.action_paths?.length ? (
-                <div className="mt-5 flex flex-wrap gap-2">
-                  {section.action_paths.slice(0, 3).map((path) => (
-                    <ActionLink key={`${path.type}-${path.url}`} path={path} />
-                  ))}
-                </div>
+              {showActionPaths && !compactLayout && section.action_paths?.length ? (
+                (() => {
+                  const actionPaths = allowedActionPathTypes
+                    ? section.action_paths.filter((path) => allowedActionPathTypes.includes(path.type))
+                    : section.action_paths;
+
+                  if (!actionPaths.length) return null;
+
+                  return (
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      {actionPaths.slice(0, 3).map((path) => (
+                        <ActionLink key={`${path.type}-${path.url}`} path={path} />
+                      ))}
+                    </div>
+                  );
+                })()
               ) : null}
 
               {showSectionCaveats && section.caveats?.length ? (
@@ -290,7 +326,15 @@ export default function PageIntelligencePanel({
             ))}
           </div>
 
-          {compactLayout && compactSourceSummary ? (
+          {compactLayout && showActionPaths && compactActionPaths.length ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {compactActionPaths.map((path) => (
+                <ActionLink key={`${path.type}-${path.url}`} path={path} />
+              ))}
+            </div>
+          ) : null}
+
+          {compactLayout && showCompactSourceSummary && compactSourceSummary ? (
             <div className="mt-4 rounded-[22px] border border-cars-primary/12 bg-cars-off-white px-5 py-4 text-sm leading-6 text-cars-gray">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
                 {compactSourceSummary.title}

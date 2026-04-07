@@ -180,11 +180,11 @@ catalogRoutes.get("/catalog/variants/:id/price-history", async (req, res, next) 
 
     const items = await VariantPriceHistory.findAll({
       where: { variant_id: variantId, market_id: marketId },
-      order: [["captured_at","ASC"]],
+      order: [["captured_at","DESC"]],
       limit,
     });
 
-    res.json({ items });
+    res.json({ items: items.reverse() });
   } catch (e) { next(e); }
 });
 

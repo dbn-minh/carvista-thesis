@@ -13,7 +13,11 @@ function buildCatalogDetailUrl(variantId) {
 
 function buildRelatedListingsUrl({ variantId, query }) {
   if (Number.isInteger(variantId)) {
-    return `/listings?variantId=${variantId}`;
+    const search = new URLSearchParams({
+      mode: "match",
+      variantId: String(variantId),
+    });
+    return `/listings?${search.toString()}`;
   }
 
   const search = new URLSearchParams();
