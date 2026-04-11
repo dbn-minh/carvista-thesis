@@ -8,12 +8,12 @@ import {
   ADVISOR_DISCOVERY_QUESTIONS,
   buildProfileSnapshot as buildAdvisorProfileSnapshot,
   countAnsweredProfileQuestions,
-  extractAdvisorProfilePatch as extractAdvisorProfilePatchFromProfile,
   getQuestionByKey,
   mergePreferenceProfiles,
   pickNextDiscoveryQuestion as pickNextDiscoveryQuestionFromProfile,
   pickNextDiscoveryQuestions as pickNextDiscoveryQuestionsFromProfile,
 } from "./advisor_profile.service.js";
+import { extractAdvisorProfilePatchWithModel, formatAdvisorNextQuestionWithModel } from "./advisor_llm.service.js";
 import {
   buildActiveTopic,
   buildConversationState,
@@ -104,6 +104,7 @@ function parseFlexibleNumber(raw) {
 }
 
 function formatCompactMoney(value) {
+  if (value == null || value === "") return null;
   const amount = Number(value);
   if (!Number.isFinite(amount)) return null;
 
@@ -471,8 +472,10 @@ function extractAnswerForQuestion(questionKey, message) {
   }
 }
 
-function extractAdvisorProfilePatch(message, expectedQuestionKey = null, currentProfile = {}) {
-  return extractAdvisorProfilePatchFromProfile(message, expectedQuestionKey, currentProfile);
+async function extractAdvisorProfilePatch(message, expectedQuestionKey = null, currentProfile = {}, ctx = {}) {
+  return extractAdvisorProfilePatchWithModel(message, expectedQuestionKey, currentProfile, {
+    ollama: ctx.services?.ollama ?? ctx.ai?.ollama,
+  });
 }
 
 function nextAdvisorQuestion(profile, mode = "required") {
@@ -501,9 +504,61 @@ function buildProfileSnapshot(profile) {
   return buildAdvisorProfileSnapshot(profile);
 }
 
+function buildAdvisorState(profile = {}, pendingQuestionKey = null, candidates = []) {
+  const normalized = mergePreferenceProfiles({}, profile);
+  const tradeoff = normalized.tradeoff_preferences?.includes("performance_over_reliability")
+    ? "performance"
+    : normalized.tradeoff_preferences?.includes("reliability_over_performance")
+      ? "durability"
+      : normalized.tradeoff_preferences?.includes("balanced")
+        ? "balanced"
+        : null;
+
+  return {
+    step: pendingQuestionKey ?? (candidates.length ? "recommendations_ready" : "collecting_profile"),
+    use_case: normalized.primary_use_cases?.[0] ?? null,
+    vehicle_type: normalized.preferred_body_type ?? null,
+    vehicle_type_requirement: normalized.body_type_requirement ?? null,
+    body_type_exclusions: (normalized.rejected_body_types ?? []).slice(0, 3),
+    seat_count: normalized.passenger_count ?? null,
+    seat_requirement: normalized.seat_requirement ?? null,
+    fuel_type: normalized.preferred_fuel_type ?? null,
+    fuel_type_exclusions: (normalized.rejected_fuel_types ?? []).slice(0, 3),
+    budget_min: normalized.budget_floor ?? null,
+    budget_max: normalized.budget_max ?? null,
+    budget_mode: normalized.budget_mode ?? null,
+    price_positioning: normalized.price_positioning ?? null,
+    style_intent: normalized.style_intent ?? null,
+    ownership_preference: tradeoff,
+    must_have_features: (normalized.must_have_features ?? []).slice(0, 4),
+    deal_breakers: (normalized.deal_breakers ?? []).slice(0, 4),
+    candidates: candidates.slice(0, 3).map((item) => ({
+      variant_id: item.variant_id ?? null,
+      title: item.name,
+      score: item.score ?? null,
+      detail_url: item.links?.detail_page_url ?? null,
+      image_url: item.thumbnail_url ?? null,
+    })),
+  };
+}
+
 function wantsTemporaryShortlist(message) {
   const normalized = normalizeText(message);
   return /\b(no more questions|dont ask|don't ask|stop asking|just recommend|give me a shortlist|temporary shortlist|shortlist tam|goi y tam|tam thoi|dung hoi nhieu|khong hoi nhieu|khong muon tra loi nhieu)\b/.test(normalized);
+}
+
+function wantsFreshAdvisorFlow(message) {
+  const normalized = normalizeText(message);
+  if (/\b(start over|restart|reset|fresh recommendation|new recommendation|recommend again|recommend another|recommend more|show me more|find another|different recommendation|different car|another car|tu van lai|de xuat lai|goi y lai|goi y them|xe khac|mau khac|chon lai)\b/.test(normalized)) {
+    return true;
+  }
+
+  const targetTerms = "(family car|daily driver|commuter car|business car|work car|travel car|suv|mpv|sedan|pickup|supercar|sports car|race car|track car)";
+  const explicitRecommendationAsk = new RegExp(`\\b(recommend|suggest|find me|show me|looking for|search for)\\b.*\\b${targetTerms}\\b`, "i");
+  const shiftedNeed = new RegExp(`\\b(now|okay now|actually|instead|this time)\\b.*\\b(need|want|looking for|find|recommend)\\b.*\\b${targetTerms}\\b`, "i");
+  const directNeed = new RegExp(`\\bi\\s+(?:need|want|am looking for|'m looking for)\\s+(?:a|an|another|different|new)?\\s*${targetTerms}\\b`, "i");
+
+  return explicitRecommendationAsk.test(normalized) || shiftedNeed.test(normalized) || directNeed.test(normalized);
 }
 
 function hasDirectionalShortlistProfile(profile = {}) {
@@ -513,19 +568,56 @@ function hasDirectionalShortlistProfile(profile = {}) {
       profile.budget_max ||
         profile.budget_target ||
         profile.budget_ceiling ||
+        profile.budget_mode ||
+        profile.price_positioning ||
         profile.primary_use_cases?.length ||
         profile.regular_passenger_count ||
         profile.passenger_count ||
         profile.city_vs_highway_ratio ||
         profile.preferred_body_type ||
-        profile.preferred_fuel_type
+        profile.rejected_body_types?.length ||
+        profile.preferred_fuel_type ||
+        profile.must_have_features?.length ||
+        profile.deal_breakers?.length
     )
   );
 }
 
+function isDiscoveryQuestionStillMissing(profile = {}, question = null) {
+  if (!question?.key) return false;
+  const mode = question.required ? "required" : "optional";
+  return nextAdvisorQuestions(profile, mode, 12).some((item) => item.key === question.key);
+}
+
+function didAnswerDiscoveryQuestion(previousProfile = {}, nextProfile = {}, question = null) {
+  if (!question?.key) return false;
+  return isDiscoveryQuestionStillMissing(previousProfile, question) && !isDiscoveryQuestionStillMissing(nextProfile, question);
+}
+
+function shouldHandlePendingAdvisorInterruption({
+  pendingQuestion,
+  answeredPendingQuestion = false,
+  classifierIntent = "recommend_car",
+  legacyIntent = "advisor",
+  message = "",
+}) {
+  if (!pendingQuestion) return false;
+  if (answeredPendingQuestion) return false;
+  if (wantsTemporaryShortlist(message)) return false;
+
+  const normalized = normalizeText(message);
+  const questionLike =
+    /\?/.test(message) ||
+    /\b(what|why|how|which|can|could|should|is|are|do|does|explain|tell me|difference between)\b/i.test(normalized);
+  const nonAdvisorIntent = classifierIntent && classifierIntent !== "recommend_car";
+  const legacyNonAdvisorIntent = legacyIntent && legacyIntent !== "advisor";
+
+  return questionLike || nonAdvisorIntent || legacyNonAdvisorIntent;
+}
+
 function buildQuestionPrompt(question) {
   if (!question) return "";
-  return `${question.question} You can answer with something like ${question.examples.map((item) => `"${item}"`).join(", ")}.`;
+  return question.question;
 }
 
 function normalizeQuestionList(questionOrQuestions) {
@@ -534,28 +626,70 @@ function normalizeQuestionList(questionOrQuestions) {
 }
 
 function buildQuestionListPrompt(questionOrQuestions) {
-  const questions = normalizeQuestionList(questionOrQuestions).slice(0, 4);
+  const questions = normalizeQuestionList(questionOrQuestions).slice(0, 1);
   if (questions.length === 0) return "";
-  if (questions.length === 1) return buildQuestionPrompt(questions[0]);
-
-  const numbered = questions.map((question, index) => `${index + 1}. ${question.question}`).join(" ");
-  return `I still need a few details before recommending cars responsibly: ${numbered} You can answer all of them in one short message.`;
+  return buildQuestionPrompt(questions[0]);
 }
 
-function buildProfileProgressCards(profile, nextQuestion) {
-  const nextQuestions = normalizeQuestionList(nextQuestion).slice(0, 4);
-  return [
-    {
-      title: "Profile so far",
-      value: `${countAnsweredQuestions(profile)} answers saved`,
-      description: buildProfileSnapshot(profile),
-    },
-    ...nextQuestions.map((question, index) => ({
-      title: nextQuestions.length === 1 ? "Still needed" : `Still needed ${index + 1}`,
-      value: humanizeQuestionKey(question.key),
-      description: buildQuestionPrompt(question),
-    })),
-  ].filter(Boolean);
+function formatUseCaseLabel(useCase) {
+  const map = {
+    daily_commute: "daily commuting",
+    city_driving: "city driving",
+    family: "family use",
+    business: "business use",
+    road_trip: "long trips",
+    commercial_service: "taxi or service use",
+    cargo: "carrying cargo",
+    offroad: "rough-road or off-road use",
+    lifestyle: "fun or performance driving",
+  };
+  return map[useCase] ?? String(useCase || "").replaceAll("_", " ");
+}
+
+function formatBodyTypeLabel(bodyType) {
+  if (!bodyType) return null;
+  if (bodyType === "any") return "open on body style";
+  const map = {
+    suv: "an SUV",
+    cuv: "a crossover",
+    mpv: "an MPV",
+  };
+  return map[bodyType] ?? `a ${bodyType}`;
+}
+
+function formatBodyTypeList(bodyTypes = []) {
+  const labels = bodyTypes.map((bodyType) => String(bodyType || "").toUpperCase()).filter(Boolean);
+  if (!labels.length) return null;
+  if (labels.length === 1) return labels[0];
+  return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+}
+
+function buildProfileAcknowledgment(profile = {}, nextQuestion = null) {
+  if (!nextQuestion?.key) return null;
+  if (nextQuestion.key === "passenger_setup") {
+    const useCase = profile.primary_use_cases?.[0];
+    return useCase ? `Got it, ${formatUseCaseLabel(useCase)} is the main use.` : null;
+  }
+  if (nextQuestion.key === "budget_range") {
+    const bodyType = formatBodyTypeLabel(profile.preferred_body_type);
+    const rejectedBodies = formatBodyTypeList(profile.rejected_body_types);
+    if (profile.needs_7_seats) return "Got it, 7-seat flexibility matters.";
+    if (profile.passenger_count) return `Got it, you usually need room for ${profile.passenger_count} people.`;
+    if (!bodyType && rejectedBodies) return `Got it, we'll stay away from ${rejectedBodies}.`;
+    return bodyType ? `Got it, you're leaning toward ${bodyType}.` : null;
+  }
+  if (nextQuestion.key === "tradeoff_preferences") {
+    const budget = formatCompactMoney(profile.budget_ceiling ?? profile.budget_target ?? profile.budget_max);
+    if (budget) return `Got it, I'll keep the budget around ${budget}.`;
+    if (profile.price_positioning === "flagship") return "Got it, I'll lean toward the top end of the catalog.";
+    if (profile.budget_mode === "open") return "Got it, I can treat budget as open.";
+    return null;
+  }
+  return null;
+}
+
+function buildProfileProgressCards(_profile, _nextQuestion) {
+  return [];
 }
 
 function buildRecommendationReason(item, profile) {
@@ -767,13 +901,32 @@ async function loadFocusedVariant(ctx, variant_id, market_id) {
 }
 
 function buildClarificationAnswer(question, profile) {
-  const snapshot = buildProfileSnapshot(profile);
-  return `I want to make sure I understood your last reply correctly. Right now I know ${snapshot}. ${buildQuestionListPrompt(question)}`;
+  return buildQuestionListPrompt(question);
 }
 
 function buildProgressAnswer(profile, nextQuestion) {
-  const snapshot = buildProfileSnapshot(profile);
-  return `Got it. So far I understand ${snapshot}. ${buildQuestionListPrompt(nextQuestion)}`;
+  const next = normalizeQuestionList(nextQuestion)[0] ?? null;
+  return [buildProfileAcknowledgment(profile, next), buildQuestionListPrompt(nextQuestion)].filter(Boolean).join(" ");
+}
+
+async function buildAdvisorNextQuestionAnswer({
+  profile,
+  nextQuestion,
+  latestMessage,
+  fallback,
+  ollama,
+}) {
+  const question = normalizeQuestionList(nextQuestion)[0] ?? null;
+  if (!question) return fallback || "";
+  return formatAdvisorNextQuestionWithModel(
+    {
+      profile,
+      nextQuestion: question,
+      latestMessage,
+      fallback: fallback || buildProgressAnswer(profile, question),
+    },
+    { ollama }
+  );
 }
 
 function buildRecommendationAnswer(recommendations, profile, nextOptionalQuestion) {
@@ -808,12 +961,12 @@ function compactInsight(value, maxLength = 88) {
   if (!text) return null;
   const normalized = text.replace(/[.]+$/g, "");
   if (normalized.length <= maxLength) return normalized;
-  return `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
+  return `${normalized.slice(0, maxLength - 1).trimEnd()}...`;
 }
 
 function buildCardsFromStructuredResult(intent, structuredResult, advisor_profile, nextQuestion = null) {
   if (!structuredResult) {
-    return intent === "recommend_car" ? buildProfileProgressCards(advisor_profile, nextQuestion) : [];
+    return [];
   }
 
   if (intent === "compare_car") {
@@ -920,32 +1073,32 @@ function buildCardsFromStructuredResult(intent, structuredResult, advisor_profil
   }
 
   if (intent === "recommend_car") {
-    const profileCard = {
-      title: "Buyer profile",
-      value: `${countAnsweredQuestions(advisor_profile)} answers saved`,
-      description: buildProfileSnapshot(advisor_profile),
-    };
-    const vehicleCards = (structuredResult.ranked_vehicles ?? []).map((item) => ({
-      title: item.name,
-      value: `Score ${item.score.toFixed(1)}`,
-      description: [
-        item.reasons?.length > 0
-          ? item.reasons.join(", ")
-          : "This car still ranks well, but the structured reasons are limited.",
-        item.caveats?.length > 0 ? `Watch-out: ${compactInsight(item.caveats[0])}` : "Watch-out: verify trim-level equipment before deciding.",
-        item.best_for?.length > 0 ? `Best for: ${item.best_for.join(", ")}` : "Best for: buyers with the same practical profile.",
-        item.links?.detail_page_url ? "Open the vehicle detail page to review specs and ownership insights." : null,
-        item.links?.related_listings_url
-          ? item.links.related_listings_count > 0
-            ? `${item.links.related_listings_count} related listing(s) are available right now.`
-            : "No exact listing is live yet, but the closest browse path is ready."
+    const vehicleCards = (structuredResult.ranked_vehicles ?? []).slice(0, 3).map((item) => {
+      const detailUrl = item.links?.detail_page_url ?? null;
+      const reason =
+        compactInsight(item.reasons?.[0], 74) ||
+        compactInsight((item.best_for ?? []).join(" and "), 74) ||
+        "A strong fit for your stated needs.";
+      return {
+        title: item.name,
+        value: item.fit_label || null,
+        description: reason,
+        image_url: item.thumbnail_url ?? null,
+        href: detailUrl,
+        action: detailUrl
+          ? {
+              type: "open_vehicle_detail",
+              payload: {
+                url: detailUrl,
+                label: item.name,
+                variant_id: item.variant_id ?? null,
+              },
+            }
           : null,
-      ]
-        .filter(Boolean)
-        .join(" "),
-    }));
+      };
+    });
 
-    return [profileCard, ...vehicleCards].filter(Boolean);
+    return vehicleCards.filter(Boolean);
   }
 
   return [];
@@ -1071,6 +1224,47 @@ function buildFactsUsed(intent, structuredResult, market_id) {
   return [];
 }
 
+function buildAdvisorQuestionReminder(question) {
+  return `To continue your vehicle recommendation, please answer this: ${buildQuestionPrompt(question)}`;
+}
+
+function buildSellGuidanceAnswer() {
+  return "To sell a vehicle here, open Sell, choose the correct variant, add price, mileage, location, and description, then publish the listing.";
+}
+
+function buildInterruptionAnswer(interruptionEnvelope, fallbackIntent = "unknown") {
+  if (!interruptionEnvelope) {
+    return "I can help with that, but I need a bit more vehicle context before I answer it confidently.";
+  }
+
+  if (interruptionEnvelope.needs_clarification) {
+    if (interruptionEnvelope.intent === "compare_car") {
+      return "I can compare those vehicles once I have the exact two models or catalog pages.";
+    }
+    if (interruptionEnvelope.intent === "calculate_tco") {
+      return "I can estimate ownership cost once I know the vehicle or base purchase price and market.";
+    }
+    if (interruptionEnvelope.intent === "predict_vehicle_value" || interruptionEnvelope.intent === "market_trend_analysis") {
+      return "I can analyze that once I know the exact vehicle from the catalog.";
+    }
+    if (interruptionEnvelope.intent === "vehicle_general_qa") {
+      return interruptionEnvelope.final_answer || "I can answer that once I know the exact vehicle or topic.";
+    }
+    if (interruptionEnvelope.intent === "out_of_scope" || fallbackIntent === "out_of_scope") {
+      return interruptionEnvelope.final_answer || "That is outside my main vehicle-advisor scope.";
+    }
+  }
+
+  return (
+    interruptionEnvelope.final_answer ||
+    (fallbackIntent === "sell_guidance" ? buildSellGuidanceAnswer() : "I can help with that in the dealership context.")
+  );
+}
+
+function combineInterruptionWithAdvisorQuestion(interruptionAnswer, question) {
+  return [interruptionAnswer, buildAdvisorQuestionReminder(question)].filter(Boolean).join("\n\n");
+}
+
 function buildFollowUpQuestions(intent, structuredResult, { focus_variant_id, nextOptionalQuestion, needs_clarification, missing_fields = [] }) {
   if (needs_clarification) {
     if (intent === "compare_car") {
@@ -1110,10 +1304,7 @@ function buildFollowUpQuestions(intent, structuredResult, { focus_variant_id, ne
     return [nextOptionalQuestion.question];
   }
   if (intent === "recommend_car") {
-    return [
-      "Want me to narrow this down by comfort, ownership cost, or family use?",
-      "Want me to compare the top two options side by side?",
-    ];
+    return [];
   }
   return ["If you want, I can help with car comparison, price outlook, or ownership costs next."];
 }
@@ -1358,29 +1549,51 @@ export async function chatAdvisor(ctx, input) {
         : typeof persistedConversationState?.active_entities?.focus_variant_label === "string"
           ? persistedConversationState.active_entities.focus_variant_label
           : null;
-  const initialPendingQuestionKey =
+  const persistedPendingQuestionKey =
     typeof persistedContext.pending_question_key === "string"
       ? persistedContext.pending_question_key
       : typeof statePendingClarification?.field === "string"
         ? statePendingClarification.field
         : null;
+  const persistedAdvisorPendingFlow =
+    persistedContext?.pending_flow?.intent === "recommend_car" || statePendingClarification?.intent === "recommend_car";
+  const freshAdvisorFlowRequested =
+    !(persistedPendingQuestionKey && persistedAdvisorPendingFlow) &&
+    wantsFreshAdvisorFlow(message);
+  const initialPendingQuestionKey =
+    freshAdvisorFlowRequested ? null : persistedPendingQuestionKey;
   const initialPendingQuestion = initialPendingQuestionKey ? QUESTION_BY_KEY[initialPendingQuestionKey] ?? null : null;
   const initialPendingFlow =
-    persistedContext?.pending_flow && typeof persistedContext.pending_flow === "object"
+    freshAdvisorFlowRequested
+      ? null
+      : persistedContext?.pending_flow && typeof persistedContext.pending_flow === "object"
       ? persistedContext.pending_flow
       : pendingFlowFromState;
-  const existingProfile = persistedContext.advisor_profile || {};
-  const profilePatch = extractAdvisorProfilePatch(message, initialPendingQuestion?.key ?? null, existingProfile);
-  const recognizedPendingQuestion = initialPendingQuestion ? hasOwn(profilePatch, initialPendingQuestion.key) : false;
-  const advisor_profile = mergeAdvisorProfile(existingProfile, profilePatch);
+  const existingProfile = freshAdvisorFlowRequested ? {} : persistedContext.advisor_profile || {};
+  const extractedProfile = await extractAdvisorProfilePatch(message, initialPendingQuestion?.key ?? null, existingProfile, ctx);
+  const tentativeAdvisorProfile = mergeAdvisorProfile(existingProfile, extractedProfile);
   const legacyIntent = detectIntent(message);
   const freshClassifierPreview = classifyIntent(message, {
     market_id: initialMarketId,
     focus_variant_id: initialFocusVariantId,
     focus_variant_label: initialFocusVariantLabel,
-    advisor_profile,
-    budget: advisor_profile.budget_max ?? null,
+    advisor_profile: tentativeAdvisorProfile,
+    budget: tentativeAdvisorProfile.budget_max ?? null,
   });
+  const rawRecognizedPendingQuestion =
+    initialPendingQuestion &&
+    (hasOwn(extractedProfile, initialPendingQuestion.key) ||
+      didAnswerDiscoveryQuestion(existingProfile, tentativeAdvisorProfile, initialPendingQuestion));
+  const pendingQuestionInterruption = shouldHandlePendingAdvisorInterruption({
+    pendingQuestion: initialPendingQuestion,
+    answeredPendingQuestion: rawRecognizedPendingQuestion,
+    classifierIntent: freshClassifierPreview.intent,
+    legacyIntent,
+    message,
+  });
+  const profilePatch = pendingQuestionInterruption ? {} : extractedProfile;
+  const recognizedPendingQuestion = pendingQuestionInterruption ? false : Boolean(rawRecognizedPendingQuestion);
+  const advisor_profile = pendingQuestionInterruption ? mergeAdvisorProfile(existingProfile, {}) : tentativeAdvisorProfile;
   const hasVehicleMentions =
     (freshClassifierPreview.entities?.vehicles?.length ?? 0) > 0;
   const turn = classifyConversationTurn({
@@ -1395,11 +1608,11 @@ export async function chatAdvisor(ctx, input) {
     recognizedPendingQuestion,
     hasVehicleMentions,
   });
-  const turnBaseContext = turn.should_clear_stale_result
+  const turnBaseContext = turn.should_clear_stale_result || freshAdvisorFlowRequested
     ? pruneConversationContext(persistedContext, {
         topicSwitched: true,
         preserveFocus: turn.preserve_focus,
-        turnType: turn.turn_type,
+        turnType: freshAdvisorFlowRequested ? "advisor_restart" : turn.turn_type,
       })
     : { ...(persistedContext || {}) };
   const market_id =
@@ -1482,6 +1695,162 @@ export async function chatAdvisor(ctx, input) {
     notes: turn.notes,
   });
 
+  if (pendingQuestionInterruption && initialPendingQuestion) {
+    const pendingQuestionToRepeat = initialPendingQuestion;
+    let interruptionEnvelope = null;
+
+    if (legacyIntent === "sell_guidance") {
+      interruptionEnvelope = {
+        intent: "sell_guidance",
+        final_answer: buildSellGuidanceAnswer(),
+        needs_clarification: false,
+        structured_result: null,
+        context_updates: {},
+        sources: [],
+        caveats: [],
+        result_confidence: buildConfidence(0.82, ["This guidance is grounded to the current CarVista selling workflow."]),
+        evidence: buildEvidence({
+          verified: ["Sell guidance is mapped to the current product workflow."],
+          inferred: [],
+          estimated: [],
+        }),
+        meta: {
+          services_used: ["AdvisorInterruptionPolicy"],
+          sources_used: [],
+          fallback_used: false,
+          route_service: "SellGuidance",
+          missing_fields: [],
+        },
+      };
+    } else {
+      try {
+        interruptionEnvelope = await orchestrateChatRequest(ctx, {
+          message,
+          context: {
+            ...(context || {}),
+            market_id: market_id ?? initialMarketId ?? 1,
+            focus_variant_id: focus_variant_id ?? null,
+            focus_variant_label: focus_variant_label ?? null,
+            advisor_profile,
+            budget: advisor_profile.budget_max ?? null,
+            country: context?.country ?? persistedContext.country ?? null,
+          },
+          advisor_profile,
+          forced_intent: freshClassifierPreview.intent === "recommend_car" ? null : freshClassifierPreview.intent,
+          flow_id: activeFlowId,
+          turn_context: {
+            turn_type: "advisor_interruption",
+            active_intent: "recommend_car",
+            pending_question_key: pendingQuestionToRepeat.key,
+          },
+        });
+      } catch {
+        interruptionEnvelope = null;
+      }
+    }
+
+    const interruptionIntent = interruptionEnvelope?.intent ?? freshClassifierPreview.intent ?? "unknown";
+    const interruptionAnswer = buildInterruptionAnswer(interruptionEnvelope, interruptionIntent);
+    const recommendationPendingFlow = buildPendingFlow({
+      id: activeFlowId,
+      intent: "recommend_car",
+      missing_fields: [pendingQuestionToRepeat.key],
+      context_snapshot: {
+        market_id,
+        focus_variant_id,
+        focus_variant_label,
+        advisor_profile,
+        advisor_state: buildAdvisorState(advisor_profile, pendingQuestionToRepeat.key),
+      },
+      source: "recommendation_profile",
+    });
+    const recommendationConversationState = buildConversationState({
+      previousState: persistedConversationState,
+      turn: {
+        ...turn,
+        turn_type: "advisor_interruption",
+        should_preserve_topic: true,
+        should_clear_stale_result: false,
+        should_replace_active_task: false,
+      },
+      intent: "recommend_car",
+      market_id,
+      focus_variant_id,
+      focus_variant_label,
+      compare_variant_ids:
+        persistedContext.compare_variant_ids ??
+        persistedConversationState?.active_entities?.compare_variant_ids ??
+        [],
+      pending_flow: recommendationPendingFlow,
+      pending_question_key: pendingQuestionToRepeat.key,
+      structured_result: null,
+      needs_clarification: true,
+      flow_id: activeFlowId,
+    });
+
+    return finalizeTurn({
+      session,
+      AiChatMessages,
+      updatedContext: {
+        ...(persistedContext || {}),
+        ...(context || {}),
+        market_id,
+        focus_variant_id,
+        focus_variant_label,
+        advisor_profile,
+        advisor_state: buildAdvisorState(advisor_profile, pendingQuestionToRepeat.key),
+        pending_question_key: pendingQuestionToRepeat.key,
+        pending_flow: recommendationPendingFlow,
+        active_topic: recommendationConversationState.active_topic,
+        conversation_state: recommendationConversationState,
+      },
+      responsePayload: {
+        session_id: session.session_id,
+        flow_id: activeFlowId,
+        intent: interruptionIntent,
+        answer: combineInterruptionWithAdvisorQuestion(interruptionAnswer, pendingQuestionToRepeat),
+        cards: buildCardsFromStructuredResult(interruptionIntent, interruptionEnvelope?.structured_result, advisor_profile, null),
+        advisor_profile,
+        advisor_state: buildAdvisorState(advisor_profile, pendingQuestionToRepeat.key),
+        suggested_actions: [{ type: "continue_profile", payload: { question_key: pendingQuestionToRepeat.key } }],
+        follow_up_questions: [pendingQuestionToRepeat.question],
+        facts_used: buildFactsUsed(interruptionIntent, interruptionEnvelope?.structured_result, market_id),
+        market_id,
+        sources: interruptionEnvelope?.sources ?? [],
+        caveats: interruptionEnvelope?.caveats ?? [],
+        confidence:
+          interruptionEnvelope?.result_confidence ??
+          buildConfidence(0.54, ["The assistant answered an interruption and preserved the pending advisor question."]),
+        evidence:
+          interruptionEnvelope?.evidence ??
+          buildEvidence({
+            verified: ["The advisor flow kept the pending buyer-profile question active."],
+            inferred: ["The latest user message did not answer the pending advisor question."],
+            estimated: [],
+          }),
+        freshness_note: interruptionEnvelope?.freshness_note ?? null,
+        needs_clarification: true,
+        structured_result: interruptionEnvelope?.structured_result ?? null,
+        meta: {
+          ...(interruptionEnvelope?.meta ?? {}),
+          flow_id: activeFlowId,
+          services_used: [
+            ...(interruptionEnvelope?.meta?.services_used ?? []),
+            "AdvisorInterruptionPolicy",
+          ],
+          sources_used: interruptionEnvelope?.meta?.sources_used ?? [],
+          fallback_used: interruptionEnvelope == null,
+          route_service: "AdvisorInterruption",
+          missing_fields: [pendingQuestionToRepeat.key],
+          turn_type: "advisor_interruption",
+          interruption_intent: interruptionIntent,
+        },
+      },
+      tool_name: interruptionIntent,
+      tool_payload: interruptionEnvelope,
+    });
+  }
+
   if (turn.turn_type === "ambiguous") {
     const ambiguousPendingFlow =
       pendingFlow ??
@@ -1505,6 +1874,7 @@ export async function chatAdvisor(ctx, input) {
             persistedConversationState?.active_entities?.compare_variant_ids ??
             [],
           advisor_profile,
+          advisor_state: buildAdvisorState(advisor_profile, pendingQuestion?.key ?? null),
         },
         source: "ambiguous_turn",
       });
@@ -1626,17 +1996,18 @@ export async function chatAdvisor(ctx, input) {
     classifierPreview.intent === "recommend_car" &&
     wantsTemporaryShortlist(message) &&
     hasDirectionalShortlistProfile(advisor_profile);
+  const shouldRunAdvisorQuestionPolicy =
+    (classifierPreview.intent === "recommend_car" || forced_intent === "recommend_car" || freshAdvisorFlowRequested) &&
+    (forced_intent == null ||
+      forced_intent === "recommend_car" ||
+      (turn.bind_pending_flow && pendingFlow?.intent === "recommend_car"));
 
-  if (forced_intent == null && classifierPreview.intent === "recommend_car") {
-    const nextRequiredQuestions = nextAdvisorQuestions(advisor_profile, "required", 3);
+  if (shouldRunAdvisorQuestionPolicy) {
+    const nextRequiredQuestions = nextAdvisorQuestions(advisor_profile, "required", 1);
     const nextRequiredQuestion = nextRequiredQuestions[0] ?? null;
-    const nextOptionalQuestion = nextAdvisorQuestion(advisor_profile, "optional");
 
     if (pendingQuestion && !recognizedPendingQuestion && Object.keys(profilePatch).length === 0) {
-      const pendingQuestions = [
-        pendingQuestion,
-        ...nextRequiredQuestions.filter((question) => question.key !== pendingQuestion.key),
-      ].slice(0, 3);
+      const pendingQuestions = [pendingQuestion];
       const pendingQuestionKeys = pendingQuestions.map((question) => question.key);
       const recommendationPendingFlow = buildPendingFlow({
         id: activeFlowId,
@@ -1667,6 +2038,13 @@ export async function chatAdvisor(ctx, input) {
         needs_clarification: true,
         flow_id: activeFlowId,
       });
+      const answer = await buildAdvisorNextQuestionAnswer({
+        profile: advisor_profile,
+        nextQuestion: pendingQuestion,
+        latestMessage: message,
+        fallback: buildClarificationAnswer(pendingQuestion, advisor_profile),
+        ollama: ctx.services?.ollama ?? ctx.ai?.ollama,
+      });
       return finalizeTurn({
         session,
         AiChatMessages,
@@ -1677,6 +2055,7 @@ export async function chatAdvisor(ctx, input) {
           focus_variant_id,
           focus_variant_label,
           advisor_profile,
+          advisor_state: buildAdvisorState(advisor_profile, pendingQuestion.key),
           pending_question_key: pendingQuestion.key,
           pending_flow: recommendationPendingFlow,
           active_topic: recommendationConversationState.active_topic,
@@ -1686,8 +2065,8 @@ export async function chatAdvisor(ctx, input) {
           session_id: session.session_id,
           flow_id: activeFlowId,
           intent: "recommend_car",
-          answer: buildClarificationAnswer(pendingQuestions, advisor_profile),
-          cards: buildProfileProgressCards(advisor_profile, pendingQuestions),
+          answer,
+          cards: [],
           advisor_profile,
           suggested_actions: [{ type: "continue_profile", payload: { question_key: pendingQuestion.key } }],
           follow_up_questions: pendingQuestions.map((question) => question.question),
@@ -1711,6 +2090,7 @@ export async function chatAdvisor(ctx, input) {
             latency_ms: 0,
             route_service: "RecommendationClarification",
             missing_fields: pendingQuestionKeys,
+            advisor_restart: freshAdvisorFlowRequested,
             turn_type: turn.turn_type,
           },
         },
@@ -1728,6 +2108,7 @@ export async function chatAdvisor(ctx, input) {
           focus_variant_id,
           focus_variant_label,
           advisor_profile,
+          advisor_state: buildAdvisorState(advisor_profile, nextRequiredQuestion.key),
         },
         source: "recommendation_profile",
       });
@@ -1748,6 +2129,13 @@ export async function chatAdvisor(ctx, input) {
         needs_clarification: true,
         flow_id: activeFlowId,
       });
+      const answer = await buildAdvisorNextQuestionAnswer({
+        profile: advisor_profile,
+        nextQuestion: nextRequiredQuestion,
+        latestMessage: message,
+        fallback: buildProgressAnswer(advisor_profile, nextRequiredQuestion),
+        ollama: ctx.services?.ollama ?? ctx.ai?.ollama,
+      });
       return finalizeTurn({
         session,
         AiChatMessages,
@@ -1758,6 +2146,7 @@ export async function chatAdvisor(ctx, input) {
           focus_variant_id,
           focus_variant_label,
           advisor_profile,
+          advisor_state: buildAdvisorState(advisor_profile, nextRequiredQuestion.key),
           pending_question_key: nextRequiredQuestion.key,
           pending_flow: recommendationPendingFlow,
           active_topic: recommendationConversationState.active_topic,
@@ -1767,8 +2156,8 @@ export async function chatAdvisor(ctx, input) {
           session_id: session.session_id,
           flow_id: activeFlowId,
           intent: "recommend_car",
-          answer: buildProgressAnswer(advisor_profile, nextRequiredQuestions),
-          cards: buildProfileProgressCards(advisor_profile, nextRequiredQuestions),
+          answer,
+          cards: [],
           advisor_profile,
           suggested_actions: [{ type: "continue_profile", payload: { question_key: nextRequiredQuestion.key } }],
           follow_up_questions: nextRequiredQuestions.map((question) => question.question),
@@ -1795,6 +2184,7 @@ export async function chatAdvisor(ctx, input) {
             latency_ms: 0,
             route_service: "RecommendationClarification",
             missing_fields: nextRequiredQuestionKeys,
+            advisor_restart: freshAdvisorFlowRequested,
             turn_type: turn.turn_type,
           },
         },
@@ -1852,12 +2242,13 @@ export async function chatAdvisor(ctx, input) {
       baseFlowContext.compare_variant_ids ?? turnBaseContext.compare_variant_ids ?? []
     );
 
-    const nextOptionalQuestion =
-      envelope.intent === "recommend_car" && !envelope.needs_clarification
-        ? nextAdvisorQuestion(advisor_profile, "optional")
-        : null;
+    const nextOptionalQuestion = null;
     const next_pending_question_key =
       envelope.intent === "recommend_car" && nextOptionalQuestion ? nextOptionalQuestion.key : null;
+    const rankedAdvisorCandidates =
+      envelope.intent === "recommend_car" && !envelope.needs_clarification
+        ? envelope.structured_result?.ranked_vehicles ?? []
+        : [];
     const pending_flow = envelope.needs_clarification
       ? buildPendingFlow({
           id: activeFlowId,
@@ -1871,6 +2262,7 @@ export async function chatAdvisor(ctx, input) {
             focus_variant_label: resolvedFocusVariantLabel,
             compare_variant_ids: resolvedCompareVariantIds,
             advisor_profile,
+            advisor_state: buildAdvisorState(advisor_profile, null, rankedAdvisorCandidates),
           },
         })
       : next_pending_question_key
@@ -1883,6 +2275,7 @@ export async function chatAdvisor(ctx, input) {
               focus_variant_id: resolvedFocusVariantId,
               focus_variant_label: resolvedFocusVariantLabel,
               advisor_profile,
+              advisor_state: buildAdvisorState(advisor_profile, next_pending_question_key),
             },
             source: "recommendation_profile",
           })
@@ -1917,6 +2310,7 @@ export async function chatAdvisor(ctx, input) {
         focus_variant_label: resolvedFocusVariantLabel,
         compare_variant_ids: resolvedCompareVariantIds,
         advisor_profile,
+        advisor_state: buildAdvisorState(advisor_profile, next_pending_question_key, rankedAdvisorCandidates),
         pending_question_key: next_pending_question_key,
         pending_flow,
         active_topic: nextConversationState.active_topic,
@@ -1929,6 +2323,7 @@ export async function chatAdvisor(ctx, input) {
         answer: envelope.final_answer,
         cards: buildCardsFromStructuredResult(envelope.intent, envelope.structured_result, advisor_profile, nextOptionalQuestion),
         advisor_profile,
+        advisor_state: buildAdvisorState(advisor_profile, next_pending_question_key, rankedAdvisorCandidates),
         suggested_actions: buildSuggestedActions(envelope.intent, envelope.structured_result, {
           market_id: resolvedMarketId,
           focus_variant_id: resolvedFocusVariantId,

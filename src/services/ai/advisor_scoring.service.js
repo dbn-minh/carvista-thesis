@@ -21,6 +21,19 @@ function isExotic(item) {
   return EXOTIC_BRANDS.has(String(item.make_name || "").toLowerCase()) || (normalizedPrice(item) ?? 0) >= 3_500_000_000;
 }
 
+function isExoticBrand(item) {
+  return EXOTIC_BRANDS.has(String(item.make_name || "").toLowerCase());
+}
+
+function isPerformanceFirstProfile(profile) {
+  return (
+    profile.performance_priority >= 0.7 ||
+    profile.primary_use_cases?.includes("lifestyle") ||
+    profile.tradeoff_preferences?.includes("performance_over_reliability") ||
+    profile.emotional_motivators?.includes("sporty_identity")
+  );
+}
+
 function boolFromValue(value) {
   if (typeof value === "boolean") return value;
   const normalized = String(value || "").trim().toLowerCase();
@@ -136,6 +149,7 @@ function buildUseCaseFit(item, profile) {
   if (useCases.includes("family") && ["suv", "mpv"].includes(item.body_type)) reasons.push("matches your family-focused use case better than a smaller body style");
   if ((useCases.includes("daily_commute") || useCases.includes("city_driving")) && ["hybrid", "ev"].includes(item.fuel_type)) reasons.push("makes everyday commuting easier with a more efficient powertrain");
   if (useCases.includes("road_trip") && (toNumberOrNull(item.power_hp) ?? 0) >= 180) reasons.push("has enough performance headroom for highway and out-of-town use");
+  if (useCases.includes("lifestyle") && ((toNumberOrNull(item.power_hp) ?? 0) >= 180 || isPremium(item) || isExotic(item))) reasons.push("leans toward a more engaging fun-driving profile");
   return { score: safeScore(score), reasons, mismatches: [] };
 }
 
@@ -143,12 +157,13 @@ function buildSizeSpaceFit(item, profile) {
   const seats = toNumberOrNull(item.seats) ?? 5;
   const cargo = firstNumericFeature(item, ["cargo_capacity_l", "cargo_l", "trunk_l"]);
   const body = String(item.body_type || "");
+  const seatRequirement = String(profile.seat_requirement || "").toLowerCase();
   let score = 72;
   const reasons = [];
   const mismatches = [];
 
   if (profile.needs_7_seats) {
-    score = seats >= 7 ? 95 : 18;
+    score = seats >= 7 ? 95 : seatRequirement === "soft" ? 58 : 18;
     if (seats >= 7) reasons.push("covers your seating requirement without relying on compromises");
     else mismatches.push("does not meet the 7-seat flexibility you asked for");
   } else if ((profile.regular_passenger_count ?? 0) >= 5 || profile.child_present || profile.elderly_present) {
@@ -160,7 +175,7 @@ function buildSizeSpaceFit(item, profile) {
   }
 
   if (profile.cargo_needs === "high" && cargo != null && cargo < 400) mismatches.push("cargo space may feel tight for the amount of gear you plan to carry");
-  return { score: safeScore(score), reasons, mismatches, hard_fail: profile.needs_7_seats && seats < 7 };
+  return { score: safeScore(score), reasons, mismatches, hard_fail: profile.needs_7_seats && seatRequirement !== "soft" && seats < 7 };
 }
 
 function buildDrivingConditionFit(item, profile) {
@@ -265,6 +280,10 @@ function buildBrandEmotionalFit(item, profile) {
     score = 0;
     mismatches.push("belongs to a brand you explicitly want to avoid");
   }
+  if (isPerformanceFirstProfile(profile) && isExoticBrand(item)) {
+    score += 20;
+    reasons.push("matches the supercar and performance-first direction you described");
+  }
   if (profile.style_priority >= 0.7 && (isPremium(item) || isExotic(item))) score += 16;
   if (profile.emotional_motivators?.includes("sporty_identity") && (isExotic(item) || (toNumberOrNull(item.power_hp) ?? 0) >= 220)) score += 14;
   return { score: safeScore(score), reasons, mismatches, hard_fail: profile.brand_rejections?.includes(brand) };
@@ -278,6 +297,8 @@ function buildTradeoffFit(item, profile) {
   if (preferences.includes("efficiency_over_performance")) score += ["hybrid", "ev"].includes(item.fuel_type) ? 18 : -10;
   if (preferences.includes("comfort_over_performance")) score += isPremium(item) ? 12 : 0;
   if (preferences.includes("reliability_over_tech")) score += isPremium(item) ? -8 : 10;
+  if (preferences.includes("reliability_over_performance")) score += isPremium(item) || isExotic(item) ? -10 : 12;
+  if (preferences.includes("performance_over_reliability")) score += (toNumberOrNull(item.power_hp) ?? 0) >= 180 || isPremium(item) ? 14 : -6;
   return { score: safeScore(score), reasons: [], mismatches: [] };
 }
 
@@ -287,6 +308,27 @@ function evaluateFeatureHardFilters(item, profile) {
     missingMustHave,
     hard_fail: missingMustHave.length > 0,
   };
+}
+
+function buildPerformanceFirstBonus(item, profile) {
+  if (!isPerformanceFirstProfile(profile)) return null;
+
+  const price = normalizedPrice(item);
+  const budget = profile.budget_target ?? profile.budget_ceiling ?? null;
+  const hp = toNumberOrNull(item.power_hp) ?? firstNumericFeature(item, ["power_hp"]);
+  let value = 0;
+
+  if (isExoticBrand(item)) value += 8;
+  if ((hp ?? 0) >= 600) value += 5;
+  else if ((hp ?? 0) >= 450) value += 3;
+
+  if (budget != null && budget >= 5_000_000_000 && price != null) {
+    const budgetUseRatio = price / budget;
+    if (budgetUseRatio >= 0.55) value += 4;
+    else if (budgetUseRatio >= 0.35) value += 2;
+  }
+
+  return value > 0 ? { label: "performance-first high-budget alignment", value } : null;
 }
 
 function weightedScore(fitScores, weights) {
@@ -336,8 +378,10 @@ export function evaluateRecommendationCandidate(item, rawProfile = {}) {
 
   const penalties = [];
   const bonuses = [];
+  const performanceFirstBonus = buildPerformanceFirstBonus(item, profile);
   if ((profile.primary_use_cases ?? []).some((useCase) => useCaseScore(useCase, item, profile) >= 88)) bonuses.push({ label: "strong use-case alignment", value: 4 });
   if (profile.brand_preferences?.includes(String(item.make_name || "").toLowerCase())) bonuses.push({ label: "preferred brand match", value: 3 });
+  if (performanceFirstBonus) bonuses.push(performanceFirstBonus);
   if (featureFilters.missingMustHave.length > 0) penalties.push({ label: `missing must-have: ${featureFilters.missingMustHave.join(", ")}`, value: 24 });
   if ((profile.parking_constraints === "tight") && ["pickup", "mpv"].includes(item.body_type)) penalties.push({ label: "large footprint for tight parking", value: 8 });
   if (profile.fuel_saving_priority >= 0.8 && isExotic(item)) penalties.push({ label: "running cost mismatch", value: 10 });
@@ -355,6 +399,7 @@ export function evaluateRecommendationCandidate(item, rawProfile = {}) {
     ...sizeFit.reasons,
     ...drivingFit.reasons,
     ...costFit.reasons,
+    ...performanceFit.reasons,
     ...comfortFit.reasons,
     ...technologyFit.reasons,
     ...safetyFit.reasons,

@@ -253,7 +253,7 @@ function formatKnowledge(structuredResult) {
 }
 
 function formatRecommendation(structuredResult, turnContext = {}) {
-  const ranked = (structuredResult.ranked_vehicles ?? []).slice(0, 5);
+  const ranked = (structuredResult.ranked_vehicles ?? []).slice(0, 3);
   const top = ranked[0];
 
   if (!top) {
@@ -264,36 +264,19 @@ function formatRecommendation(structuredResult, turnContext = {}) {
   }
 
   const profileSummary = structuredResult.profile_summary;
-  const limitation = turnContext.directional_shortlist
-    ? "This is a temporary shortlist based on the details you gave, so treat the assumptions as important."
-    : /partial/i.test(profileSummary || "")
-      ? "This is a directional shortlist because the buyer profile is still partial."
-      : null;
-  const vehicleLines = ranked.map((item, index) => {
-    const why =
-      trimInsight(item.reasons?.[0], 120) ||
-      trimInsight(item.market_summary, 120) ||
-      "it matches the profile fields available so far";
-    const caveat =
-      trimInsight(item.caveats?.[0], 120) ||
-      trimInsight(item.top_mismatches?.[0], 120) ||
-      "verify trim-level equipment and live listing availability before deciding";
-    const bestFor =
+  const intro = turnContext.directional_shortlist || /partial/i.test(profileSummary || "")
+    ? "These are the closest matches currently available in our catalog."
+    : "Based on your needs, these are the best matches for you.";
+  const vehicleLines = ranked.map((item) => {
+    const reason =
+      trimInsight(item.reasons?.[0], 90) ||
       trimInsight((item.best_for ?? []).join(" and "), 90) ||
-      "buyers with the same practical profile";
-    const label = item.fit_label ? ` (${item.fit_label.toLowerCase()})` : "";
-    return `${index + 1}. ${item.name}${label}. Why it fits: ${why}. Watch-out: ${caveat}. Best for: ${bestFor}.`;
+      "a strong fit for your stated needs";
+    return `${item.name}: ${reason}.`;
   });
 
   return {
-    final_answer: [
-      profileSummary ? `Profile used: ${profileSummary}.` : null,
-      limitation,
-      ...vehicleLines,
-      "Next step: compare the top two, filter by budget or seats, or estimate ownership cost.",
-    ]
-      .filter(Boolean)
-      .join(" "),
+    final_answer: [intro, ...vehicleLines].join(" "),
     concise_summary: `Top recommendation: ${top.name}`,
   };
 }

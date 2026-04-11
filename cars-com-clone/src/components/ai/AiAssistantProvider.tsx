@@ -4,7 +4,6 @@ import {
   createContext,
   useContext,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -90,10 +89,10 @@ type AiAssistantContextValue = {
 };
 
 const starterPrompts = [
-  "I need a family SUV for mostly city driving.",
-  "I want a fuel-efficient car for daily commuting.",
-  "Suggest a practical car for weekend road trips.",
-  "Help me understand whether this car fits my needs.",
+  "Family use, 5 seats, under 1 billion.",
+  "Daily commute, fuel efficient, mid-range.",
+  "Long trips, 7 seats, comfortable.",
+  "Taxi use, durable and low maintenance.",
 ];
 
 const compareStarterPrompts = [
@@ -144,27 +143,117 @@ function sanitizeInsightCards(cards?: AiInsightCard[]) {
   return cards.filter((card) => !isProfileProgressCard(card));
 }
 
-function InsightCards({ cards }: { cards?: AiInsightCard[] }) {
+function isVehicleRecommendationCard(card: AiInsightCard) {
+  return card.action?.type === "open_vehicle_detail" || String(card.href || "").startsWith("/catalog/");
+}
+
+function removeVehicleRecommendationMessages(messages: ChatBubble[]) {
+  return messages.filter(
+    (message) =>
+      message.role !== "assistant" ||
+      !(message.cards ?? []).some((card) => isVehicleRecommendationCard(card))
+  );
+}
+
+function normalizeFollowUpText(value?: string | null) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[?!.\s]+$/g, "")
+    .trim();
+}
+
+function sanitizeFollowUps(questions?: string[], answer?: string) {
+  const normalizedAnswer = normalizeFollowUpText(answer);
+  return (questions ?? [])
+    .filter(Boolean)
+    .filter((question) => {
+      const normalizedQuestion = normalizeFollowUpText(question);
+      return normalizedQuestion && !normalizedAnswer.includes(normalizedQuestion);
+    })
+    .slice(0, 2);
+}
+
+function InsightCards({
+  cards,
+  onAction,
+}: {
+  cards?: AiInsightCard[];
+  onAction?: (action: AiSuggestedAction) => void;
+}) {
   const visibleCards = sanitizeInsightCards(cards);
   if (visibleCards.length === 0) return null;
 
   return (
     <div className="mt-3 grid gap-3">
-      {visibleCards.map((card, index) => (
-        <article
-          key={`${card.title}-${index}`}
-          className="rounded-[22px] border border-cars-gray-light/70 bg-white px-4 py-4 shadow-sm"
-        >
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
-            {card.title}
-          </p>
-          {card.value != null ? (
-            <p className="mt-2 break-words text-base font-apercu-bold text-cars-primary">
-              {typeof card.value === "number" ? toCurrency(card.value) : String(card.value)}
-            </p>
-          ) : null}
-          <p className="mt-2 break-words text-sm leading-6 text-cars-gray">{card.description}</p>
-        </article>
+      {visibleCards.map((card, index) => {
+        const action =
+          card.action ||
+          (card.href
+            ? {
+                type: "open_vehicle_detail",
+                payload: { url: card.href, label: card.title },
+              }
+            : null);
+        const handleCardClick = action && onAction ? () => onAction(action) : null;
+        const content = (
+          <div key={`${card.title}-${index}-content`}>
+            <div className="flex gap-3">
+              {card.image_url ? (
+                <img
+                  src={card.image_url}
+                  alt={card.title}
+                  className="h-16 w-20 shrink-0 rounded-[8px] object-cover"
+                />
+              ) : null}
+              <div className="min-w-0 flex-1">
+                <p className="break-words text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
+                  {card.title}
+                </p>
+                {card.value != null ? (
+                  <p className="mt-2 break-words text-base font-apercu-bold text-cars-primary">
+                    {typeof card.value === "number" ? toCurrency(card.value) : String(card.value)}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            <p className="mt-2 break-words text-sm leading-6 text-cars-gray">{card.description}</p>
+          </div>
+        );
+
+        return handleCardClick ? (
+          <button
+            key={`${card.title}-${index}`}
+            type="button"
+            onClick={handleCardClick}
+            className="rounded-[22px] border border-cars-gray-light/70 bg-white px-4 py-4 text-left shadow-sm transition-colors hover:border-cars-accent/40 hover:bg-cars-off-white"
+          >
+            {content}
+          </button>
+        ) : (
+          <article
+            key={`${card.title}-${index}`}
+            className="rounded-[22px] border border-cars-gray-light/70 bg-white px-4 py-4 shadow-sm"
+          >
+            {content}
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function FollowUpList({ questions }: { questions?: string[] }) {
+  const visibleQuestions = sanitizeFollowUps(questions);
+  if (visibleQuestions.length === 0) return null;
+
+  return (
+    <div className="mt-3 rounded-[18px] bg-cars-off-white px-3 py-3 text-xs leading-5 text-cars-gray">
+      <p className="font-semibold uppercase tracking-[0.14em] text-cars-accent">Next</p>
+      {visibleQuestions.map((question) => (
+        <p key={question} className="mt-2 break-words text-cars-primary">
+          {question}
+        </p>
       ))}
     </div>
   );
@@ -287,7 +376,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
         role: "assistant",
         content: hasComparePair
           ? `I have ${comparePairLabel} loaded and ready to compare. Ask about family use, resale, ownership cost, comfort, or tell me what matters most to you.`
-          : "Hi, I am your CarVista advisor. Tell me about your budget, how you drive, and what kind of car you like, and I will guide you through the best fit.",
+          : "What will you mainly use the vehicle for? Taxi, daily commute, family use, business, or long trips?",
       },
     ]);
   }, [compareContext.labels, messages.length, open]);
@@ -295,7 +384,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!transcriptRef.current) return;
     transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
-  }, [messages, sending]);
+  });
 
   useEffect(() => {
     if (!authenticated || !pendingAction) return;
@@ -487,21 +576,26 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
 
       setSessionId(response.session_id);
       setStoredAdvisorProfile(response.advisor_profile ?? {});
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: buildId("assistant"),
-          role: "assistant",
-          content: response.answer,
-          cards: sanitizeInsightCards(response.cards),
-          followUps: response.follow_up_questions,
-          confidence: response.confidence ?? null,
-          sources: response.sources ?? [],
-          caveats: response.caveats ?? [],
-          freshnessNote: response.freshness_note ?? null,
-          suggestedActions: response.suggested_actions ?? [],
-        },
-      ]);
+      setMessages((prev) => {
+        const baseMessages = response.meta?.advisor_restart
+          ? removeVehicleRecommendationMessages(prev)
+          : prev;
+        return [
+          ...baseMessages,
+          {
+            id: buildId("assistant"),
+            role: "assistant",
+            content: response.answer,
+            cards: sanitizeInsightCards(response.cards),
+            followUps: sanitizeFollowUps(response.follow_up_questions, response.answer),
+            confidence: response.confidence ?? null,
+            sources: response.sources ?? [],
+            caveats: response.caveats ?? [],
+            freshnessNote: response.freshness_note ?? null,
+            suggestedActions: response.suggested_actions ?? [],
+          },
+        ];
+      });
     } catch (error) {
       if (requestVersion !== conversationVersionRef.current) return;
       setChatError(error instanceof Error ? error.message : "Chat failed.");
@@ -576,13 +670,10 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const contextValue = useMemo<AiAssistantContextValue>(
-    () => ({
-      openAssistant,
-      openCompare,
-    }),
-    [authenticated, focusVariantId, focusVariantLabel, marketId, pathname]
-  );
+  const contextValue: AiAssistantContextValue = {
+    openAssistant,
+    openCompare,
+  };
 
   const activeStarterPrompts =
     compareContext.labels.length >= 2 ? compareStarterPrompts : starterPrompts;
@@ -674,9 +765,10 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                   >
                     <p>{message.content}</p>
                     <ConfidenceBadge confidence={message.confidence} />
-                    <InsightCards cards={message.cards} />
+                    <InsightCards cards={message.cards} onAction={handleSuggestedAction} />
                     <SourceList sources={message.sources} freshnessNote={message.freshnessNote} />
                     <CaveatList caveats={message.caveats} />
+                    <FollowUpList questions={message.followUps} />
                     {message.role === "assistant" && getRenderableActions(message.suggestedActions).length > 0 ? (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {getRenderableActions(message.suggestedActions).map((action, index) => {
@@ -744,7 +836,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                     }
                   }}
                   className="min-h-[76px] flex-1 rounded-[22px] border border-cars-gray-light px-4 py-3 text-sm leading-6 text-cars-primary outline-none focus:border-cars-accent"
-                  placeholder="Tell the advisor what you need. Example: I need a family SUV for city driving under 1 billion VND."
+                  placeholder="Example: Family use, SUV, under 1 billion."
                 />
                 <button
                   type="button"

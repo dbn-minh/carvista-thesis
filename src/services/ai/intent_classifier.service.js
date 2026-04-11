@@ -117,7 +117,7 @@ function buildMissingFields(intent, entities, context) {
     if (entities.country == null && context.market_id == null) missing.push("country");
     if (entities.vehicles.length < 1 && !context.focus_variant_id && entities.budget == null) missing.push("vehicle_or_price");
   }
-  if (intent === "recommend_car" && entities.budget == null) missing.push("budget");
+  if (intent === "recommend_car" && entities.budget == null && !context.advisor_profile?.budget_flexibility) missing.push("budget");
   return missing;
 }
 

@@ -60,6 +60,7 @@ export type VariantDetail = {
 };
 
 export type AdvisorProfile = {
+  budget_min?: number | null;
   budget_max?: number | null;
   environment?: string | null;
   long_trip_habit?: string | null;
@@ -72,10 +73,33 @@ export type AdvisorProfile = {
   new_vs_used?: string | null;
 };
 
+export type AdvisorState = {
+  step?: string | null;
+  use_case?: string | null;
+  vehicle_type?: string | null;
+  seat_count?: number | null;
+  budget_min?: number | null;
+  budget_max?: number | null;
+  ownership_preference?: string | null;
+  candidates?: Array<{
+    variant_id?: number | null;
+    title?: string | null;
+    score?: number | null;
+    detail_url?: string | null;
+    image_url?: string | null;
+  }>;
+};
+
 export type AiInsightCard = {
   title: string;
   value?: string | number | null;
   description: string;
+  image_url?: string | null;
+  href?: string | null;
+  action?: {
+    type: string;
+    payload?: Record<string, unknown>;
+  } | null;
 };
 
 export type AiSource = {
@@ -390,6 +414,7 @@ export type ChatResponse = {
   caveats?: string[];
   freshness_note?: string | null;
   advisor_profile: AdvisorProfile;
+  advisor_state?: AdvisorState | null;
   suggested_actions: AiSuggestedAction[];
   follow_up_questions: string[];
   facts_used: Array<Record<string, unknown>>;
@@ -403,5 +428,7 @@ export type ChatResponse = {
     latency_ms: number;
     route_service?: string | null;
     missing_fields?: string[];
+    advisor_restart?: boolean;
+    turn_type?: string;
   };
 };

@@ -15,6 +15,75 @@ function normalizedPrice(item) {
   return toNumberOrNull(item.latest_price ?? item.avg_asking_price ?? item.msrp_base);
 }
 
+function isAvailableCatalogCandidate(item) {
+  if (item.is_placeholder === true || item.is_placeholder === 1 || item.is_placeholder === "1") return false;
+  if (String(item.status || "").toLowerCase() === "unavailable") return false;
+  return true;
+}
+
+function matchesDealBreaker(item, dealBreaker) {
+  const normalized = String(dealBreaker || "").toLowerCase();
+  if (!normalized) return false;
+  if (normalized === "manual_transmission") return String(item.transmission || "").toLowerCase().includes("manual");
+  if (normalized === "ev_powertrain") return String(item.fuel_type || "").toLowerCase() === "ev";
+  if (normalized === "oversized_vehicle") {
+    const length = toNumberOrNull(item.length_mm);
+    return ["pickup", "full_size_suv"].includes(String(item.body_type || "").toLowerCase()) || (length != null && length > 4900);
+  }
+  if (normalized === "avoid_chinese_brands") return ["byd", "vinfast", "mg", "great wall", "haval", "geely", "chery"].includes(String(item.make_name || "").toLowerCase());
+  return false;
+}
+
+function buildHardFilterFailures(item, profile = {}) {
+  const failures = [];
+  const price = normalizedPrice(item);
+  const preferredBodies = (profile.preferred_body_types ?? [])
+    .map((value) => String(value || "").toLowerCase())
+    .filter((value) => value && value !== "any");
+  const rejectedBodies = (profile.rejected_body_types ?? [])
+    .map((value) => String(value || "").toLowerCase())
+    .filter(Boolean);
+  const preferredFuels = (profile.preferred_fuel_types ?? [])
+    .map((value) => String(value || "").toLowerCase())
+    .filter((value) => value && value !== "any");
+  const rejectedFuels = (profile.rejected_fuel_types ?? [])
+    .map((value) => String(value || "").toLowerCase())
+    .filter(Boolean);
+  const seatNeed = profile.needs_7_seats
+    ? 7
+    : toNumberOrNull(profile.regular_passenger_count ?? profile.family_size ?? profile.passenger_count);
+  const seats = toNumberOrNull(item.seats);
+  const bodyType = String(item.body_type || "").toLowerCase();
+  const fuelType = String(item.fuel_type || "").toLowerCase();
+  const bodyRequirement = String(profile.body_type_requirement || "").toLowerCase();
+  const fuelRequirement = String(profile.fuel_type_requirement || "").toLowerCase();
+  const seatRequirement = String(profile.seat_requirement || "").toLowerCase();
+  const brandRejections = (profile.brand_rejections ?? []).map((value) => String(value || "").toLowerCase()).filter(Boolean);
+  const dealBreakers = (profile.deal_breakers ?? []).map((value) => String(value || "").toLowerCase()).filter(Boolean);
+
+  if (!isAvailableCatalogCandidate(item)) failures.push("not available in the catalog");
+  if (rejectedBodies.includes(bodyType)) failures.push("explicitly excluded body style");
+  if (preferredBodies.length && bodyRequirement === "hard" && !preferredBodies.includes(bodyType)) {
+    failures.push("different vehicle type");
+  }
+  if (preferredFuels.length && fuelRequirement === "hard" && !preferredFuels.includes(fuelType)) {
+    failures.push("different fuel type");
+  }
+  if (rejectedFuels.includes(fuelType)) failures.push("explicitly excluded fuel type");
+  if (brandRejections.includes(String(item.make_name || "").toLowerCase())) failures.push("belongs to an excluded brand");
+  if (seatNeed != null && seats != null && seats < Math.min(seatNeed, 7) && seatRequirement !== "soft") {
+    failures.push("below requested seating");
+  }
+  if (profile.budget_ceiling != null && price != null && price > profile.budget_ceiling * 1.08) {
+    failures.push("above budget range");
+  }
+  for (const dealBreaker of dealBreakers) {
+    if (matchesDealBreaker(item, dealBreaker)) failures.push(`hits deal-breaker: ${dealBreaker.replaceAll("_", " ")}`);
+  }
+
+  return failures;
+}
+
 function buildMarketSummary(item) {
   const activeListingCount = toNumberOrNull(item.active_listing_count);
   const avgAsking = toNumberOrNull(item.avg_asking_price);
@@ -35,11 +104,98 @@ function buildProfileSummary(profile = {}) {
     profile.primary_use_cases?.length ? `main use: ${profile.primary_use_cases.slice(0, 2).join(" & ").replaceAll("_", " ")}` : null,
     profile.budget_target ? `target budget ${profile.budget_target.toLocaleString("en-US")}` : null,
     profile.budget_ceiling && profile.budget_ceiling !== profile.budget_target ? `ceiling ${profile.budget_ceiling.toLocaleString("en-US")}` : null,
+    profile.budget_mode === "open" ? "open budget" : null,
+    profile.price_positioning ? `${profile.price_positioning} positioning` : null,
     profile.passenger_count ? `${profile.passenger_count} passengers` : null,
+    profile.rejected_body_types?.length ? `avoid ${profile.rejected_body_types.slice(0, 2).join(" & ")}` : null,
     profile.city_vs_highway_ratio ? `${profile.city_vs_highway_ratio.replaceAll("_", " ")} use` : null,
   ]
     .filter(Boolean)
     .join(", ");
+}
+
+function buildPriceStats(rows = []) {
+  const prices = rows.map((row) => normalizedPrice(row)).filter((value) => Number.isFinite(value));
+  if (!prices.length) return { min: null, max: null, range: null };
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  return {
+    min,
+    max,
+    range: Math.max(max - min, 1),
+  };
+}
+
+function isPremiumLikeCandidate(item) {
+  const make = String(item.make_name || "").toLowerCase();
+  return ["bmw", "mercedes-benz", "mercedes", "audi", "lexus", "volvo", "land rover", "porsche", "ferrari", "lamborghini", "mclaren", "aston martin"].includes(make) || (normalizedPrice(item) ?? 0) >= 1_400_000_000;
+}
+
+function buildPricePositioningAdjustment(item, profile = {}, stats = {}) {
+  const price = normalizedPrice(item);
+  if (price == null || stats.min == null || stats.max == null || !profile.price_positioning) {
+    return { value: 0, reason: null };
+  }
+
+  const priceRank = stats.range > 0 ? (price - stats.min) / stats.range : 0.5;
+  switch (profile.price_positioning) {
+    case "flagship":
+      return {
+        value: clamp(Math.round(priceRank * 18 + (isPremiumLikeCandidate(item) ? 3 : 0)), 0, 22),
+        reason: priceRank >= 0.6 ? "sits at the flagship end of the current catalog" : null,
+      };
+    case "premium":
+      return {
+        value: clamp(Math.round(priceRank * 10 + (isPremiumLikeCandidate(item) ? 3 : 0)), 0, 14),
+        reason: priceRank >= 0.5 ? "leans toward the premium end of the current catalog" : null,
+      };
+    case "value":
+      return {
+        value: clamp(Math.round((1 - priceRank) * 10 + (!isPremiumLikeCandidate(item) ? 2 : 0)), 0, 12),
+        reason: priceRank <= 0.45 ? "lands closer to the stronger value end of the catalog" : null,
+      };
+    case "budget":
+      return {
+        value: clamp(Math.round((1 - priceRank) * 14 + (!isPremiumLikeCandidate(item) ? 2 : 0)), 0, 16),
+        reason: priceRank <= 0.35 ? "stays closer to the more accessible end of the catalog" : null,
+      };
+    default:
+      return { value: 0, reason: null };
+  }
+}
+
+function buildPreferenceAdjustment(item, profile = {}) {
+  const bodyType = String(item.body_type || "").toLowerCase();
+  const fuelType = String(item.fuel_type || "").toLowerCase();
+  const preferredBodies = (profile.preferred_body_types ?? []).map((value) => String(value || "").toLowerCase()).filter((value) => value && value !== "any");
+  const rejectedBodies = (profile.rejected_body_types ?? []).map((value) => String(value || "").toLowerCase()).filter(Boolean);
+  const preferredFuels = (profile.preferred_fuel_types ?? []).map((value) => String(value || "").toLowerCase()).filter((value) => value && value !== "any");
+  const rejectedFuels = (profile.rejected_fuel_types ?? []).map((value) => String(value || "").toLowerCase()).filter(Boolean);
+  const reasons = [];
+  let value = 0;
+
+  if (preferredBodies.includes(bodyType)) {
+    value += profile.body_type_requirement === "hard" ? 10 : 7;
+    reasons.push("matches your preferred body style");
+  } else if (preferredBodies.length && profile.body_type_requirement !== "hard") {
+    value -= 4;
+  }
+
+  if (rejectedBodies.includes(bodyType)) value -= 12;
+
+  if (preferredFuels.includes(fuelType)) {
+    value += profile.fuel_type_requirement === "hard" ? 8 : 5;
+    reasons.push("fits your preferred fuel type");
+  } else if (preferredFuels.length && profile.fuel_type_requirement !== "hard") {
+    value -= 3;
+  }
+
+  if (rejectedFuels.includes(fuelType)) value -= 8;
+
+  return {
+    value: clamp(value, -16, 16),
+    reasons: reasons.slice(0, 2),
+  };
 }
 
 function candidateFromVariantContext(context) {
@@ -70,8 +226,9 @@ async function loadRecommendationEnrichment(ctx, variantIds = [], market_id = 1)
   const marketSignalMap = new Map();
   const specMap = new Map();
   const featureMap = new Map();
+  const imageMap = new Map();
 
-  if (!variantIds.length) return { reviewMap, marketSignalMap, specMap, featureMap };
+  if (!variantIds.length) return { reviewMap, marketSignalMap, specMap, featureMap, imageMap };
 
   try {
     const [reviewRows] = await ctx.sequelize.query(
@@ -150,7 +307,25 @@ async function loadRecommendationEnrichment(ctx, variantIds = [], market_id = 1)
     }
   }
 
-  return { reviewMap, marketSignalMap, specMap, featureMap };
+  if (ctx.models?.VariantImages?.findAll) {
+    try {
+      const imageRows = await ctx.models.VariantImages.findAll({
+        where: { variant_id: variantIds },
+        attributes: ["variant_id", "url", "sort_order"],
+        order: [["variant_id", "ASC"], ["sort_order", "ASC"]],
+      });
+      for (const row of imageRows) {
+        const plain = row.toJSON ? row.toJSON() : row;
+        const variantId = Number(plain.variant_id);
+        if (!Number.isInteger(variantId) || imageMap.has(variantId)) continue;
+        imageMap.set(variantId, plain.url ?? null);
+      }
+    } catch {
+      // Optional enrichment.
+    }
+  }
+
+  return { reviewMap, marketSignalMap, specMap, featureMap, imageMap };
 }
 
 function buildRecommendationReasons(item, evaluation) {
@@ -228,12 +403,15 @@ export async function recommendCars(ctx, { profile, market_id = 1 }) {
       cv.drivetrain,
       cv.seats,
       cv.msrp_base,
+      cv.is_placeholder,
       cm.name AS model_name,
       mk.name AS make_name,
-      latest.price AS latest_price
+      COALESCE(latest.price, active.avg_asking_price) AS latest_price,
+      COALESCE(active.active_listing_count, 0) AS active_listing_count
     FROM car_variants cv
     JOIN car_models cm ON cm.model_id = cv.model_id
     JOIN car_makes mk ON mk.make_id = cm.make_id
+    JOIN markets m ON m.market_id = :market_id
     LEFT JOIN (
       SELECT x.variant_id, x.price
       FROM variant_price_history x
@@ -247,13 +425,22 @@ export async function recommendCars(ctx, { profile, market_id = 1 }) {
        AND latest_source.max_captured_at = x.captured_at
       WHERE x.market_id = :market_id AND x.price_type = 'avg_market'
     ) latest ON latest.variant_id = cv.variant_id
+    LEFT JOIN (
+      SELECT l.variant_id, COUNT(*) AS active_listing_count, AVG(l.asking_price) AS avg_asking_price
+      FROM listings l
+      JOIN markets listing_market ON listing_market.country_code = l.location_country_code
+      WHERE listing_market.market_id = :market_id AND l.status = 'active'
+      GROUP BY l.variant_id
+    ) active ON active.variant_id = cv.variant_id
+    WHERE cv.is_placeholder = 0
     ORDER BY cv.model_year DESC, mk.name, cm.name
     LIMIT 140
   `;
 
   const [rows] = await ctx.sequelize.query(sql, { replacements: { market_id } });
+  const priceStats = buildPriceStats(rows);
   const variantIds = rows.map((row) => Number(row.variant_id)).filter((value) => Number.isInteger(value));
-  const { reviewMap, marketSignalMap, specMap, featureMap } = await loadRecommendationEnrichment(ctx, variantIds, market_id);
+  const { reviewMap, marketSignalMap, specMap, featureMap, imageMap } = await loadRecommendationEnrichment(ctx, variantIds, market_id);
 
   const evaluated = rows
     .map((row) => {
@@ -264,29 +451,52 @@ export async function recommendCars(ctx, { profile, market_id = 1 }) {
         ...(marketSignalMap.get(variantId) ?? {}),
         ...(specMap.get(variantId) ?? {}),
         feature_map: featureMap.get(variantId) ?? {},
+        thumbnail_url: imageMap.get(variantId) ?? null,
         name: [row.model_year, row.make_name, row.model_name, row.trim_name].filter(Boolean).join(" "),
       };
       const evaluation = evaluateRecommendationCandidate(candidate, normalizedProfile);
+      const pricePositioningAdjustment = buildPricePositioningAdjustment(candidate, normalizedProfile, priceStats);
+      const preferenceAdjustment = buildPreferenceAdjustment(candidate, normalizedProfile);
       return {
         ...candidate,
         evaluation,
-        score: evaluation.final_score,
+        price_positioning_adjustment: pricePositioningAdjustment,
+        preference_adjustment: preferenceAdjustment,
+        hard_filter_failures: buildHardFilterFailures(candidate, normalizedProfile),
+        score: clamp(evaluation.final_score + pricePositioningAdjustment.value + preferenceAdjustment.value, 0, 100),
       };
     })
-    .filter((item) => !item.evaluation.hard_fail)
+    .filter((item) => !item.evaluation.hard_fail);
+
+  const strictMatches = evaluated.filter((item) => item.hard_filter_failures.length === 0);
+  const closestAvailableFallback = strictMatches.length < Math.min(2, evaluated.length);
+  const rankedSource = (closestAvailableFallback ? evaluated : strictMatches)
     .sort((left, right) => right.score - left.score)
     .slice(0, 3);
 
-  const links = await linkRecommendationTargets(ctx, evaluated);
-  const ranked = evaluated.map((item, index, array) => {
+  const links = await linkRecommendationTargets(ctx, rankedSource);
+  const ranked = rankedSource.map((item, index, array) => {
     const evaluation = item.evaluation;
+    const reasons = [
+      ...(item.price_positioning_adjustment?.reason ? [item.price_positioning_adjustment.reason] : []),
+      ...buildRecommendationReasons(item, evaluation),
+      ...(item.preference_adjustment?.reasons ?? []),
+    ].slice(0, 4);
     return {
       variant_id: item.variant_id ?? null,
       name: item.name,
-      score: evaluation.final_score,
-      fit_label: fitLabel(evaluation.final_score),
-      reasons: buildRecommendationReasons(item, evaluation),
-      caveats: buildRecommendationCaveats(evaluation),
+      body_type: item.body_type ?? null,
+      fuel_type: item.fuel_type ?? null,
+      seats: toNumberOrNull(item.seats),
+      latest_price: normalizedPrice(item),
+      score: item.score,
+      fit_label: fitLabel(item.score),
+      reasons,
+      caveats: [
+        ...(closestAvailableFallback && item.hard_filter_failures.length ? [`Closest available match: ${item.hard_filter_failures.join(", ")}`] : []),
+        ...buildRecommendationCaveats(evaluation),
+      ].slice(0, 3),
+      thumbnail_url: item.thumbnail_url ?? null,
       market_summary: buildMarketSummary(item),
       links: links[index] ?? null,
       fit_scores: evaluation.fit_scores,
@@ -297,21 +507,24 @@ export async function recommendCars(ctx, { profile, market_id = 1 }) {
   });
 
   const profileSummary = buildProfileSummary(normalizedProfile);
-  const marketCoverage = evaluated.filter((item) => item.market_summary).length;
-  const reviewCoverage = evaluated.filter((item) => (item.review_count ?? 0) > 0).length;
-  const specCoverage = evaluated.filter((item) => Object.keys(item.feature_map ?? {}).length > 0 || item.power_hp != null).length;
+  const marketCoverage = rankedSource.filter((item) => item.market_summary).length;
+  const reviewCoverage = rankedSource.filter((item) => (item.review_count ?? 0) > 0).length;
+  const specCoverage = rankedSource.filter((item) => Object.keys(item.feature_map ?? {}).length > 0 || item.power_hp != null).length;
+  const coverageDenominator = Math.max(rankedSource.length, 1);
 
   return recommendationResultSchema.parse({
     intent: "recommend_car",
     ranked_vehicles: ranked,
-    profile_summary: profileSummary || "partial buyer profile",
+    profile_summary: closestAvailableFallback
+      ? `closest available matches${profileSummary ? ` for ${profileSummary}` : ""}`
+      : profileSummary || "partial buyer profile",
     confidence: buildConfidence(
       clamp(
         0.45 +
           Object.keys(normalizedProfile || {}).length * 0.01 +
-          (marketCoverage / Math.max(evaluated.length, 1)) * 0.12 +
-          (reviewCoverage / Math.max(evaluated.length, 1)) * 0.08 +
-          (specCoverage / Math.max(evaluated.length, 1)) * 0.12,
+          (marketCoverage / coverageDenominator) * 0.12 +
+          (reviewCoverage / coverageDenominator) * 0.08 +
+          (specCoverage / coverageDenominator) * 0.12,
         0.45,
         0.9
       ),

@@ -11,6 +11,8 @@ import { fetchOfficialVehicleSignals, loadListingMarketSignals } from "./source_
 import { recommendCars } from "./recommendation.service.js";
 import { calculateTco } from "./tco.service.js";
 
+process.env.NODE_ENV = "test";
+
 const menuXml = `<?xml version="1.0" encoding="UTF-8"?><menuItems><menuItem><text>Auto</text><value>42015</value></menuItem></menuItems>`;
 const vehicleXml = `<?xml version="1.0" encoding="UTF-8"?><vehicle><comb08>34</comb08><city08>29</city08><highway08>41</highway08><fuelCost08>1300</fuelCost08><fuelType1>Regular Gasoline</fuelType1><drive>Front-Wheel Drive</drive><VClass>Midsize Cars</VClass></vehicle>`;
 const recallsPayload = {
@@ -404,6 +406,14 @@ test("recommendation service returns deep links into vehicle detail and related 
           ];
         },
       },
+      VariantImages: {
+        async findAll() {
+          return [
+            { variant_id: 7, url: "/images/corolla-cross.jpg", sort_order: 0 },
+            { variant_id: 9, url: "/images/civic.jpg", sort_order: 0 },
+          ];
+        },
+      },
     },
   };
 
@@ -421,8 +431,328 @@ test("recommendation service returns deep links into vehicle detail and related 
   assert.ok(result.ranked_vehicles[0].links?.detail_page_url?.includes("/catalog/7"));
   assert.ok(result.ranked_vehicles[0].links?.related_listings_url?.includes("/listings?mode=match&variantId=7"));
   assert.deepEqual(result.ranked_vehicles[0].links?.related_listing_ids, [101, 102]);
+  assert.equal(result.ranked_vehicles[0].thumbnail_url, "/images/corolla-cross.jpg");
   assert.ok(result.ranked_vehicles[0].reasons.some((reason) => /owner sentiment|market/i.test(reason)));
   assert.ok(result.ranked_vehicles[0].market_summary?.includes("live-style"));
+});
+
+test("recommendation service prioritizes exotic catalog matches for high-budget performance profiles", async () => {
+  const ctx = {
+    sequelize: {
+      async query(sql) {
+        if (sql.includes("FROM car_variants cv")) {
+          return [[
+            {
+              variant_id: 183,
+              model_year: 2024,
+              trim_name: "Competition xDrive",
+              body_type: "coupe",
+              fuel_type: "gasoline",
+              engine: "3.0L",
+              transmission: "8-Speed Automatic",
+              drivetrain: "AWD",
+              seats: 4,
+              msrp_base: 4250000000,
+              model_name: "M4",
+              make_name: "BMW",
+              latest_price: 3706839139,
+            },
+            {
+              variant_id: 175,
+              model_year: 2021,
+              trim_name: "Base",
+              body_type: "coupe",
+              fuel_type: "gasoline",
+              engine: "3.9L V8",
+              transmission: "7-Speed Dual-Clutch",
+              drivetrain: "RWD",
+              seats: 2,
+              msrp_base: 18900000000,
+              model_name: "F8 Tributo",
+              make_name: "Ferrari",
+              latest_price: 12180856840,
+            },
+            {
+              variant_id: 178,
+              model_year: 2020,
+              trim_name: "Coupe",
+              body_type: "coupe",
+              fuel_type: "gasoline",
+              engine: "4.0L V8",
+              transmission: "7-Speed Dual-Clutch",
+              drivetrain: "RWD",
+              seats: 2,
+              msrp_base: 18200000000,
+              model_name: "720S",
+              make_name: "McLaren",
+              latest_price: 11684876144,
+            },
+          ]];
+        }
+
+        if (sql.includes("FROM car_reviews") || sql.includes("FROM vehicle_market_signals")) {
+          return [[]];
+        }
+
+        throw new Error(`Unexpected SQL in exotic recommendation test: ${sql}`);
+      },
+    },
+    models: {
+      Listings: {
+        async findAll() {
+          return [];
+        },
+      },
+      VariantSpecs: {
+        async findAll() {
+          return [
+            { variant_id: 183, power_hp: 523 },
+            { variant_id: 175, power_hp: 710 },
+            { variant_id: 178, power_hp: 710 },
+          ];
+        },
+      },
+      VariantSpecKv: {
+        async findAll() {
+          return [];
+        },
+      },
+      VariantImages: {
+        async findAll() {
+          return [];
+        },
+      },
+    },
+  };
+
+  const result = await recommendCars(ctx, {
+    profile: {
+      primary_use_cases: ["lifestyle"],
+      preferred_body_types: ["coupe"],
+      budget_target: 20000000000,
+      budget_ceiling: 20000000000,
+      performance_priority: 0.95,
+      tradeoff_preferences: ["performance_over_reliability"],
+      emotional_motivators: ["sporty_identity"],
+    },
+    market_id: 1,
+  });
+
+  assert.match(result.ranked_vehicles[0].name, /Ferrari|McLaren/);
+  assert.doesNotMatch(result.ranked_vehicles[0].name, /BMW M4/);
+  assert.ok(result.ranked_vehicles[0].reasons.some((reason) => /performance|supercar/i.test(reason)));
+});
+
+test("recommendation service can use open-budget flagship positioning without a numeric ceiling", async () => {
+  const ctx = {
+    sequelize: {
+      async query(sql) {
+        if (sql.includes("FROM car_variants cv")) {
+          return [[
+            {
+              variant_id: 183,
+              model_year: 2024,
+              trim_name: "Competition xDrive",
+              body_type: "coupe",
+              fuel_type: "gasoline",
+              engine: "3.0L",
+              transmission: "8-Speed Automatic",
+              drivetrain: "AWD",
+              seats: 4,
+              msrp_base: 4250000000,
+              model_name: "M4",
+              make_name: "BMW",
+              latest_price: 3706839139,
+            },
+            {
+              variant_id: 175,
+              model_year: 2021,
+              trim_name: "Base",
+              body_type: "coupe",
+              fuel_type: "gasoline",
+              engine: "3.9L V8",
+              transmission: "7-Speed Dual-Clutch",
+              drivetrain: "RWD",
+              seats: 2,
+              msrp_base: 18900000000,
+              model_name: "F8 Tributo",
+              make_name: "Ferrari",
+              latest_price: 12180856840,
+            },
+            {
+              variant_id: 178,
+              model_year: 2020,
+              trim_name: "Coupe",
+              body_type: "coupe",
+              fuel_type: "gasoline",
+              engine: "4.0L V8",
+              transmission: "7-Speed Dual-Clutch",
+              drivetrain: "RWD",
+              seats: 2,
+              msrp_base: 18200000000,
+              model_name: "720S",
+              make_name: "McLaren",
+              latest_price: 11684876144,
+            },
+          ]];
+        }
+
+        if (sql.includes("FROM car_reviews") || sql.includes("FROM vehicle_market_signals")) {
+          return [[]];
+        }
+
+        throw new Error(`Unexpected SQL in open-budget flagship test: ${sql}`);
+      },
+    },
+    models: {
+      Listings: {
+        async findAll() {
+          return [];
+        },
+      },
+      VariantSpecs: {
+        async findAll() {
+          return [
+            { variant_id: 183, power_hp: 523 },
+            { variant_id: 175, power_hp: 710 },
+            { variant_id: 178, power_hp: 710 },
+          ];
+        },
+      },
+      VariantSpecKv: {
+        async findAll() {
+          return [];
+        },
+      },
+      VariantImages: {
+        async findAll() {
+          return [];
+        },
+      },
+    },
+  };
+
+  const result = await recommendCars(ctx, {
+    profile: {
+      primary_use_cases: ["lifestyle"],
+      preferred_body_types: ["coupe"],
+      budget_mode: "open",
+      budget_flexibility: "open",
+      price_positioning: "flagship",
+      style_intent: "halo",
+      performance_priority: 0.95,
+      tradeoff_preferences: ["performance_over_reliability"],
+      emotional_motivators: ["sporty_identity"],
+    },
+    market_id: 1,
+  });
+
+  assert.match(result.profile_summary, /open budget/i);
+  assert.match(result.profile_summary, /flagship positioning/i);
+  assert.match(result.ranked_vehicles[0].name, /Ferrari/);
+  assert.ok(result.ranked_vehicles[0].reasons.some((reason) => /flagship end of the current catalog/i.test(reason)));
+});
+
+test("recommendation service honors excluded body styles while keeping the shortlist grounded in catalog data", async () => {
+  const ctx = {
+    sequelize: {
+      async query(sql) {
+        if (sql.includes("FROM car_variants cv")) {
+          return [[
+            {
+              variant_id: 7,
+              model_year: 2024,
+              trim_name: "Hybrid Premium",
+              body_type: "suv",
+              fuel_type: "hybrid",
+              engine: "2.0L",
+              transmission: "AT",
+              drivetrain: "FWD",
+              seats: 5,
+              msrp_base: 980000000,
+              model_name: "Corolla Cross",
+              make_name: "Toyota",
+              latest_price: 955000000,
+            },
+            {
+              variant_id: 11,
+              model_year: 2024,
+              trim_name: "Premium",
+              body_type: "mpv",
+              fuel_type: "gasoline",
+              engine: "1.5L",
+              transmission: "AT",
+              drivetrain: "FWD",
+              seats: 7,
+              msrp_base: 990000000,
+              model_name: "Xpander",
+              make_name: "Mitsubishi",
+              latest_price: 985000000,
+            },
+            {
+              variant_id: 9,
+              model_year: 2024,
+              trim_name: "Touring",
+              body_type: "sedan",
+              fuel_type: "gasoline",
+              engine: "1.5T",
+              transmission: "CVT",
+              drivetrain: "FWD",
+              seats: 5,
+              msrp_base: 910000000,
+              model_name: "Civic",
+              make_name: "Honda",
+              latest_price: 905000000,
+            },
+          ]];
+        }
+
+        if (sql.includes("FROM car_reviews") || sql.includes("FROM vehicle_market_signals")) {
+          return [[]];
+        }
+
+        throw new Error(`Unexpected SQL in exclusion shortlist test: ${sql}`);
+      },
+    },
+    models: {
+      Listings: {
+        async findAll() {
+          return [];
+        },
+      },
+      VariantSpecs: {
+        async findAll() {
+          return [];
+        },
+      },
+      VariantSpecKv: {
+        async findAll() {
+          return [];
+        },
+      },
+      VariantImages: {
+        async findAll() {
+          return [];
+        },
+      },
+    },
+  };
+
+  const result = await recommendCars(ctx, {
+    profile: {
+      primary_use_cases: ["family"],
+      rejected_body_types: ["suv"],
+      body_type_requirement: "open",
+      budget_target: 1000000000,
+      budget_ceiling: 1000000000,
+      tradeoff_preferences: ["balanced"],
+    },
+    market_id: 1,
+  });
+
+  assert.match(result.profile_summary, /avoid suv/i);
+  assert.doesNotMatch(result.ranked_vehicles[0].body_type ?? "", /^suv$/i);
+  assert.ok(result.ranked_vehicles.every((vehicle) => vehicle.body_type !== "suv"));
 });
 
 test("listing signal loader prefers persisted market snapshots before live listing queries", async () => {
@@ -527,7 +857,7 @@ test("chat advisor preserves frontend contract while using layered orchestration
   assert.equal(messages[2].role, "assistant");
 });
 
-test("chat advisor asks grouped missing buyer-profile questions before recommending", async () => {
+test("chat advisor asks one buyer-profile question at a time before recommending", async () => {
   const sessions = [];
   const messages = [];
   let sessionIdCounter = 70;
@@ -569,14 +899,553 @@ test("chat advisor asks grouped missing buyer-profile questions before recommend
   assert.equal(response.intent, "recommend_car");
   assert.equal(response.needs_clarification, true);
   assert.equal(response.structured_result, null);
-  assert.deepEqual(response.meta?.missing_fields, ["budget_range", "passenger_setup", "top_priorities"]);
-  assert.equal(response.follow_up_questions.length, 3);
-  assert.match(response.answer, /1\. .*2\. .*3\./);
+  assert.deepEqual(response.meta?.missing_fields, ["passenger_setup"]);
+  assert.equal(response.follow_up_questions.length, 1);
+  assert.equal(response.follow_up_questions[0], "What type of vehicle do you prefer?");
+  assert.match(response.answer, /daily commuting/i);
+  assert.match(response.answer, /What type of vehicle do you prefer\?/);
+  assert.doesNotMatch(response.answer, /What is your budget range\?/);
+  assert.doesNotMatch(response.answer, /Still needed|Moderate confidence|You can answer all|1\./i);
+  assert.equal(response.cards.length, 0);
   assert.equal(messages.length, 2);
   assert.deepEqual(sessions[0].context_json.pending_flow.missing_fields, response.meta.missing_fields);
 });
 
-test("chat advisor can return a temporary shortlist when the user declines more intake questions", async () => {
+test("chat advisor accepts niche performance use cases instead of repeating the same question", async () => {
+  const sessions = [];
+  const messages = [];
+  let sessionIdCounter = 71;
+
+  const ctx = {
+    sequelize: {},
+    models: {
+      AiChatSessions: {
+        async create(payload) {
+          const row = {
+            session_id: sessionIdCounter++,
+            ...payload,
+            async update(next) {
+              Object.assign(this, next);
+            },
+          };
+          sessions.push(row);
+          return row;
+        },
+      },
+      AiChatMessages: {
+        async create(payload) {
+          messages.push(payload);
+          return payload;
+        },
+      },
+    },
+  };
+
+  const response = await chatAdvisor(ctx, {
+    user_id: 42,
+    message: "for drifting",
+    context: { market_id: 1 },
+  });
+
+  assert.equal(response.intent, "recommend_car");
+  assert.equal(response.needs_clarification, true);
+  assert.deepEqual(response.meta?.missing_fields, ["passenger_setup"]);
+  assert.equal(response.follow_up_questions[0], "What type of vehicle do you prefer?");
+  assert.match(response.answer, /fun or performance driving/i);
+  assert.match(response.answer, /What type of vehicle do you prefer\?/);
+  assert.doesNotMatch(response.answer, /Still needed|Moderate confidence|You can answer all|1\./i);
+  assert.ok(response.advisor_profile.primary_use_cases.includes("lifestyle"));
+  assert.ok(response.advisor_profile.performance_priority >= 0.9);
+});
+
+test("chat advisor answers an interruption and repeats the pending buyer-profile question", async () => {
+  const sessions = [];
+  const messages = [];
+  let sessionIdCounter = 72;
+
+  const ctx = {
+    sequelize: {},
+    models: {
+      AiChatSessions: {
+        async create(payload) {
+          const row = {
+            session_id: sessionIdCounter++,
+            ...payload,
+            async update(next) {
+              Object.assign(this, next);
+            },
+          };
+          sessions.push(row);
+          return row;
+        },
+        async findByPk(id) {
+          return sessions.find((item) => item.session_id === id) ?? null;
+        },
+      },
+      AiChatMessages: {
+        async create(payload) {
+          messages.push(payload);
+          return payload;
+        },
+      },
+    },
+  };
+
+  const first = await chatAdvisor(ctx, {
+    user_id: 42,
+    message: "Family use",
+    context: { market_id: 1 },
+  });
+
+  assert.equal(first.intent, "recommend_car");
+  assert.equal(first.follow_up_questions[0], "What type of vehicle do you prefer?");
+
+  const second = await chatAdvisor(ctx, {
+    session_id: first.session_id,
+    user_id: 42,
+    message: "Explain the difference between hybrid and plug-in hybrid",
+    context: { market_id: 1 },
+  });
+
+  assert.equal(second.intent, "vehicle_general_qa");
+  assert.equal(second.needs_clarification, true);
+  assert.match(second.answer, /regular hybrid|plug-?in hybrid/i);
+  assert.match(second.answer, /please answer this: What type of vehicle do you prefer\?/i);
+  assert.deepEqual(second.follow_up_questions, ["What type of vehicle do you prefer?"]);
+  assert.equal(sessions[0].context_json.pending_question_key, "passenger_setup");
+  assert.equal(sessions[0].context_json.conversation_state.pending_clarification.intent, "recommend_car");
+  assert.equal(sessions[0].context_json.conversation_state.pending_clarification.field, "passenger_setup");
+  assert.equal(sessions[0].context_json.active_topic.intent, "recommend_car");
+  assert.deepEqual(sessions[0].context_json.advisor_profile.preferred_fuel_types, []);
+});
+
+test("chat advisor completes the guided recommendation flow in four short steps", async () => {
+  const sessions = [];
+  const messages = [];
+  let sessionIdCounter = 75;
+
+  const ctx = {
+    sequelize: {
+      async query(sql) {
+        if (sql.includes("FROM car_variants cv")) {
+          return [[
+            {
+              variant_id: 7,
+              model_year: 2024,
+              trim_name: "Hybrid Premium",
+              body_type: "suv",
+              fuel_type: "hybrid",
+              engine: "2.0L",
+              transmission: "AT",
+              drivetrain: "FWD",
+              seats: 5,
+              msrp_base: 980000000,
+              model_name: "Corolla Cross",
+              make_name: "Toyota",
+              latest_price: 955000000,
+            },
+            {
+              variant_id: 11,
+              model_year: 2024,
+              trim_name: "Premium",
+              body_type: "mpv",
+              fuel_type: "gasoline",
+              engine: "1.5L",
+              transmission: "AT",
+              drivetrain: "FWD",
+              seats: 7,
+              msrp_base: 990000000,
+              model_name: "Xpander",
+              make_name: "Mitsubishi",
+              latest_price: 985000000,
+            },
+            {
+              variant_id: 9,
+              model_year: 2024,
+              trim_name: "Touring",
+              body_type: "sedan",
+              fuel_type: "gasoline",
+              engine: "1.5T",
+              transmission: "CVT",
+              drivetrain: "FWD",
+              seats: 5,
+              msrp_base: 910000000,
+              model_name: "Civic",
+              make_name: "Honda",
+              latest_price: 905000000,
+            },
+          ]];
+        }
+
+        if (sql.includes("FROM car_reviews") || sql.includes("FROM vehicle_market_signals")) {
+          return [[]];
+        }
+
+        throw new Error(`Unexpected SQL in guided recommendation flow test: ${sql}`);
+      },
+    },
+    models: {
+      AiChatSessions: {
+        async create(payload) {
+          const row = {
+            session_id: sessionIdCounter++,
+            ...payload,
+            async update(next) {
+              Object.assign(this, next);
+            },
+          };
+          sessions.push(row);
+          return row;
+        },
+        async findByPk(id) {
+          return sessions.find((item) => item.session_id === id) ?? null;
+        },
+      },
+      AiChatMessages: {
+        async create(payload) {
+          messages.push(payload);
+          return payload;
+        },
+      },
+      Listings: {
+        async findAll() {
+          return [];
+        },
+      },
+      VariantSpecs: {
+        async findAll() {
+          return [];
+        },
+      },
+      VariantSpecKv: {
+        async findAll() {
+          return [];
+        },
+      },
+      VariantImages: {
+        async findAll() {
+          return [
+            { variant_id: 7, url: "/images/corolla-cross.jpg", sort_order: 0 },
+            { variant_id: 11, url: "/images/xpander.jpg", sort_order: 0 },
+            { variant_id: 9, url: "/images/civic.jpg", sort_order: 0 },
+          ];
+        },
+      },
+    },
+  };
+
+  const first = await chatAdvisor(ctx, {
+    user_id: 42,
+    message: "Family use",
+    context: { market_id: 1 },
+  });
+  assert.equal(first.follow_up_questions.length, 1);
+  assert.equal(first.follow_up_questions[0], "What type of vehicle do you prefer?");
+  assert.equal(first.cards.length, 0);
+
+  const second = await chatAdvisor(ctx, {
+    session_id: first.session_id,
+    user_id: 42,
+    message: "SUV",
+    context: { market_id: 1 },
+  });
+  assert.equal(second.follow_up_questions.length, 1);
+  assert.equal(second.follow_up_questions[0], "What is your budget range?");
+  assert.equal(second.cards.length, 0);
+
+  const third = await chatAdvisor(ctx, {
+    session_id: first.session_id,
+    user_id: 42,
+    message: "Under 1 billion",
+    context: { market_id: 1 },
+  });
+  assert.equal(third.follow_up_questions.length, 1);
+  assert.equal(third.follow_up_questions[0], "Do you prefer durability and low maintenance, or stronger performance and a sportier feel?");
+  assert.equal(third.cards.length, 0);
+
+  const final = await chatAdvisor(ctx, {
+    session_id: first.session_id,
+    user_id: 42,
+    message: "faster is better",
+    context: { market_id: 1 },
+  });
+
+  assert.equal(final.needs_clarification, false);
+  assert.equal(final.follow_up_questions.length, 0);
+  assert.match(final.answer, /Based on your needs, these are the best matches for you\./);
+  assert.ok(final.cards.length >= 2);
+  assert.ok(final.cards.length <= 3);
+  assert.ok(final.cards.every((card) => card.image_url));
+  assert.ok(final.cards.every((card) => card.href?.startsWith("/catalog/")));
+  assert.ok(final.cards.every((card) => card.action?.type === "open_vehicle_detail"));
+  assert.ok(final.advisor_profile.performance_priority >= 0.9);
+  assert.ok(final.advisor_profile.tradeoff_preferences.includes("performance_over_reliability"));
+  assert.ok(messages.length >= 8);
+
+  const restart = await chatAdvisor(ctx, {
+    session_id: first.session_id,
+    user_id: 42,
+    message: "recommend more",
+    context: { market_id: 1 },
+  });
+
+  assert.equal(restart.needs_clarification, true);
+  assert.equal(restart.follow_up_questions[0], "What will you mainly use the vehicle for?");
+  assert.equal(restart.cards.length, 0);
+  assert.equal(restart.advisor_profile.primary_use_cases.length, 0);
+  assert.match(restart.answer, /What will you mainly use the vehicle for\?/);
+});
+
+test("chat advisor treats natural flagship budget language as a valid budget answer", async () => {
+  const sessions = [];
+  const messages = [];
+  let sessionIdCounter = 140;
+
+  const ctx = {
+    sequelize: {
+      async query(sql) {
+        throw new Error(`Unexpected SQL in flagship budget clarification test: ${sql}`);
+      },
+    },
+    models: {
+      AiChatSessions: {
+        async create(payload) {
+          const row = {
+            session_id: sessionIdCounter++,
+            ...payload,
+            async update(next) {
+              Object.assign(this, next);
+            },
+          };
+          sessions.push(row);
+          return row;
+        },
+        async findByPk(id) {
+          return sessions.find((item) => item.session_id === id) ?? null;
+        },
+      },
+      AiChatMessages: {
+        async create(payload) {
+          messages.push(payload);
+          return payload;
+        },
+      },
+    },
+  };
+
+  const first = await chatAdvisor(ctx, {
+    user_id: 42,
+    message: "Family use",
+    context: { market_id: 1 },
+  });
+  const second = await chatAdvisor(ctx, {
+    session_id: first.session_id,
+    user_id: 42,
+    message: "SUV",
+    context: { market_id: 1 },
+  });
+  const third = await chatAdvisor(ctx, {
+    session_id: first.session_id,
+    user_id: 42,
+    message: "the most expensive one",
+    context: { market_id: 1 },
+  });
+
+  assert.equal(second.follow_up_questions[0], "What is your budget range?");
+  assert.equal(third.follow_up_questions[0], "Do you prefer durability and low maintenance, or stronger performance and a sportier feel?");
+  assert.equal(third.advisor_profile.budget_mode, "open");
+  assert.equal(third.advisor_profile.price_positioning, "flagship");
+  assert.doesNotMatch(third.answer, /What is your budget range\?/);
+  assert.doesNotMatch(third.answer, /budget around 0/i);
+});
+
+test("chat advisor treats negative body-style replies as exclusions instead of positive preference", async () => {
+  const sessions = [];
+  const messages = [];
+  let sessionIdCounter = 145;
+
+  const ctx = {
+    sequelize: {
+      async query(sql) {
+        throw new Error(`Unexpected SQL in body exclusion clarification test: ${sql}`);
+      },
+    },
+    models: {
+      AiChatSessions: {
+        async create(payload) {
+          const row = {
+            session_id: sessionIdCounter++,
+            ...payload,
+            async update(next) {
+              Object.assign(this, next);
+            },
+          };
+          sessions.push(row);
+          return row;
+        },
+        async findByPk(id) {
+          return sessions.find((item) => item.session_id === id) ?? null;
+        },
+      },
+      AiChatMessages: {
+        async create(payload) {
+          messages.push(payload);
+          return payload;
+        },
+      },
+    },
+  };
+
+  const first = await chatAdvisor(ctx, {
+    user_id: 42,
+    message: "racing",
+    context: { market_id: 1 },
+  });
+  const second = await chatAdvisor(ctx, {
+    session_id: first.session_id,
+    user_id: 42,
+    message: "anything except SUV",
+    context: { market_id: 1 },
+  });
+
+  assert.equal(second.follow_up_questions[0], "What is your budget range?");
+  assert.match(second.answer, /stay away from SUV/i);
+  assert.deepEqual(second.advisor_profile.rejected_body_types, ["suv"]);
+  assert.deepEqual(second.advisor_profile.preferred_body_types, []);
+  assert.equal(second.advisor_profile.body_type_requirement, "open");
+  assert.doesNotMatch(second.answer, /leaning toward an SUV/i);
+});
+
+test("chat advisor accepts flexible natural budget phrasing and moves to the tradeoff question", async () => {
+  const sessions = [];
+  let sessionIdCounter = 146;
+
+  const ctx = {
+    sequelize: {
+      async query(sql) {
+        throw new Error(`Unexpected SQL in flexible budget clarification test: ${sql}`);
+      },
+    },
+    models: {
+      AiChatSessions: {
+        async create(payload) {
+          const row = {
+            session_id: sessionIdCounter++,
+            ...payload,
+            async update(next) {
+              Object.assign(this, next);
+            },
+          };
+          sessions.push(row);
+          return row;
+        },
+        async findByPk(id) {
+          return sessions.find((item) => item.session_id === id) ?? null;
+        },
+      },
+      AiChatMessages: {
+        async create(payload) {
+          return payload;
+        },
+      },
+    },
+  };
+
+  const first = await chatAdvisor(ctx, {
+    user_id: 42,
+    message: "Mostly for commuting to work.",
+    context: { market_id: 1 },
+  });
+  const second = await chatAdvisor(ctx, {
+    session_id: first.session_id,
+    user_id: 42,
+    message: "Maybe a hatchback or sedan.",
+    context: { market_id: 1 },
+  });
+  const third = await chatAdvisor(ctx, {
+    session_id: first.session_id,
+    user_id: 42,
+    message: "I can stretch a bit for the right car.",
+    context: { market_id: 1 },
+  });
+
+  assert.equal(first.follow_up_questions[0], "What type of vehicle do you prefer?");
+  assert.equal(second.follow_up_questions[0], "What is your budget range?");
+  assert.equal(third.follow_up_questions[0], "Do you prefer durability and low maintenance, or stronger performance and a sportier feel?");
+  assert.equal(third.advisor_profile.budget_mode, "flexible");
+  assert.equal(third.advisor_profile.budget_flexibility, "flexible");
+  assert.doesNotMatch(third.answer, /What is your budget range\?/);
+});
+
+test("chat advisor clears prior performance profile when user asks for a new family car", async () => {
+  const sessions = [
+    {
+      session_id: 91,
+      user_id: 42,
+      context_json: {
+        market_id: 1,
+        advisor_profile: {
+          primary_use_cases: ["lifestyle"],
+          preferred_body_types: ["coupe"],
+          regular_passenger_count: 2,
+          budget_target: 20000000000,
+          budget_ceiling: 20000000000,
+          performance_priority: 0.95,
+          tradeoff_preferences: ["performance_over_reliability"],
+        },
+        active_topic: { intent: "recommend_car" },
+        conversation_state: {
+          active_intent: "recommend_car",
+          active_topic: { intent: "recommend_car" },
+          active_entities: { market_id: 1 },
+          pending_clarification: null,
+        },
+      },
+      async update(next) {
+        Object.assign(this, next);
+      },
+    },
+  ];
+  const messages = [];
+
+  const ctx = {
+    sequelize: {},
+    models: {
+      AiChatSessions: {
+        async findByPk(id) {
+          return sessions.find((item) => item.session_id === id) ?? null;
+        },
+      },
+      AiChatMessages: {
+        async create(payload) {
+          messages.push(payload);
+          return payload;
+        },
+      },
+    },
+  };
+
+  const response = await chatAdvisor(ctx, {
+    session_id: 91,
+    user_id: 42,
+    message: "okay now i need a family car",
+    context: { market_id: 1 },
+  });
+
+  assert.equal(response.intent, "recommend_car");
+  assert.equal(response.needs_clarification, true);
+  assert.equal(response.meta?.advisor_restart, true);
+  assert.deepEqual(response.advisor_profile.primary_use_cases, ["family"]);
+  assert.deepEqual(response.advisor_profile.preferred_body_types, []);
+  assert.equal(response.advisor_profile.budget_ceiling, null);
+  assert.equal(response.advisor_profile.performance_priority, 0);
+  assert.deepEqual(response.advisor_profile.tradeoff_preferences, []);
+  assert.equal(response.follow_up_questions[0], "What type of vehicle do you prefer?");
+  assert.doesNotMatch(response.answer, /Ferrari|Lamborghini|McLaren/i);
+  assert.equal(response.cards.length, 0);
+});
+
+test("chat advisor can return a concise shortlist when the user declines more intake questions", async () => {
   const sessions = [];
   const messages = [];
   let sessionIdCounter = 80;
@@ -679,6 +1548,15 @@ test("chat advisor can return a temporary shortlist when the user declines more 
           return [];
         },
       },
+      VariantImages: {
+        async findAll() {
+          return [
+            { variant_id: 7, url: "/images/corolla-cross.jpg", sort_order: 0 },
+            { variant_id: 9, url: "/images/civic.jpg", sort_order: 0 },
+            { variant_id: 11, url: "/images/xpander.jpg", sort_order: 0 },
+          ];
+        },
+      },
     },
   };
 
@@ -691,8 +1569,13 @@ test("chat advisor can return a temporary shortlist when the user declines more 
   assert.equal(response.intent, "recommend_car");
   assert.equal(response.needs_clarification, false);
   assert.ok(response.structured_result.ranked_vehicles.length >= 3);
-  assert.match(response.answer, /temporary shortlist/i);
-  assert.match(response.answer, /Why it fits: .*Watch-out: .*Best for:/);
+  const recommendationCard = response.cards.find((card) => card.title.includes("Corolla Cross"));
+  assert.equal(recommendationCard?.image_url, "/images/corolla-cross.jpg");
+  assert.equal(recommendationCard?.href, "/catalog/7");
+  assert.equal(recommendationCard?.action?.type, "open_vehicle_detail");
+  assert.match(response.answer, /closest matches currently available in our catalog/i);
+  assert.doesNotMatch(response.answer, /Why it fits:|Watch-out:|Best for:/);
+  assert.equal(response.follow_up_questions.length, 0);
   assert.equal(response.meta?.missing_fields.length, 0);
 });
 
@@ -701,6 +1584,7 @@ test("chat orchestrator formats recommendation shortlists with reasons caveats a
     primary_use_cases: ["family", "daily_commute"],
     budget_max: 1000000000,
     regular_passenger_count: 4,
+    tradeoff_preferences: ["reliability_over_performance"],
     city_vs_highway_ratio: "mostly_city",
     safety_priority: 0.95,
     fuel_saving_priority: 0.9,
@@ -781,6 +1665,15 @@ test("chat orchestrator formats recommendation shortlists with reasons caveats a
           return [];
         },
       },
+      VariantImages: {
+        async findAll() {
+          return [
+            { variant_id: 7, url: "/images/corolla-cross.jpg", sort_order: 0 },
+            { variant_id: 9, url: "/images/civic.jpg", sort_order: 0 },
+            { variant_id: 11, url: "/images/xpander.jpg", sort_order: 0 },
+          ];
+        },
+      },
     },
   };
 
@@ -797,10 +1690,9 @@ test("chat orchestrator formats recommendation shortlists with reasons caveats a
   assert.equal(result.intent, "recommend_car");
   assert.equal(result.needs_clarification, false);
   assert.ok(result.structured_result.ranked_vehicles.length >= 3);
-  assert.match(result.final_answer, /1\. .*Why it fits: .*Watch-out: .*Best for:/);
-  assert.match(result.final_answer, /2\. .*Why it fits: .*Watch-out: .*Best for:/);
-  assert.match(result.final_answer, /3\. .*Why it fits: .*Watch-out: .*Best for:/);
-  assert.match(result.final_answer, /Next step:/);
+  assert.match(result.final_answer, /Based on your needs, these are the best matches for you\./);
+  assert.match(result.final_answer, /Corolla Cross/);
+  assert.doesNotMatch(result.final_answer, /Why it fits:|Watch-out:|Best for:|Next step:/);
 });
 
 test("chat advisor binds short clarification replies to the pending compare flow", async () => {

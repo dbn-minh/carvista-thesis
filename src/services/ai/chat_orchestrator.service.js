@@ -1,4 +1,5 @@
 import { formatFinalAnswer } from "./ai_formatter.service.js";
+import { enhanceAdvisorRecommendationWithModel, formatConversationPolicyWithModel } from "./advisor_llm.service.js";
 import { compareVariants } from "./compare_variants.service.js";
 import { handleConversationPolicy } from "./conversation_policy.service.js";
 import {
@@ -260,6 +261,9 @@ export async function orchestrateChatRequest(
       structured_result: null,
       policy_response: policyResponse,
     });
+    formatted.final_answer = await formatConversationPolicyWithModel(intentResult.intent, message, policyResponse, {
+      ollama: ctx.services?.ollama ?? ctx.ai?.ollama,
+    });
     return chatEnvelopeSchema.parse({
       flow_id,
       intent: intentResult.intent,
@@ -276,7 +280,7 @@ export async function orchestrateChatRequest(
       caveats: [],
       freshness_note: null,
       meta: {
-        services_used: ["IntentClassifier", "ConversationPolicyService", "AiFormatter"],
+        services_used: ["IntentClassifier", "ConversationPolicyService", "AiFormatter", "OllamaPolicyFormatter"],
         sources_used: [],
         fallback_used: false,
         latency_ms: Date.now() - startedAt,
@@ -383,8 +387,16 @@ export async function orchestrateChatRequest(
     structured_result: structuredResult,
     turn_context,
   });
+  if (intentResult.intent === "recommend_car" && structuredResult) {
+    const enhanced = await enhanceAdvisorRecommendationWithModel(structuredResult, turn_context, {
+      ollama: ctx.services?.ollama ?? ctx.ai?.ollama,
+    });
+    formatted.final_answer = enhanced.final_answer;
+    structuredResult = enhanced.structured_result;
+  }
   const shared = extractSharedEnvelopeFields(rawPayload, structuredResult);
   servicesUsed.push("AiFormatter");
+  if (intentResult.intent === "recommend_car") servicesUsed.push("OllamaAdvisorFormatter");
   logAiEvent("info", "structured_result_ready", {
     flow_id,
     intent: intentResult.intent,
