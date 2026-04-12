@@ -165,5 +165,12 @@ export const env = {
       folder: process.env.CLOUDINARY_FOLDER || "carvista",
     },
   },
+  ai: {
+    ollama: {
+      baseUrl: trimSlash(process.env.OLLAMA_BASE_URL || "http://localhost:11434"),
+      model: process.env.OLLAMA_MODEL || "qwen3:1.7b",
+      timeoutMs: toInt(process.env.OLLAMA_TIMEOUT_MS, 30000),
+    },
+  },
   priceDropThreshold: toFloat(process.env.PRICE_DROP_THRESHOLD, 0.03),
 };

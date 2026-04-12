@@ -49,6 +49,18 @@ function normalizeUrl(url) {
   }
 }
 
+function normalizeRetrievedAt(value) {
+  if (!value) return new Date().toISOString();
+  if (value instanceof Date) {
+    const timestamp = value.getTime();
+    return Number.isFinite(timestamp) ? value.toISOString() : new Date().toISOString();
+  }
+  const text = String(value).trim();
+  if (!text) return new Date().toISOString();
+  const parsed = Date.parse(text);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : text;
+}
+
 export function confidenceLabel(score) {
   if (score >= 0.82) return "High confidence";
   if (score >= 0.64) return "Good confidence";
@@ -71,7 +83,7 @@ export function buildSource(input) {
     type: input.type,
     title: input.title,
     url: normalizeUrl(input.url),
-    retrieved_at: input.retrieved_at ?? new Date().toISOString(),
+    retrieved_at: normalizeRetrievedAt(input.retrieved_at),
     trust: input.trust ?? "medium",
     note: input.note ?? null,
   });

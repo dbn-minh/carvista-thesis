@@ -46,6 +46,61 @@ function toNumberOrNull(value) {
   return Number.isFinite(num) ? num : null;
 }
 
+const PRICE_HISTORY_SOURCE_PRIORITIES = new Map([
+  ["internal_marketplace_rollup", 400],
+  ["bootstrap_seed_rollup", 300],
+  ["local_seed_history_v1", 200],
+]);
+
+function priceHistorySourcePriority(source) {
+  return PRICE_HISTORY_SOURCE_PRIORITIES.get(String(source || "").trim().toLowerCase()) ?? 100;
+}
+
+function normalizePriceHistoryRow(row) {
+  if (!row) return null;
+  const plain = typeof row.toJSON === "function" ? row.toJSON() : row;
+  if (!plain?.captured_at) return null;
+
+  const capturedAt = new Date(plain.captured_at);
+  if (Number.isNaN(capturedAt.getTime())) return null;
+
+  return {
+    ...plain,
+    captured_at: capturedAt.toISOString(),
+  };
+}
+
+export function normalizeVariantPriceHistoryRows(rows, { limit = null } = {}) {
+  const bestRowByTimestamp = new Map();
+
+  for (const row of rows ?? []) {
+    const normalized = normalizePriceHistoryRow(row);
+    if (!normalized) continue;
+
+    const key = normalized.captured_at;
+    const existing = bestRowByTimestamp.get(key);
+    if (!existing) {
+      bestRowByTimestamp.set(key, normalized);
+      continue;
+    }
+
+    const incomingPriority = priceHistorySourcePriority(normalized.source);
+    const existingPriority = priceHistorySourcePriority(existing.source);
+    const incomingId = Number(normalized.price_id ?? 0);
+    const existingId = Number(existing.price_id ?? 0);
+
+    if (incomingPriority > existingPriority || (incomingPriority === existingPriority && incomingId > existingId)) {
+      bestRowByTimestamp.set(key, normalized);
+    }
+  }
+
+  const ordered = [...bestRowByTimestamp.values()].sort(
+    (left, right) => Date.parse(left.captured_at) - Date.parse(right.captured_at)
+  );
+
+  return limit != null && ordered.length > limit ? ordered.slice(-limit) : ordered;
+}
+
 async function fetchText(url) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
@@ -249,8 +304,8 @@ export async function loadVariantContext(ctx, { variant_id, market_id = 1 }) {
       }),
       VariantPriceHistory.findAll({
         where: { variant_id, market_id, price_type: "avg_market" },
-        order: [["captured_at", "ASC"]],
-        limit: 36,
+        order: [["captured_at", "DESC"], ["price_id", "DESC"]],
+        limit: 120,
       }),
     ]);
 
@@ -267,10 +322,14 @@ export async function loadVariantContext(ctx, { variant_id, market_id = 1 }) {
     );
 
     const averageRating = reviewStats.count > 0 ? reviewStats.sum / reviewStats.count : null;
+    const priceHistory = normalizeVariantPriceHistoryRows(historyRows, { limit: 36 });
+    const latestHistoryPrice =
+      priceHistory.length > 0 ? toNumberOrNull(priceHistory[priceHistory.length - 1]?.price) : null;
 
     return {
       variant: {
         ...variant,
+        latest_price: latestHistoryPrice ?? variant.latest_price,
         label: [variant.model_year, variant.make_name, variant.model_name, variant.trim_name].filter(Boolean).join(" "),
       },
       spec: spec?.toJSON() ?? null,
@@ -280,7 +339,7 @@ export async function loadVariantContext(ctx, { variant_id, market_id = 1 }) {
         avg_rating: averageRating,
         review_count: reviewStats.count,
       },
-      price_history: historyRows.map((row) => row.toJSON()),
+      price_history: priceHistory,
       sources: [
         buildInternalSource("Vehicle identity and catalog specs"),
         buildInternalSource("Structured variant specification tables"),

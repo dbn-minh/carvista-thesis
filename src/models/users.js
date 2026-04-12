@@ -23,10 +23,6 @@ export default class Users extends Model {
       type: DataTypes.STRING(30),
       allowNull: true
     },
-    preferred_contact_method: {
-      type: DataTypes.STRING(40),
-      allowNull: true
-    },
     password_hash: {
       type: DataTypes.STRING(255),
       allowNull: false
@@ -35,6 +31,10 @@ export default class Users extends Model {
       type: DataTypes.ENUM('user','admin'),
       allowNull: false,
       defaultValue: "user"
+    },
+    preferred_contact_method: {
+      type: DataTypes.STRING(40),
+      allowNull: true
     }
   }, {
     sequelize,

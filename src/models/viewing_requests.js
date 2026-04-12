@@ -26,14 +26,6 @@ export default class ViewingRequests extends Model {
         key: 'user_id'
       }
     },
-    seller_user_id: {
-      type: DataTypes.BIGINT,
-      allowNull: true,
-      references: {
-        model: 'users',
-        key: 'user_id'
-      }
-    },
     contact_name: {
       type: DataTypes.STRING(120),
       allowNull: true
@@ -46,16 +38,8 @@ export default class ViewingRequests extends Model {
       type: DataTypes.STRING(30),
       allowNull: true
     },
-    preferred_contact_method: {
-      type: DataTypes.STRING(40),
-      allowNull: true
-    },
     message: {
       type: DataTypes.TEXT,
-      allowNull: true
-    },
-    preferred_viewing_time: {
-      type: DataTypes.DATE,
       allowNull: true
     },
     status: {
@@ -63,14 +47,26 @@ export default class ViewingRequests extends Model {
       allowNull: false,
       defaultValue: "pending"
     },
-    follow_up_status: {
-      type: DataTypes.STRING(40),
-      allowNull: true,
-      defaultValue: "new"
+    seller_user_id: {
+      type: DataTypes.BIGINT,
+      allowNull: true
+    },
+    preferred_viewing_time: {
+      type: DataTypes.DATE,
+      allowNull: true
     },
     notified_at: {
       type: DataTypes.DATE,
       allowNull: true
+    },
+    preferred_contact_method: {
+      type: DataTypes.STRING(40),
+      allowNull: true
+    },
+    follow_up_status: {
+      type: DataTypes.STRING(40),
+      allowNull: false,
+      defaultValue: "new"
     }
   }, {
     sequelize,
@@ -99,13 +95,6 @@ export default class ViewingRequests extends Model {
         using: "BTREE",
         fields: [
           { name: "buyer_id" },
-        ]
-      },
-      {
-        name: "idx_requests_seller",
-        using: "BTREE",
-        fields: [
-          { name: "seller_user_id" },
         ]
       },
       {

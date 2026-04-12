@@ -19,8 +19,13 @@ export default class ListingImages extends Model {
       }
     },
     url: {
-      type: DataTypes.TEXT('long'),
+      type: DataTypes.TEXT,
       allowNull: false
+    },
+    sort_order: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0
     },
     provider: {
       type: DataTypes.STRING(32),
@@ -49,11 +54,6 @@ export default class ListingImages extends Model {
     bytes: {
       type: DataTypes.BIGINT,
       allowNull: true
-    },
-    sort_order: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      defaultValue: 0
     }
   }, {
     sequelize,

@@ -1,4 +1,5 @@
 import { clamp } from "./_helpers.js";
+import { enhanceComparePresentationWithModel } from "./advisor_llm.service.js";
 import { buildConfidence, buildEvidence } from "./contracts.js";
 import { buildComparePresentation } from "./presentation.service.js";
 import { buildInternalSource, fetchOfficialVehicleSignals } from "./source_retrieval.service.js";
@@ -46,7 +47,7 @@ function buildProsCons(item) {
 
   if (specs.curb_weight_kg != null && Number(specs.curb_weight_kg) >= 2200) cons.push("Higher curb weight may blunt efficiency and agility.");
   if (item.avg_rating != null && item.avg_rating < 3.0) cons.push("Local review sentiment is weaker than ideal.");
-  if (recallCount > 0) cons.push(`Official recall lookup returned ${recallCount} item(s), so safety diligence matters.`);
+  if (recallCount > 0) cons.push("Recall history deserves a closer safety check before you buy.");
   if (item.latest_price == null && item.msrp_base == null) cons.push("Market value is less grounded because pricing data is limited.");
   if ((scores.price_score ?? 0) <= 10) cons.push("Price positioning is less convincing in this comparison.");
   if ((scores.comfort_score ?? 0) <= 5.5) cons.push("Cabin comfort or everyday refinement does not look like a standout strength.");
@@ -497,9 +498,12 @@ export async function compareVariants(ctx, input) {
     caveats,
   };
 
+  const presentation = buildComparePresentation(result);
+  const enhancedPresentation = await enhanceComparePresentationWithModel(result, presentation);
+
   return {
     ...result,
-    ...buildComparePresentation(result),
+    ...enhancedPresentation,
   };
 }
 

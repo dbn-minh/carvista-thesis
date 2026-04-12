@@ -462,6 +462,7 @@ export const aiApi = {
     variant_ids: number[];
     market_id: number;
     price_type?: string;
+    buyer_profile?: AdvisorProfile | null;
   }) {
     return apiFetch<AiCompareResponse>("/ai/compare", {
       method: "POST",
