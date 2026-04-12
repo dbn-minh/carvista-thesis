@@ -35,6 +35,21 @@ const ADVISOR_QUESTION_SYSTEM_PROMPT = [
   "Return strict JSON only.",
 ].join(" ");
 
+const COMPARE_FORMAT_SYSTEM_PROMPT = [
+  "You are a dealership AI comparison copy helper.",
+  "Rewrite grounded comparison summaries so they feel natural, concise, polished, and useful to a real buyer.",
+  "Use only the vehicle names and grounded facts supplied by backend JSON.",
+  "Do not invent vehicles, prices, specs, trims, features, or conclusions outside the supplied data.",
+  "Do not mention raw scores, point totals, confidence labels, backend logic, or AI internals.",
+  "Avoid repetitive sentence structure, duplicated points, and robotic phrasing.",
+  "Focus on overall value, driving feel, daily usability, design appeal, and ownership considerations.",
+  "Do not force weak or inaccurate claims such as family practicality for exotic supercars.",
+  "If one car is the better all-round choice, say so clearly.",
+  "If the other car is more emotional, dramatic, or exotic, describe it that way.",
+  "Mention recall or reliability carefully and neutrally, and only when it adds decision value.",
+  "Return strict JSON only.",
+].join(" ");
+
 const ADVISOR_SKILL_FALLBACK = [
   "# CarVista Advisor Concierge Skill",
   "Use English only. Ask one focused question at a time.",
@@ -84,6 +99,19 @@ function compactVehicleForPrompt(item) {
     best_for: (item.best_for ?? []).slice(0, 2),
     image: item.thumbnail_url ?? null,
     detail_url: item.links?.detail_page_url ?? null,
+  };
+}
+
+function compactCompareItemForPrompt(item) {
+  return {
+    variant_id: item?.variant_id ?? null,
+    title: [item?.year, item?.make, item?.model, item?.trim].filter(Boolean).join(" ").replace(/\s+/g, " ").trim(),
+    body_type: item?.body_type ?? null,
+    fuel_type: item?.fuel_type ?? null,
+    seats: item?.seats ?? null,
+    price: item?.latest_price ?? item?.msrp_base ?? null,
+    top_pros: (item?.pros ?? []).slice(0, 2),
+    watch_outs: (item?.cons ?? []).slice(0, 2),
   };
 }
 
@@ -410,6 +438,29 @@ function normalizeGeneratedSentence(value, fallback, maxLength = 170) {
   return text.length <= maxLength ? text : `${text.slice(0, maxLength - 3).trimEnd()}...`;
 }
 
+function sanitizeCompareAssistantMessage(value, fallback) {
+  const text = normalizeGeneratedSentence(value, fallback, 320)
+    .replace(/\s+/g, " ")
+    .replace(/\s+([?.!,])/g, "$1")
+    .trim();
+  if (!text) return fallback;
+  if (/\b(score|points?|confidence|backend|json|model|ai)\b/i.test(text)) return fallback;
+  return text;
+}
+
+function sanitizeCompareHighlights(value, fallback = []) {
+  const fallbackList = Array.isArray(fallback) ? fallback.slice(0, 3) : [];
+  if (!Array.isArray(value)) return fallbackList;
+
+  const items = value
+    .slice(0, 3)
+    .map((entry) => normalizeGeneratedSentence(entry, "", 60))
+    .filter(Boolean)
+    .filter((entry) => !/\b(score|points?|confidence|backend|json|model|ai)\b/i.test(entry));
+
+  return items.length ? items : fallbackList;
+}
+
 function sanitizeSingleAdvisorQuestion(value, fallback) {
   const text = normalizeGeneratedSentence(value, fallback, 190)
     .replace(/\s+/g, " ")
@@ -521,6 +572,32 @@ function buildRecommendationFormattingPrompt(structuredResult, turnContext = {})
     `directional_shortlist: ${Boolean(turnContext.directional_shortlist)}`,
     `profile_summary: ${JSON.stringify(structuredResult?.profile_summary || "")}`,
     `candidate_vehicles: ${JSON.stringify(candidates)}`,
+  ].join("\n");
+}
+
+function buildCompareFormattingPrompt(result, presentation) {
+  const items = Array.isArray(result?.items) ? result.items : [];
+  const sorted = [...items].sort(
+    (left, right) => (Number(right?.scores?.final_score) || 0) - (Number(left?.scores?.final_score) || 0)
+  );
+
+  return [
+    "/no_think",
+    'Rewrite the grounded comparison verdict into short website copy. Return JSON exactly as {"assistant_message": string, "highlights": string[]}.',
+    "Keep it concise and buyer-friendly, with no more than 2 short paragraphs of total copy.",
+    "Explain who makes more sense overall, where the other option still makes sense, and mention budget or buyer priorities only if the supplied profile summary makes that relevant.",
+    "Do not repeat both full vehicle names in every sentence.",
+    "Do not mention raw scoring or confidence.",
+    "Avoid duplicated points, avoid robotic wording, and avoid forcing weak claims that do not fit the vehicle character.",
+    "If one option is the smarter all-rounder, say that plainly. If the other is more emotional, dramatic, or exotic, position it that way.",
+    "Use recall or reliability wording only if it materially matters to the buying decision, and keep it neutral.",
+    `comparison_focus: ${JSON.stringify(result?.comparison_focus || "")}`,
+    `profile_fit_summary: ${JSON.stringify(result?.profile_fit_summary || "")}`,
+    `fallback_assistant_message: ${JSON.stringify(presentation?.assistant_message || "")}`,
+    `fallback_highlights: ${JSON.stringify((presentation?.highlights ?? []).slice(0, 3))}`,
+    `winner_name: ${JSON.stringify(sorted[0] ? compactCompareItemForPrompt(sorted[0]).title : null)}`,
+    `runner_up_name: ${JSON.stringify(sorted[1] ? compactCompareItemForPrompt(sorted[1]).title : null)}`,
+    `compared_vehicles: ${JSON.stringify(sorted.slice(0, 2).map(compactCompareItemForPrompt))}`,
   ].join("\n");
 }
 
@@ -640,4 +717,32 @@ export async function formatAdvisorRecommendationWithModel(
 ) {
   const enhanced = await enhanceAdvisorRecommendationWithModel(structuredResult, turnContext, { ollama });
   return enhanced.final_answer;
+}
+
+export async function enhanceComparePresentationWithModel(
+  result,
+  presentation,
+  { ollama = defaultOllamaService } = {}
+) {
+  const fallback = presentation ?? {};
+  if (!shouldUseOllama(ollama) || !fallback.assistant_message) return fallback;
+
+  try {
+    const response = await ollama.generate({
+      system: COMPARE_FORMAT_SYSTEM_PROMPT,
+      prompt: buildCompareFormattingPrompt(result, fallback),
+      format: "json",
+      options: { temperature: 0.3, num_predict: 190 },
+    });
+    const parsed = parseModelJson(response.text);
+    if (!parsed || typeof parsed !== "object") return fallback;
+
+    return {
+      ...fallback,
+      assistant_message: sanitizeCompareAssistantMessage(parsed.assistant_message, fallback.assistant_message),
+      highlights: sanitizeCompareHighlights(parsed.highlights, fallback.highlights),
+    };
+  } catch {
+    return fallback;
+  }
 }

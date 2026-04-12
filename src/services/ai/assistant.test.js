@@ -7,7 +7,12 @@ import { classifyIntent } from "./intent_classifier.service.js";
 import { classifyConversationRoute } from "./conversation_orchestrator.service.js";
 import { classifyConversationTurn } from "./conversation_state.service.js";
 import { compareVariants } from "./compare_variants.service.js";
-import { fetchOfficialVehicleSignals, loadListingMarketSignals } from "./source_retrieval.service.js";
+import {
+  fetchOfficialVehicleSignals,
+  loadListingMarketSignals,
+  loadVariantContext,
+  normalizeVariantPriceHistoryRows,
+} from "./source_retrieval.service.js";
 import { recommendCars } from "./recommendation.service.js";
 import { calculateTco } from "./tco.service.js";
 
@@ -192,6 +197,163 @@ test("official fallback retrieval parses FuelEconomy.gov and NHTSA payloads", as
   }
 });
 
+test("official stored signals accept Date objects in retrieved_at without breaking TCO sources", async () => {
+  const ctx = {
+    sequelize: {
+      async query(sql) {
+        if (sql.includes("FROM vehicle_fuel_economy_snapshots")) {
+          return [[
+            {
+              combined_mpg: 33,
+              city_mpg: 28,
+              highway_mpg: 39,
+              annual_fuel_cost_usd: 1350,
+              fuel_type: "Gasoline",
+              drive: "FWD",
+              class_name: "Compact SUV",
+              provider_key: "internal_marketplace",
+              source_type: "internal_marketplace",
+              title: "Persisted fuel snapshot",
+              url: null,
+              trust_level: "high",
+              retrieved_at: new Date("2026-04-12T01:23:45.000Z"),
+              notes: null,
+            },
+          ]];
+        }
+        if (sql.includes("FROM vehicle_recall_snapshots")) {
+          return [[
+            {
+              campaign_number: "24V000001",
+              component: "BRAKES",
+              summary: "Sample recall",
+              consequence: "Reduced braking performance",
+              remedy: "Dealer inspection",
+              provider_key: "nhtsa",
+              source_type: "official_api",
+              title: "Persisted recall snapshot",
+              url: "https://example.com/recall",
+              trust_level: "high",
+              retrieved_at: new Date("2026-04-11T10:00:00.000Z"),
+              notes: null,
+            },
+          ]];
+        }
+        return [[]];
+      },
+    },
+  };
+
+  const result = await fetchOfficialVehicleSignals({
+    ctx,
+    variant_id: 9,
+    year: 2023,
+    make: "Hyundai",
+    model: "Tucson",
+  });
+
+  assert.equal(result.fuel_economy.combined_mpg, 33);
+  assert.equal(result.recalls.length, 1);
+  assert.equal(result.sources.length, 2);
+  assert.match(result.sources[0].retrieved_at, /^2026-04-12T01:23:45.000Z$/);
+});
+
+test("normalizeVariantPriceHistoryRows keeps the latest window and removes same-day source duplicates", () => {
+  const rows = [
+    { price_id: 1, captured_at: "2026-01-01T00:00:00.000Z", price: "1000000000.00", source: "local_seed_history_v1" },
+    { price_id: 2, captured_at: "2026-02-01T00:00:00.000Z", price: "980000000.00", source: "local_seed_history_v1" },
+    { price_id: 3, captured_at: "2026-03-01T00:00:00.000Z", price: "960000000.00", source: "local_seed_history_v1" },
+    { price_id: 4, captured_at: "2026-03-01T00:00:00.000Z", price: "910000000.00", source: "internal_marketplace_rollup" },
+    { price_id: 5, captured_at: "2026-04-01T00:00:00.000Z", price: "940000000.00", source: "local_seed_history_v1" },
+    { price_id: 6, captured_at: "2026-04-01T00:00:00.000Z", price: "920000000.00", source: "bootstrap_seed_rollup" },
+  ];
+
+  const normalized = normalizeVariantPriceHistoryRows(rows, { limit: 3 });
+
+  assert.deepEqual(
+    normalized.map((row) => row.captured_at),
+    [
+      "2026-02-01T00:00:00.000Z",
+      "2026-03-01T00:00:00.000Z",
+      "2026-04-01T00:00:00.000Z",
+    ]
+  );
+  assert.equal(normalized[1].source, "internal_marketplace_rollup");
+  assert.equal(normalized[1].price, "910000000.00");
+  assert.equal(normalized[2].source, "bootstrap_seed_rollup");
+  assert.equal(normalized[2].price, "920000000.00");
+});
+
+test("loadVariantContext uses the latest canonical price history window for downstream pricing", async () => {
+  const variantRow = {
+    variant_id: 9,
+    model_id: 10,
+    model_year: 2023,
+    trim_name: "1.6 Turbo",
+    body_type: "suv",
+    fuel_type: "gasoline",
+    engine: "1.6T",
+    transmission: "AT",
+    drivetrain: "FWD",
+    seats: 5,
+    doors: 5,
+    msrp_base: 1100000000,
+    model_name: "Tucson",
+    make_name: "Hyundai",
+    latest_price: 1234567890,
+  };
+
+  const historyRows = Array.from({ length: 40 }, (_, index) => {
+    const capturedAt = new Date(Date.UTC(2023, index, 1)).toISOString();
+    return {
+      toJSON: () => ({
+        price_id: index + 1,
+        variant_id: 9,
+        market_id: 1,
+        price_type: "avg_market",
+        price: String(1300000000 - index * 10000000),
+        captured_at: capturedAt,
+        source: "local_seed_history_v1",
+      }),
+    };
+  });
+
+  historyRows.push({
+    toJSON: () => ({
+      price_id: 999,
+      variant_id: 9,
+      market_id: 1,
+      price_type: "avg_market",
+      price: "905000000",
+      captured_at: new Date(Date.UTC(2026, 3, 1)).toISOString(),
+      source: "internal_marketplace_rollup",
+    }),
+  });
+
+  const ctx = {
+    sequelize: {
+      async query(sql) {
+        if (sql.includes("FROM car_variants cv")) return [[variantRow]];
+        throw new Error(`Unexpected SQL: ${sql}`);
+      },
+    },
+    models: {
+      VariantSpecs: { findOne: async () => null },
+      VariantSpecKv: { findAll: async () => [] },
+      CarReviews: { findAll: async () => [] },
+      VariantPriceHistory: { findAll: async () => historyRows },
+    },
+  };
+
+  const context = await loadVariantContext(ctx, { variant_id: 9, market_id: 1 });
+
+  assert.equal(context.price_history.length, 36);
+  assert.equal(context.price_history[0].captured_at, new Date(Date.UTC(2023, 4, 1)).toISOString());
+  assert.equal(context.price_history.at(-1)?.captured_at, new Date(Date.UTC(2026, 3, 1)).toISOString());
+  assert.equal(context.price_history.at(-1)?.source, "internal_marketplace_rollup");
+  assert.equal(context.variant.latest_price, 905000000);
+});
+
 test("compare engine returns source-aware verdict with buyer-profile fit", async () => {
   const originalFetch = global.fetch;
   global.fetch = mockFetchFactory();
@@ -289,11 +451,16 @@ test("compare engine returns source-aware verdict with buyer-profile fit", async
      assert.ok(result.confidence.score > 0.5);
      assert.ok(result.sources.length >= 2);
      assert.ok(result.items[0].scores.use_case_fit_score >= 0);
-      assert.ok(result.items[0].scores.comfort_score >= 0);
-      assert.ok(result.items[0].scores.resale_score >= 0);
-   } finally {
-    global.fetch = originalFetch;
-  }
+     assert.ok(result.items[0].scores.comfort_score >= 0);
+     assert.ok(result.items[0].scores.resale_score >= 0);
+     assert.match(result.assistant_message, /stronger overall case|better all-round buy/i);
+     assert.match(result.assistant_message, /saved budget|saved priorities/i);
+     assert.ok(!/overall\s+\d+(\.\d+)?/i.test(result.assistant_message));
+     assert.ok(!/recall history deserves/i.test(result.assistant_message));
+     assert.ok(result.items.every((item) => item.cons.every((entry) => !/lookup returned/i.test(entry))));
+    } finally {
+     global.fetch = originalFetch;
+   }
 });
 
 test("chat orchestrator returns clarification envelope for incomplete TCO requests", async () => {
@@ -776,7 +943,7 @@ test("listing signal loader prefers persisted market snapshots before live listi
               title: "Persisted marketplace rollup",
               url: null,
               trust_level: "high",
-              retrieved_at: new Date().toISOString(),
+              retrieved_at: new Date("2026-04-12T03:30:00.000Z"),
               notes: "Generated from listing aggregation",
             },
           ]];
@@ -805,6 +972,7 @@ test("listing signal loader prefers persisted market snapshots before live listi
   assert.equal(result.average_asking_price, 955000000);
   assert.equal(result.data_confidence, 0.81);
   assert.equal(result.sources.length, 1);
+  assert.match(result.sources[0].retrieved_at, /^2026-04-12T03:30:00.000Z$/);
   assert.equal(liveListingReads, 0);
 });
 

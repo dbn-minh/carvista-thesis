@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   advisorExtractionToProfilePatch,
   enhanceAdvisorRecommendationWithModel,
+  enhanceComparePresentationWithModel,
   extractAdvisorProfilePatchWithModel,
   formatAdvisorNextQuestionWithModel,
   formatConversationPolicyWithModel,
@@ -273,6 +274,73 @@ test("advisor formatter can enrich allowed catalog card reasons", async () => {
     result.structured_result.ranked_vehicles[0].reasons[0],
     "A practical 7-seat MPV fit for family trips without stretching the budget"
   );
+});
+
+test("compare formatter uses Qwen to shorten verdict copy without raw score language", async () => {
+  const presentation = {
+    assistant_message:
+      "Hyundai Tucson makes the stronger overall case among Hyundai Tucson and Lamborghini Urus, especially for overall value and family practicality.",
+    highlights: [
+      "Hyundai Tucson: stronger overall value",
+      "Lamborghini Urus: more about premium comfort",
+      "Weighted for budget-aware fit.",
+    ],
+  };
+  const result = {
+    comparison_focus: "Buyer-profile weighted comparison",
+    profile_fit_summary: "Weighted for budget-aware, 2-passenger use.",
+    items: [
+      {
+        variant_id: 1,
+        year: 2023,
+        make: "Hyundai",
+        model: "Tucson",
+        trim: "1.6 Turbo",
+        body_type: "suv",
+        fuel_type: "gasoline",
+        seats: 5,
+        latest_price: 892917786,
+        pros: ["Easy to justify against your saved budget."],
+        cons: ["Cabin richness is not the standout strength here."],
+        scores: { final_score: 91.1 },
+      },
+      {
+        variant_id: 2,
+        year: 2023,
+        make: "Lamborghini",
+        model: "Urus",
+        trim: "S",
+        body_type: "suv",
+        fuel_type: "gasoline",
+        seats: 5,
+        latest_price: 10148014318,
+        pros: ["The more dramatic pick if emotion matters most."],
+        cons: ["It asks for a much heavier spend."],
+        scores: { final_score: 74.4 },
+      },
+    ],
+  };
+  const ollama = {
+    async generate() {
+      return {
+        text: JSON.stringify({
+          assistant_message:
+            "The Tucson is the easier all-round choice here. The Urus still makes sense if drama and badge appeal matter more than budget discipline.",
+          highlights: [
+            "Tucson: easier all-round buy",
+            "Urus: the emotional wildcard",
+            "Saved budget tilts this one",
+          ],
+        }),
+      };
+    },
+  };
+
+  const enhanced = await enhanceComparePresentationWithModel(result, presentation, { ollama });
+
+  assert.match(enhanced.assistant_message, /easier all-round choice/i);
+  assert.equal(enhanced.highlights.length, 3);
+  assert.ok(!/score|points|confidence/i.test(enhanced.assistant_message));
 });
 
 test("conversation policy formatter uses Ollama for a softer dealership redirect", async () => {

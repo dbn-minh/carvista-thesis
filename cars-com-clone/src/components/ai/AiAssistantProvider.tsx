@@ -17,7 +17,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { setStoredAdvisorProfile } from "@/lib/advisor-profile";
+import { getStoredAdvisorProfile, setStoredAdvisorProfile } from "@/lib/advisor-profile";
 import { aiApi, catalogApi } from "@/lib/carvista-api";
 import { hasToken, toCurrency } from "@/lib/api-client";
 import { buildCompareHref, buildComparePairLabel, enrichCompareFollowUpMessage } from "@/lib/compare";
@@ -211,13 +211,13 @@ function InsightCards({
                   {card.title}
                 </p>
                 {card.value != null ? (
-                  <p className="mt-2 break-words text-base font-apercu-bold text-cars-primary">
+                  <p className="mt-2 break-words text-base font-apercu-bold text-cars-primary dark:text-white/92">
                     {typeof card.value === "number" ? toCurrency(card.value) : String(card.value)}
                   </p>
                 ) : null}
               </div>
             </div>
-            <p className="mt-2 break-words text-sm leading-6 text-cars-gray">{card.description}</p>
+            <p className="mt-2 break-words text-sm leading-6 text-cars-gray dark:text-white/68">{card.description}</p>
           </div>
         );
 
@@ -226,14 +226,14 @@ function InsightCards({
             key={`${card.title}-${index}`}
             type="button"
             onClick={handleCardClick}
-            className="rounded-[22px] border border-cars-gray-light/70 bg-white px-4 py-4 text-left shadow-sm transition-colors hover:border-cars-accent/40 hover:bg-cars-off-white"
+            className="rounded-[22px] border border-cars-gray-light/70 bg-white px-4 py-4 text-left shadow-sm transition-colors hover:border-cars-accent/40 hover:bg-cars-off-white dark:border-white/10 dark:bg-[#0f182c] dark:hover:border-[#7da7ff]/40 dark:hover:bg-[#15223a]"
           >
             {content}
           </button>
         ) : (
           <article
             key={`${card.title}-${index}`}
-            className="rounded-[22px] border border-cars-gray-light/70 bg-white px-4 py-4 shadow-sm"
+            className="rounded-[22px] border border-cars-gray-light/70 bg-white px-4 py-4 shadow-sm dark:border-white/10 dark:bg-[#0f182c]"
           >
             {content}
           </article>
@@ -248,10 +248,10 @@ function FollowUpList({ questions }: { questions?: string[] }) {
   if (visibleQuestions.length === 0) return null;
 
   return (
-    <div className="mt-3 rounded-[18px] bg-cars-off-white px-3 py-3 text-xs leading-5 text-cars-gray">
-      <p className="font-semibold uppercase tracking-[0.14em] text-cars-accent">Next</p>
+    <div className="mt-3 rounded-[18px] bg-cars-off-white px-3 py-3 text-xs leading-5 text-cars-gray dark:bg-[#111c31] dark:text-white/68">
+      <p className="font-semibold uppercase tracking-[0.14em] text-cars-accent dark:text-[#7da7ff]">Next</p>
       {visibleQuestions.map((question) => (
-        <p key={question} className="mt-2 break-words text-cars-primary">
+        <p key={question} className="mt-2 break-words text-cars-primary dark:text-white/88">
           {question}
         </p>
       ))}
@@ -263,7 +263,7 @@ function ConfidenceBadge({ confidence }: { confidence?: AiConfidence | null }) {
   if (!confidence) return null;
 
   return (
-    <div className="mt-3 inline-flex rounded-full bg-[#eef4ff] px-3 py-1 text-xs font-semibold text-cars-primary">
+    <div className="mt-3 inline-flex rounded-full bg-[#eef4ff] px-3 py-1 text-xs font-semibold text-cars-primary dark:bg-[#182844] dark:text-white/88">
       {confidence.label}
     </div>
   );
@@ -279,14 +279,14 @@ function SourceList({
   if (!sources || sources.length === 0) return null;
 
   return (
-    <div className="mt-3 space-y-2 rounded-[18px] bg-cars-off-white px-3 py-3">
+    <div className="mt-3 space-y-2 rounded-[18px] bg-cars-off-white px-3 py-3 dark:bg-[#111c31]">
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cars-accent">
         Sources
       </p>
-      <div className="space-y-2 text-xs leading-5 text-cars-gray">
+      <div className="space-y-2 text-xs leading-5 text-cars-gray dark:text-white/68">
         {sources.slice(0, 4).map((source, index) => (
           <div key={`${source.provider}-${source.title}-${index}`}>
-            <p className="font-semibold text-cars-primary">
+            <p className="font-semibold text-cars-primary dark:text-white/88">
               {source.provider}: {source.title}
             </p>
             {source.url ? (
@@ -294,7 +294,7 @@ function SourceList({
                 href={source.url}
                 target="_blank"
                 rel="noreferrer"
-                className="break-all text-cars-accent underline underline-offset-2"
+                className="break-all text-cars-accent underline underline-offset-2 dark:text-[#7da7ff]"
               >
                 {source.url}
               </a>
@@ -311,8 +311,8 @@ function CaveatList({ caveats }: { caveats?: string[] }) {
   if (!caveats || caveats.length === 0) return null;
 
   return (
-    <div className="mt-3 rounded-[18px] border border-amber-200 bg-amber-50 px-3 py-3 text-xs leading-5 text-amber-900">
-      <p className="font-semibold uppercase tracking-[0.14em] text-amber-900/80">Caveats</p>
+    <div className="mt-3 rounded-[18px] border border-amber-200 bg-amber-50 px-3 py-3 text-xs leading-5 text-amber-900 dark:border-amber-400/20 dark:bg-[#2c2112] dark:text-amber-100">
+      <p className="font-semibold uppercase tracking-[0.14em] text-amber-900/80 dark:text-amber-100/80">Caveats</p>
       <ul className="mt-2 space-y-1">
         {caveats.slice(0, 3).map((caveat) => (
           <li key={caveat}>- {caveat}</li>
@@ -513,6 +513,11 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (open && !options) {
+      setOpen(false);
+      return;
+    }
+
     launchAssistant(options);
   }
 
@@ -650,10 +655,12 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
     setCompareState((prev) => ({ ...prev, loading: true, error: "" }));
 
     try {
+      const advisorProfile = getStoredAdvisorProfile();
       const result = await aiApi.compare({
         variant_ids: [compareState.variantId, compareState.selectedVariant.variant_id],
         market_id: compareState.marketId,
         price_type: "avg_market",
+        buyer_profile: advisorProfile,
       });
 
       setCompareState((prev) => ({
@@ -684,14 +691,11 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
 
       <div className="fixed bottom-5 right-5 z-[60] flex flex-col items-end gap-3">
         {open ? (
-          <section className="w-[min(92vw,400px)] overflow-hidden rounded-[30px] border border-cars-primary/10 bg-white shadow-[0_24px_80px_rgba(15,45,98,0.22)]">
+          <section className="w-[min(92vw,400px)] overflow-hidden rounded-[30px] border border-cars-primary/10 bg-white shadow-[0_24px_80px_rgba(15,45,98,0.22)] dark:border-white/10 dark:bg-[#091222] dark:shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
             <div className="bg-[linear-gradient(135deg,rgba(15,45,98,0.98),rgba(27,76,160,0.92),rgba(95,150,255,0.82))] px-5 py-4 text-white">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
-                    CarVista advisor
-                  </p>
-                  <h2 className="mt-1 text-2xl font-apercu-bold">AI concierge</h2>
+                  <h2 className="text-2xl font-apercu-bold">CarVista Advisor</h2>
                   <p className="mt-2 text-sm leading-6 text-white/85">
                     Ask for recommendations, compare cars, forecast pricing, or understand TCO.
                   </p>
@@ -700,10 +704,10 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                   <button
                     type="button"
                     onClick={startNewConversation}
-                    className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+                    className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/20"
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
-                    New chat
+                    Refresh
                   </button>
                   <button
                     type="button"
@@ -713,22 +717,6 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-              </div>
-
-              <div className="mt-4 flex items-center gap-3 text-xs text-white/80">
-                <label className="font-semibold uppercase tracking-[0.14em]">Market</label>
-                <select
-                  value={marketId}
-                  onChange={(event) => setMarketId(event.target.value)}
-                  className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-white outline-none"
-                >
-                  <option value="1" className="text-cars-primary">
-                    Market 1
-                  </option>
-                  <option value="2" className="text-cars-primary">
-                    Market 2
-                  </option>
-                </select>
               </div>
 
               {focusVariantLabel ? (
@@ -749,7 +737,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
 
             <div
               ref={transcriptRef}
-              className="max-h-[420px] space-y-4 overflow-y-auto bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_45%)] px-4 py-4"
+              className="max-h-[420px] space-y-4 overflow-y-auto bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_45%)] px-4 py-4 dark:bg-[linear-gradient(180deg,#0b1424_0%,#091222_45%)]"
             >
               {messages.map((message) => (
                 <div
@@ -759,8 +747,8 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                   <div
                     className={
                       message.role === "user"
-                        ? "max-w-[85%] break-words rounded-[24px] rounded-br-md bg-cars-primary px-4 py-3 text-sm leading-6 text-white"
-                        : "max-w-[92%] break-words rounded-[24px] rounded-bl-md border border-cars-gray-light/80 bg-white px-4 py-3 text-sm leading-6 text-cars-primary shadow-sm"
+                        ? "max-w-[85%] break-words rounded-[24px] rounded-br-md bg-cars-primary px-4 py-3 text-sm leading-6 text-white dark:bg-[#18376f]"
+                        : "max-w-[92%] break-words rounded-[24px] rounded-bl-md border border-cars-gray-light/80 bg-white px-4 py-3 text-sm leading-6 text-cars-primary shadow-sm dark:border-white/10 dark:bg-[#101a2d] dark:text-white/88"
                     }
                   >
                     <p>{message.content}</p>
@@ -779,7 +767,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                               key={`${action.type}-${index}`}
                               type="button"
                               onClick={() => handleSuggestedAction(action)}
-                              className="rounded-full border border-cars-primary/15 px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+                              className="rounded-full border border-cars-primary/15 px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-cars-off-white dark:border-white/10 dark:text-white/88 dark:hover:bg-[#16223a]"
                             >
                               {label}
                             </button>
@@ -793,7 +781,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
 
               {sending ? (
                 <div className="flex justify-start">
-                  <div className="rounded-[24px] rounded-bl-md border border-cars-gray-light/80 bg-white px-4 py-3 text-sm text-cars-gray shadow-sm">
+                  <div className="rounded-[24px] rounded-bl-md border border-cars-gray-light/80 bg-white px-4 py-3 text-sm text-cars-gray shadow-sm dark:border-white/10 dark:bg-[#101a2d] dark:text-white/68">
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Thinking...
@@ -809,7 +797,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                       key={prompt}
                       type="button"
                       onClick={() => void sendMessage(prompt)}
-                      className="rounded-full border border-cars-primary/10 bg-white px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+                      className="rounded-full border border-cars-primary/10 bg-white px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-cars-off-white dark:border-white/10 dark:bg-[#101a2d] dark:text-white/88 dark:hover:bg-[#16223a]"
                     >
                       {prompt}
                     </button>
@@ -818,13 +806,13 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
               ) : null}
 
               {chatError ? (
-                <div className="rounded-[20px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-[20px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-400/20 dark:bg-[#2a1318] dark:text-red-200">
                   {chatError}
                 </div>
               ) : null}
             </div>
 
-            <div className="border-t border-cars-gray-light/70 bg-white px-4 py-4">
+            <div className="border-t border-cars-gray-light/70 bg-white px-4 py-4 dark:border-white/10 dark:bg-[#091222]">
               <div className="flex gap-3">
                 <textarea
                   value={input}
@@ -835,7 +823,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                       void sendMessage();
                     }
                   }}
-                  className="min-h-[76px] flex-1 rounded-[22px] border border-cars-gray-light px-4 py-3 text-sm leading-6 text-cars-primary outline-none focus:border-cars-accent"
+                  className="min-h-[76px] flex-1 rounded-[22px] border border-cars-gray-light px-4 py-3 text-sm leading-6 text-cars-primary outline-none focus:border-cars-accent dark:border-white/10 dark:bg-[#101a2d] dark:text-white/90 dark:placeholder:text-white/38 dark:focus:border-[#7da7ff]"
                   placeholder="Example: Family use, SUV, under 1 billion."
                 />
                 <button

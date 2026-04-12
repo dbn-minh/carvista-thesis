@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { calculateTco } from "../services/ai/tco.service.js";
 import { buildVariantPageIntelligence } from "../services/ai/page_intelligence.service.js";
+import { normalizeVariantPriceHistoryRows } from "../services/ai/source_retrieval.service.js";
 import { parsePreferenceProfileQuery } from "../services/ai/user_preference_profile.service.js";
 
 export const catalogRoutes = Router();
@@ -180,11 +181,11 @@ catalogRoutes.get("/catalog/variants/:id/price-history", async (req, res, next) 
 
     const items = await VariantPriceHistory.findAll({
       where: { variant_id: variantId, market_id: marketId },
-      order: [["captured_at","DESC"]],
-      limit,
+      order: [["captured_at","DESC"], ["price_id", "DESC"]],
+      limit: Math.max(limit * 3, limit),
     });
 
-    res.json({ items: items.reverse() });
+    res.json({ items: normalizeVariantPriceHistoryRows(items, { limit }) });
   } catch (e) { next(e); }
 });
 

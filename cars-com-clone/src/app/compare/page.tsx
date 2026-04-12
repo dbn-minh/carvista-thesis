@@ -14,7 +14,6 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
-import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import EmptyState from "@/components/common/EmptyState";
 import StatusBanner from "@/components/common/StatusBanner";
 import Header from "@/components/layout/Header";
@@ -90,6 +89,12 @@ type VerdictCard = {
   winner: string;
   description: string;
   icon: typeof Users;
+};
+
+type WinnerHighlight = {
+  key: string;
+  title: string;
+  score: number;
 };
 
 const emptySearchState: SearchState = {
@@ -516,6 +521,53 @@ function buildVehicleStrengths(item: AiCompareItem) {
     .map((item) => item.label);
 }
 
+function buildWinnerHighlights(
+  winner: AiCompareItem | null,
+  runnerUp: AiCompareItem | null
+): WinnerHighlight[] {
+  if (!winner || !runnerUp) return [];
+
+  const comfortTechWinner = winner.scores.comfort_score + winner.scores.technology_score * 0.6;
+  const comfortTechRunnerUp = runnerUp.scores.comfort_score + runnerUp.scores.technology_score * 0.6;
+  const ownershipWinner = scoreOwnershipCost(winner);
+  const ownershipRunnerUp = scoreOwnershipCost(runnerUp);
+  const valueWinner = scoreValue(winner);
+  const valueRunnerUp = scoreValue(runnerUp);
+
+  return [
+    {
+      key: "value",
+      title: "Better value overall",
+      score: valueWinner - valueRunnerUp,
+    },
+    {
+      key: "ownership",
+      title: "Easier daily ownership",
+      score: ownershipWinner - ownershipRunnerUp,
+    },
+    {
+      key: "fit",
+      title: "Closer profile match",
+      score: winner.scores.use_case_fit_score - runnerUp.scores.use_case_fit_score,
+    },
+    {
+      key: "comfort",
+      title: "More polished cabin",
+      score: comfortTechWinner - comfortTechRunnerUp,
+    },
+    {
+      key: "safety",
+      title: "Stronger safety case",
+      score: winner.scores.safety_score - runnerUp.scores.safety_score,
+    },
+    {
+      key: "overall",
+      title: "Stronger all-round balance",
+      score: winner.scores.final_score - runnerUp.scores.final_score,
+    },
+  ].sort((left, right) => right.score - left.score).slice(0, 3);
+}
+
 function formatCompareValue(key: string, value: unknown) {
   if (value == null) return "Not available";
 
@@ -717,7 +769,6 @@ function CompareFollowUpAnswer({
 function ComparePageContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { openAssistant } = useAiAssistant();
   const nextPath = useMemo(() => {
     const suffix = searchParams.toString();
     return suffix ? `${pathname}?${suffix}` : pathname || "/compare";
@@ -1012,10 +1063,12 @@ function ComparePageContent() {
     setMessage("Building a grounded comparison from CarVista specs, pricing, and market data.");
 
     try {
+      const advisorProfile = getStoredAdvisorProfile();
       const response = await aiApi.compare({
         variant_ids: [activeLeft.variantId, activeRight.variantId],
         market_id: marketId,
         price_type: "avg_market",
+        buyer_profile: advisorProfile,
       });
 
       setResult(response);
@@ -1065,6 +1118,17 @@ function ComparePageContent() {
         ? result.items.find((item) => item.variant_id === result.recommended_variant_id) ?? null
         : null,
     [result]
+  );
+  const runnerUpItem = useMemo(
+    () =>
+      recommendedItem && result
+        ? result.items.find((item) => item.variant_id !== recommendedItem.variant_id) ?? null
+        : null,
+    [recommendedItem, result]
+  );
+  const winnerHighlights = useMemo(
+    () => buildWinnerHighlights(recommendedItem, runnerUpItem),
+    [recommendedItem, runnerUpItem]
   );
 
   const comparisonRows = useMemo(() => {
@@ -1191,18 +1255,6 @@ function ComparePageContent() {
     }
   }
 
-  function openCompareInAssistant() {
-    openAssistant({
-      marketId,
-      variantId: recommendedItem?.variant_id ?? leftSelection?.variantId ?? undefined,
-      variantLabel: recommendedItem ? buildCompareItemLabel(recommendedItem) : vehicleLabels[0] ?? undefined,
-      compareVariantIds: [leftSelection?.variantId ?? 0, rightSelection?.variantId ?? 0].filter((value) =>
-        Number.isInteger(value) && value > 0
-      ),
-      compareVariantLabels: vehicleLabels.filter((value): value is string => Boolean(value)),
-    });
-  }
-
   if (!ready) return null;
 
   return (
@@ -1230,14 +1282,6 @@ function ComparePageContent() {
               >
                 Browse listings
               </Link>
-              <button
-                type="button"
-                onClick={openCompareInAssistant}
-                disabled={!result}
-                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-white disabled:opacity-50"
-              >
-                Continue in AI advisor
-              </button>
             </div>
           </div>
         </section>
@@ -1309,27 +1353,50 @@ function ComparePageContent() {
         {result ? (
           <>
             <section className="mt-6 section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(15,45,98,0.98),rgba(27,76,160,0.92),rgba(95,150,255,0.82))] p-6 text-white md:p-8">
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-white/70">
-                Quick verdict
-              </p>
-              <h2 className="mt-2 text-3xl font-apercu-bold">
-                {recommendedItem ? `${buildCompareItemLabel(recommendedItem)} comes out ahead overall.` : "Comparison ready"}
-              </h2>
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-white/85">
-                {result.assistant_message}
-              </p>
-              {result.highlights?.length ? (
-                <div className="mt-5 flex flex-wrap gap-2">
-                  {result.highlights.slice(0, 4).map((highlight) => (
-                    <span
-                      key={highlight}
-                      className="rounded-full bg-white/12 px-3 py-2 text-xs font-semibold text-white"
-                    >
-                      {highlight}
-                    </span>
-                  ))}
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.22em] text-white/70">
+                    Quick verdict
+                  </p>
+                  <h2 className="mt-2 text-3xl font-apercu-bold">
+                    {recommendedItem ? `${buildCompareItemLabel(recommendedItem)} comes out ahead overall.` : "Comparison ready"}
+                  </h2>
+                  <p className="mt-4 text-sm leading-7 text-white/85">
+                    {result.assistant_message}
+                  </p>
+                  {result.highlights?.length ? (
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      {result.highlights.slice(0, 3).map((highlight) => (
+                        <span
+                          key={highlight}
+                          className="rounded-full bg-white/12 px-3 py-2 text-xs font-semibold text-white"
+                        >
+                          {highlight}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
+
+                {recommendedItem && winnerHighlights.length ? (
+                  <aside className="rounded-[24px] border border-white/12 bg-white/10 px-5 py-5 backdrop-blur-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
+                      Winner highlights
+                    </p>
+                    <h3 className="mt-2 text-lg font-apercu-bold text-white">
+                      {buildCompareItemLabel(recommendedItem)}
+                    </h3>
+                    <ul className="mt-4 space-y-3">
+                      {winnerHighlights.map((highlight) => (
+                        <li key={highlight.key} className="flex items-center gap-3">
+                          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-300" />
+                          <p className="text-sm font-semibold text-white">{highlight.title}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </aside>
+                ) : null}
+              </div>
             </section>
 
             <section className="mt-6 grid gap-4 xl:grid-cols-3">
@@ -1359,7 +1426,7 @@ function ComparePageContent() {
                 ({ selection, item }, index) => (
                   <article
                     key={selection?.variantId ?? index}
-                    className="overflow-hidden rounded-[30px] border border-cars-gray-light/70 bg-white shadow-[0_20px_44px_rgba(15,45,98,0.08)]"
+                    className="flex h-full flex-col overflow-hidden rounded-[30px] border border-cars-gray-light/70 bg-white shadow-[0_20px_44px_rgba(15,45,98,0.08)]"
                   >
                     <div className="relative h-56 bg-cars-off-white">
                       {getSelectionImage(selection) ? (
@@ -1380,7 +1447,7 @@ function ComparePageContent() {
                       ) : null}
                     </div>
 
-                    <div className="p-5">
+                    <div className="flex flex-1 flex-col p-5">
                       <div className="flex flex-wrap items-start justify-between gap-4">
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
@@ -1444,7 +1511,7 @@ function ComparePageContent() {
                         </div>
                       </div>
 
-                      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                      <div className="mt-5 grid flex-1 gap-4 lg:grid-cols-2">
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
                             Pros
@@ -1467,18 +1534,18 @@ function ComparePageContent() {
                         </div>
                       </div>
 
-                      <div className="mt-5 flex flex-wrap gap-3">
+                      <div className="mt-auto flex flex-wrap gap-3 pt-5">
                         {selection?.listingId ? (
                           <Link
                             href={`/listings/${selection.listingId}`}
-                            className="inline-flex rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white"
+                            className="inline-flex min-h-10 min-w-[132px] items-center justify-center whitespace-nowrap rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white"
                           >
                             View listing
                           </Link>
                         ) : selection?.variantId ? (
                           <Link
                             href={`/catalog/${selection.variantId}`}
-                            className="inline-flex rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white"
+                            className="inline-flex min-h-10 min-w-[132px] items-center justify-center whitespace-nowrap rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white"
                           >
                             View vehicle
                           </Link>
@@ -1606,13 +1673,6 @@ function ComparePageContent() {
                     >
                       {sendingFollowUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                       Ask follow-up
-                    </button>
-                    <button
-                      type="button"
-                      onClick={openCompareInAssistant}
-                      className="rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
-                    >
-                      Open in AI advisor
                     </button>
                   </div>
                 </form>

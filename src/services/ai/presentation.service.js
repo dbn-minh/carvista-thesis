@@ -22,24 +22,94 @@ function formatVariantName(item) {
   return [item?.make, item?.model, item?.trim].filter(Boolean).join(" ").trim();
 }
 
-function describeScore(item) {
-  if (!item?.scores) return "Scoring details are limited.";
+function formatThemeList(themes) {
+  if (!themes.length) return "balanced all-round use";
+  if (themes.length === 1) return themes[0];
+  return `${themes.slice(0, -1).join(", ")} and ${themes.at(-1)}`;
+}
 
-  const finalScore = safeNumber(item.scores.final_score);
-  const ratingScore = safeNumber(item.scores.rating_score);
-  const priceScore = safeNumber(item.scores.price_score);
-  const practicalityScore = safeNumber(item.scores.practicality_score);
-  const useCaseFit = safeNumber(item.scores.use_case_fit_score);
+function buildComparisonThemes(item) {
+  if (!item?.scores) return [];
+
+  const seats = safeNumber(item.seats) ?? 0;
+  const powerHp = safeNumber(item?.specs?.power_hp ?? item?.specs_kv_selected?.power_hp?.value) ?? 0;
+  const priceScore = safeNumber(item.scores.price_score) ?? 0;
+  const practicalityScore = safeNumber(item.scores.practicality_score) ?? 0;
+  const comfortScore = safeNumber(item.scores.comfort_score) ?? 0;
+  const efficiencyScore = safeNumber(item.scores.efficiency_score) ?? 0;
+  const resaleScore = safeNumber(item.scores.resale_score) ?? 0;
+  const technologyScore = safeNumber(item.scores.technology_score) ?? 0;
+  const maintenanceScore = safeNumber(item.scores.maintenance_score) ?? 0;
+  const safetyScore = safeNumber(item.scores.safety_score) ?? 0;
 
   return [
-    finalScore != null ? `overall ${finalScore.toFixed(1)}` : null,
-    ratingScore != null ? `rating ${ratingScore.toFixed(1)}` : null,
-    priceScore != null ? `value ${priceScore.toFixed(1)}` : null,
-    practicalityScore != null ? `practicality ${practicalityScore.toFixed(1)}` : null,
-    useCaseFit != null ? `use-case fit ${useCaseFit.toFixed(1)}` : null,
+    { label: "overall value", score: priceScore + resaleScore * 0.45 },
+    { label: "family practicality", score: practicalityScore + comfortScore + (seats >= 7 ? 2 : seats >= 5 ? 1 : 0) },
+    { label: "easy ownership", score: efficiencyScore + maintenanceScore + priceScore * 0.15 },
+    { label: "premium comfort", score: comfortScore + technologyScore * 0.75 },
+    { label: "resale confidence", score: resaleScore + safetyScore * 0.2 },
+    { label: "sportier feel", score: powerHp / 35 + comfortScore * 0.2 + technologyScore * 0.15 },
   ]
-    .filter(Boolean)
-    .join(", ");
+    .sort((left, right) => right.score - left.score)
+    .filter((item, index, items) => item.score > 0 && items.findIndex((candidate) => candidate.label === item.label) === index)
+    .slice(0, 2)
+    .map((item) => item.label);
+}
+
+function buildBudgetLens(result, winner, runnerUp) {
+  if (!winner || !String(result?.profile_fit_summary || "").toLowerCase().includes("budget")) return null;
+
+  const winnerPrice = safeNumber(winner.latest_price ?? winner.msrp_base);
+  const runnerPrice = safeNumber(runnerUp?.latest_price ?? runnerUp?.msrp_base);
+  const winnerName = formatVariantName(winner);
+
+  if (winnerPrice != null && runnerPrice != null) {
+    if (winnerPrice <= runnerPrice * 0.85) {
+      return `With your saved budget in mind, ${winnerName} is the easier recommendation to justify.`;
+    }
+    if (winnerPrice < runnerPrice) {
+      return `With your saved budget in mind, ${winnerName} still makes the cleaner value case.`;
+    }
+  }
+
+  return `With your saved priorities in mind, ${winnerName} still makes the cleaner all-round choice.`;
+}
+
+function toSentenceFragment(value, fallback) {
+  const text = String(value || fallback || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[.]+$/g, "");
+  if (!text) return fallback;
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+function buildTradeoffSentence(item, fallbackLabel = "all-round use") {
+  if (!item) return null;
+
+  const itemName = formatVariantName(item);
+  const strongestTheme = buildComparisonThemes(item)[0] ?? fallbackLabel;
+  const standout = toSentenceFragment(item?.pros?.[0], `its strongest case is ${strongestTheme}`);
+  const caution = item?.cons?.[0] ?? null;
+  const shouldSkipCaution = /\brecall\b/i.test(String(caution || ""));
+
+  return caution && !shouldSkipCaution
+    ? `${itemName} stands out for ${standout} but asks you to accept ${toSentenceFragment(caution, "a narrower trade-off")}`
+    : `${itemName} stands out most for ${strongestTheme}`;
+}
+
+function describeAlternativeAngle(item, themes = []) {
+  if (!item) return "a narrower niche";
+
+  const price = safeNumber(item.latest_price ?? item.msrp_base) ?? 0;
+  const powerHp = safeNumber(item?.specs?.power_hp ?? item?.specs_kv_selected?.power_hp?.value) ?? 0;
+
+  if (powerHp >= 450 || price >= 5000000000) return "drama, design presence, and occasion";
+  if (themes.includes("sportier feel")) return "driving character and performance feel";
+  if (themes.includes("premium comfort")) return "comfort, badge appeal, and presence";
+  if (themes.includes("easy ownership")) return "lower-stress daily ownership";
+  if (themes.includes("overall value")) return "overall value";
+  return themes[0] ?? "a narrower niche";
 }
 
 export function buildComparePresentation(result) {
@@ -55,30 +125,53 @@ export function buildComparePresentation(result) {
     comparedNames.length > 1
       ? `${comparedNames.slice(0, -1).join(", ")} and ${comparedNames.at(-1)}`
       : comparedNames[0] || "the selected variants";
+  const winnerThemes = winner ? buildComparisonThemes(winner) : [];
+  const runnerUpThemes = runnerUp ? buildComparisonThemes(runnerUp) : [];
+  const budgetLens = buildBudgetLens(result, winner, runnerUp);
+  const winnerName = winner ? formatVariantName(winner) : null;
+  const runnerUpName = runnerUp ? formatVariantName(runnerUp) : null;
+  const winnerTradeoff = buildTradeoffSentence(winner, "all-round balance");
+  const runnerUpTradeoff = buildTradeoffSentence(runnerUp, "a narrower niche");
+  const runnerUpAngle = describeAlternativeAngle(runnerUp, runnerUpThemes);
+  const assistantMessage = winner
+    ? [
+        `${winnerName} is the better all-round buy here, especially if you care about ${formatThemeList(winnerThemes)}.`,
+        runnerUp
+          ? `${runnerUpName} is the more compelling choice if your heart is pulling you toward ${runnerUpAngle}.`
+          : null,
+        winnerTradeoff ? `${winnerTradeoff}.` : null,
+        runnerUpTradeoff && runnerUpName ? `${runnerUpTradeoff}.` : null,
+        budgetLens,
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : "The comparison ran, but there was not enough grounded data to produce a confident verdict.";
 
   return buildNarrativeEnvelope({
     title: "AI comparison verdict",
-    assistant_message: winner
-      ? `${formatVariantName(winner)} is the strongest overall fit among ${comparedText}. ${describeScore(winner)}.`
-      : "The comparison ran, but there was not enough grounded data to produce a confident verdict.",
+    assistant_message: assistantMessage,
     highlights: [
-      winner ? `${formatVariantName(winner)} is the best all-round recommendation.` : null,
-      runnerUp ? `${formatVariantName(runnerUp)} is the closest alternative.` : null,
-      result?.profile_fit_summary ?? null,
+      winner ? `${winnerName}: stronger ${winnerThemes[0] ?? "all-round balance"}` : null,
+      runnerUp ? `${runnerUpName}: more about ${runnerUpThemes[0] ?? "a narrower niche"}` : null,
+      budgetLens ?? result?.profile_fit_summary ?? null,
     ].filter(Boolean),
     insight_cards: [
       winner
         ? {
             title: "Best overall",
             value: formatVariantName(winner),
-            description: winner.recommendation_reason || describeScore(winner),
+            description:
+              winner.pros?.[0] ||
+              `Best balanced for ${formatThemeList(winnerThemes)} from the current catalog, pricing, and market signals.`,
           }
         : null,
       runnerUp
         ? {
             title: "Closest alternative",
             value: formatVariantName(runnerUp),
-            description: runnerUp.pros?.[0] || describeScore(runnerUp),
+            description:
+              runnerUp.pros?.[0] ||
+              `Makes the more specific case for ${formatThemeList(runnerUpThemes)} if that matters most to you.`,
           }
         : null,
       result?.comparison_focus
