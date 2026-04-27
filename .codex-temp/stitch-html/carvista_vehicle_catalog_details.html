@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-secondary": "#460084",
+                    "on-primary-fixed": "#001f24",
+                    "error": "#ffb4ab",
+                    "inverse-surface": "#e0e3e1",
+                    "on-primary": "#00363d",
+                    "error-container": "#93000a",
+                    "tertiary-container": "#c8d4d1",
+                    "surface-container-highest": "#323634",
+                    "surface-container": "#1c201f",
+                    "secondary-fixed-dim": "#dab9ff",
+                    "primary-fixed": "#9af0ff",
+                    "surface-variant": "#323634",
+                    "secondary-fixed": "#eedbff",
+                    "surface-dim": "#101413",
+                    "on-tertiary-container": "#515c5a",
+                    "surface-bright": "#363a39",
+                    "on-tertiary-fixed-variant": "#3e4947",
+                    "tertiary-fixed-dim": "#bdc9c6",
+                    "on-primary-fixed-variant": "#004f58",
+                    "surface": "#101413",
+                    "on-background": "#e0e3e1",
+                    "inverse-on-surface": "#2d3130",
+                    "on-surface": "#e0e3e1",
+                    "tertiary-fixed": "#d9e5e2",
+                    "outline-variant": "#3b494c",
+                    "on-tertiary": "#283231",
+                    "surface-tint": "#00daf2",
+                    "primary": "#c5f6ff",
+                    "on-primary-container": "#00636f",
+                    "tertiary": "#e4f0ed",
+                    "on-error": "#690005",
+                    "surface-container-low": "#181c1b",
+                    "on-error-container": "#ffdad6",
+                    "inverse-primary": "#006874",
+                    "secondary": "#dab9ff",
+                    "primary-fixed-dim": "#00daf2",
+                    "on-secondary-container": "#cfa7ff",
+                    "on-secondary-fixed-variant": "#6312b1",
+                    "on-secondary-fixed": "#2a0053",
+                    "background": "#101413",
+                    "on-tertiary-fixed": "#131e1c",
+                    "secondary-container": "#6517b3",
+                    "primary-container": "#00e6ff",
+                    "outline": "#849396",
+                    "surface-container-lowest": "#0b0f0e",
+                    "surface-container-high": "#272b2a",
+                    "on-surface-variant": "#bac9cc"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { background-color: #101413; color: #e0e3e1; font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-card { background: rgba(16, 20, 19, 0.7); backdrop-filter: blur(20px); }
+        .hero-vignette { background: linear-gradient(to top, #101413 0%, transparent 40%); }
+        .primary-gradient { background: linear-gradient(135deg, #c5f6ff 0%, #00e6ff 100%); }
+    </style>
+</head>
+<body class="antialiased">
+<!-- Top Navigation Bar -->
+<nav class="fixed top-0 w-full z-50 bg-[#101413]/70 backdrop-blur-xl flex justify-between items-center px-8 h-20 max-w-full shadow-[0_8px_30px_rgb(0,0,0,0.12)]">
+<div class="text-2xl font-bold tracking-tighter text-white uppercase font-['Space_Grotesk']">CARVISTA</div>
+<div class="hidden md:flex gap-12 font-['Space_Grotesk'] tracking-tight">
+<a class="text-cyan-400 border-b-2 border-cyan-400 pb-1 duration-300 ease-in-out" href="#">Category</a>
+<a class="text-gray-400 hover:text-white transition-colors duration-300 ease-in-out" href="#">Listings</a>
+<a class="text-gray-400 hover:text-white transition-colors duration-300 ease-in-out" href="#">Sell</a>
+<a class="text-gray-400 hover:text-white transition-colors duration-300 ease-in-out" href="#">Inventory</a>
+</div>
+<div class="flex items-center gap-6">
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="search">search</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+</div>
+</nav>
+<main class="pt-20 pb-32">
+<!-- Hero Section -->
+<section class="relative h-[870px] w-full overflow-hidden">
+<div class="absolute inset-0 z-0">
+<img alt="Porsche 911 GT3 RS" class="w-full h-full object-cover" data-alt="Sleek silver Porsche 911 GT3 RS with massive rear wing parked on a scenic mountain road at dusk with moody blue lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAsnRkhHwf27D1108rJEPHnCuVEuKf2eQtIAiKp4kdPigoFAIoxoqEN_XQsa5dZlOs3zO6ShVy2uk_BA5jSGODgrys9YnwWCRWB8IBo3VOuRn3apPDQB4D6MZbEjJavZYr_hGkJQUyVm-vn_iTXLe6VMWPRd4oZfjljYW0J2Jb4tFwbsISAZIKmT7BMkthU1fKP9CWyVC0hhodlfnIJbm0ccl0M9aLH6nc-GeyEWzZmxsx-SGW1GE7RSBKRXd7t2x79XGCKbcoHNHHj"/>
+<div class="absolute inset-0 hero-vignette"></div>
+</div>
+<div class="relative z-10 h-full flex flex-col justify-end px-8 md:px-16 pb-20">
+<div class="max-w-6xl w-full">
+<span class="text-primary font-headline tracking-[0.3em] uppercase text-sm mb-4 block">Precision Engineering</span>
+<h1 class="text-6xl md:text-8xl font-headline font-bold text-white tracking-tighter leading-none mb-12">
+                        PORSCHE 911 <br/><span class="text-transparent bg-clip-text primary-gradient">GT3 RS</span>
+</h1>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-16 border-t border-white/10 pt-10">
+<div>
+<p class="text-on-surface-variant text-xs uppercase tracking-widest font-label mb-2">Power</p>
+<p class="text-3xl font-headline font-bold text-white italic">518 HP</p>
+</div>
+<div>
+<p class="text-on-surface-variant text-xs uppercase tracking-widest font-label mb-2">0-60 MPH</p>
+<p class="text-3xl font-headline font-bold text-white italic">3.0 SEC</p>
+</div>
+<div>
+<p class="text-on-surface-variant text-xs uppercase tracking-widest font-label mb-2">Top Speed</p>
+<p class="text-3xl font-headline font-bold text-white italic">184 MPH</p>
+</div>
+<div>
+<p class="text-on-surface-variant text-xs uppercase tracking-widest font-label mb-2">Starting at</p>
+<p class="text-3xl font-headline font-bold text-primary italic">$241,300</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Content Grid -->
+<div class="max-w-7xl mx-auto px-8 mt-24">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
+<!-- Left Column: Specs & Intelligence -->
+<div class="lg:col-span-8 space-y-24">
+<!-- Intelligence Snapshot -->
+<section class="space-y-8">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="psychology">psychology</span>
+<h2 class="text-3xl font-headline font-bold tracking-tight">Intelligence Snapshot</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- AI Price Outlook -->
+<div class="bg-surface-container-low p-8 rounded-xl border border-white/5 space-y-4">
+<div class="flex justify-between items-start">
+<h3 class="font-headline font-semibold text-lg">AI Price Outlook</h3>
+<span class="text-primary text-sm font-label font-bold">STABLE</span>
+</div>
+<p class="text-on-surface-variant text-sm leading-relaxed">High demand for the GT3 RS variant maintains strong resale values. Forecast suggests a 2.4% appreciation over the next 12 months for low-mileage examples.</p>
+<div class="pt-4">
+<div class="h-2 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full w-3/4 primary-gradient"></div>
+</div>
+<div class="flex justify-between mt-2 text-[10px] text-on-surface-variant uppercase tracking-widest">
+<span>Depreciation</span>
+<span>Appreciation</span>
+</div>
+</div>
+</div>
+<!-- Fit Score -->
+<div class="bg-surface-container-low p-8 rounded-xl border border-white/5 space-y-4">
+<h3 class="font-headline font-semibold text-lg">Performance Fit Score</h3>
+<div class="flex items-center gap-6">
+<div class="relative w-20 h-20 flex items-center justify-center">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-surface-container-highest" cx="40" cy="40" fill="transparent" r="36" stroke="currentColor" stroke-width="6"></circle>
+<circle class="text-cyan-400" cx="40" cy="40" fill="transparent" r="36" stroke="currentColor" stroke-dasharray="226" stroke-dashoffset="22" stroke-width="6"></circle>
+</svg>
+<span class="absolute text-xl font-headline font-bold">92</span>
+</div>
+<p class="text-on-surface-variant text-sm">Based on your preference for <span class="text-white">track-ready aerodynamics</span> and <span class="text-white">naturally aspirated engines</span>.</p>
+</div>
+</div>
+</div>
+<!-- Price History & Est Costs -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="bg-surface-container-low p-8 rounded-xl border border-white/5">
+<h3 class="font-headline font-semibold text-lg mb-6">Market Price History</h3>
+<div class="h-32 flex items-end gap-2">
+<div class="flex-1 bg-surface-container-highest h-1/2 rounded-t-sm"></div>
+<div class="flex-1 bg-surface-container-highest h-2/3 rounded-t-sm"></div>
+<div class="flex-1 bg-surface-container-highest h-3/4 rounded-t-sm"></div>
+<div class="flex-1 primary-gradient h-full rounded-t-sm"></div>
+<div class="flex-1 bg-surface-container-highest h-5/6 rounded-t-sm"></div>
+</div>
+<div class="flex justify-between mt-4 text-[10px] text-on-surface-variant uppercase tracking-widest">
+<span>2020</span>
+<span>2024 (Now)</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-8 rounded-xl border border-white/5">
+<h3 class="font-headline font-semibold text-lg mb-6">Annual Estimated Costs</h3>
+<ul class="space-y-4">
+<li class="flex justify-between text-sm">
+<span class="text-on-surface-variant">Maintenance &amp; Tires</span>
+<span class="font-headline font-medium">$4,200</span>
+</li>
+<li class="flex justify-between text-sm">
+<span class="text-on-surface-variant">Insurance Premium</span>
+<span class="font-headline font-medium">$3,850</span>
+</li>
+<li class="flex justify-between text-sm border-t border-white/5 pt-4">
+<span class="text-white font-semibold">Total Estimated</span>
+<span class="font-headline font-bold text-primary">$8,050</span>
+</li>
+</ul>
+</div>
+</div>
+</section>
+<!-- Technical Specifications -->
+<section class="space-y-8">
+<h2 class="text-3xl font-headline font-bold tracking-tight">Technical Specifications</h2>
+<div class="grid grid-cols-2 sm:grid-cols-3 gap-y-12 gap-x-8">
+<div class="space-y-1">
+<p class="text-on-surface-variant text-[10px] uppercase tracking-widest font-label">Engine</p>
+<p class="text-lg font-headline font-medium">4.0L Naturally Aspirated Boxer-6</p>
+</div>
+<div class="space-y-1">
+<p class="text-on-surface-variant text-[10px] uppercase tracking-widest font-label">Transmission</p>
+<p class="text-lg font-headline font-medium">7-Speed PDK Automatic</p>
+</div>
+<div class="space-y-1">
+<p class="text-on-surface-variant text-[10px] uppercase tracking-widest font-label">Drivetrain</p>
+<p class="text-lg font-headline font-medium">Rear-Wheel Drive</p>
+</div>
+<div class="space-y-1">
+<p class="text-on-surface-variant text-[10px] uppercase tracking-widest font-label">Weight</p>
+<p class="text-lg font-headline font-medium">3,268 lbs (1,482 kg)</p>
+</div>
+<div class="space-y-1">
+<p class="text-on-surface-variant text-[10px] uppercase tracking-widest font-label">Max Engine Speed</p>
+<p class="text-lg font-headline font-medium">9,000 RPM</p>
+</div>
+<div class="space-y-1">
+<p class="text-on-surface-variant text-[10px] uppercase tracking-widest font-label">Torque</p>
+<p class="text-lg font-headline font-medium">342 lb-ft @ 6,750 rpm</p>
+</div>
+</div>
+</section>
+<!-- User Insights & Reviews -->
+<section class="space-y-10">
+<div class="flex justify-between items-end">
+<h2 class="text-3xl font-headline font-bold tracking-tight">User Insights &amp; Reviews</h2>
+<button class="text-primary text-sm font-label uppercase tracking-widest hover:underline decoration-2 underline-offset-8">Read All 124 Reviews</button>
+</div>
+<div class="space-y-8">
+<div class="bg-surface-container-low p-8 rounded-xl border border-white/5">
+<div class="flex justify-between items-start mb-6">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center font-headline font-bold text-primary">MS</div>
+<div>
+<p class="font-headline font-semibold">Marc S.</p>
+<p class="text-on-surface-variant text-xs">Verified Owner | 3 years</p>
+</div>
+</div>
+<div class="flex gap-1 text-primary">
+<span class="material-symbols-outlined fill-1" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined fill-1" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined fill-1" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined fill-1" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined fill-1" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+</div>
+<h4 class="font-headline font-bold text-xl mb-3">The ultimate track weapon that can still manage the street.</h4>
+<p class="text-on-surface-variant leading-relaxed">There is nothing quite like the 9,000 RPM scream. The downforce in high-speed corners is transformative. While it's loud inside, it's surprisingly compliant for a GT3 RS on the road.</p>
+</div>
+<div class="bg-surface-container-low p-8 rounded-xl border border-white/5">
+<div class="flex justify-between items-start mb-6">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center font-headline font-bold text-secondary">DL</div>
+<div>
+<p class="font-headline font-semibold">David L.</p>
+<p class="text-on-surface-variant text-xs">Track Instructor</p>
+</div>
+</div>
+<div class="flex gap-1 text-primary">
+<span class="material-symbols-outlined fill-1" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined fill-1" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined fill-1" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined fill-1" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined" data-icon="star">star</span>
+</div>
+</div>
+<h4 class="font-headline font-bold text-xl mb-3">Surgical Precision.</h4>
+<p class="text-on-surface-variant leading-relaxed">The steering feel is the gold standard. Every input is telegraphed perfectly. If you want a weekend car for Sunday drives, get a standard GT3. If you want to hunt lap times, this is the only answer.</p>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column: Gallery & Quick Info -->
+<div class="lg:col-span-4 space-y-12">
+<!-- Gallery Preview -->
+<div class="space-y-4">
+<h3 class="font-headline font-bold text-xl uppercase tracking-widest text-on-surface-variant">Detail Gallery</h3>
+<div class="grid grid-cols-2 gap-4">
+<img alt="Engine Detail" class="w-full h-40 object-cover rounded-xl" data-alt="Close up of a high performance flat six engine with carbon fiber components and red accents in a dark garage" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAFDLeNi3bKbiANvGJQrDErKHtTINVl3L8mw98dU8OWPkxj5rEuQC2K3sUgBMw5EqKNFzmxx9ixKwsX0AGHBfN9QDOgzGcTmj8UDL5FM-NxI1McvsAjd0Ug0C2XEgJHeKwUUAKVZT_qi7qgjqoVXmMJCE3HyJPLnr-kpTWaCq8W0aAfttjXPtvq9Ip8dXdBzjZ8h4sJ0JA-oC0FJwmOVUvDpFThSlRDt25yRU0uFJoc6Y7flTjTvbmzhvjI07xOII6OA9gG6wjOzjzH"/>
+<img alt="Steering Wheel" class="w-full h-40 object-cover rounded-xl" data-alt="Modern Porsche steering wheel with drive mode selector and carbon fiber trim, focused on the Porsche crest" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDM-cnHuIRYG2s2P0nFqKlpYoFox5lO1H5qciE3u_OxhKV34A2vBJ4Zm5EWx0PJgY8OSUvzMU6QKGEzx86K25DR23p1QbEIqxcmM2TpQxaKLB2PP_ErjjOmZ9gDRVLG1E1R5aAIrVDWjFdfv8OeMCiChAt0Gn2jhchXmMdIdO1FF0s1-xoIy5H5Su7TC9V88WjjozNUMOdRXATTWMMu2G_BdM6CLCZE00A74tbJdSH5utb6bdn5Mko-pi3Js1o13uv87ZgOE5z7Q0p_"/>
+<img alt="Wheels" class="w-full h-40 object-cover rounded-xl" data-alt="Lightweight center-lock alloy wheels of a sports car with yellow brake calipers visible behind the spokes" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2DsLXHUIm406JIPvYL06Y5Fpl2UgwhZ727lE2B-5CaV2X6N_Sqi_1_8cWVZExUyGyWKv9qMPMAx0MujFdDF5oIO9nkMMBi4hPQvgez2xInUkfHYC3ovCFLgatXNpiiiMzCRbczo6OnvnubikCL0WZ4R66w_NVavhagxGfT34V5Le16l5zgD4C3mUisJt2R70m3fPEKP-8czUbN3k-jJp9_NnMNq7ICpSONrT8GuBeZJZ-YwIbF79VQwooIZGpAPSjxumB0GNYI_-t"/>
+<img alt="Rear Wing" class="w-full h-40 object-cover rounded-xl" data-alt="Aggressive swan-neck rear wing of a silver racing car with carbon fiber texture and aerodynamic winglets" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBl6q8DaExA8hI2P6jReAp_P5zBhmkYk3O1r7Pu1LpOVjViMn2lKL0lO5Dxo8rrmD7Rqr6WTkmTgm1KflYi2Sk0NGCfpieuRRbjw2m3vUHYYYwrK1_BchopMEihN3GqHVUuztaXlE8cuCp4e_6ZNwBajXV6rEn8Q7BvTYGmN7f5WtZHVI1_jxiSq1--RCwtK8xpvlNfLINUdzyLZGWWOJQFwn9F7LA0owghU-8lIxOrx2Lmj5Gz1fqdW6m5O1Fz4NYhWUWNQYp5OBTN"/>
+</div>
+</div>
+<!-- Market Context -->
+<div class="bg-surface-container-high p-8 rounded-2xl space-y-8 border border-white/10">
+<h3 class="font-headline font-bold text-xl">Variant Analysis</h3>
+<div class="space-y-6">
+<div>
+<p class="text-on-surface-variant text-xs uppercase tracking-widest mb-1">Availability</p>
+<p class="font-headline font-medium text-lg">Rare / Allocated</p>
+</div>
+<div>
+<p class="text-on-surface-variant text-xs uppercase tracking-widest mb-1">Curb Appeal</p>
+<p class="font-headline font-medium text-lg text-secondary">Extreme / Aggressive</p>
+</div>
+<div>
+<p class="text-on-surface-variant text-xs uppercase tracking-widest mb-1">Primary Rival</p>
+<p class="font-headline font-medium text-lg">Mercedes-AMG GT Black Series</p>
+</div>
+</div>
+<button class="w-full py-4 rounded-full font-headline font-bold tracking-widest text-sm uppercase primary-gradient text-on-primary-container shadow-xl hover:scale-[1.02] transition-transform">
+                            VIEW INVENTORY
+                        </button>
+</div>
+<!-- Comparison Callout -->
+<div class="p-8 border border-outline-variant/20 rounded-2xl flex items-center gap-6">
+<span class="material-symbols-outlined text-4xl text-primary" data-icon="compare_arrows">compare_arrows</span>
+<div>
+<h4 class="font-headline font-bold">Compare Variants</h4>
+<p class="text-xs text-on-surface-variant">See how the GT3 RS stacks up against the GT3 and GT4 RS.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- AI Advisor FAB -->
+<button class="fixed bottom-10 right-10 w-16 h-16 rounded-full bg-cyan-500/20 backdrop-blur-xl border border-cyan-400/30 flex items-center justify-center text-cyan-300 shadow-[0_0_30px_rgba(0,230,255,0.2)] hover:scale-110 transition-transform z-50 group">
+<span class="material-symbols-outlined text-3xl" data-icon="psychology">psychology</span>
+<div class="absolute right-20 bg-[#101413]/90 px-4 py-2 rounded-lg text-xs font-headline tracking-widest text-cyan-300 border border-cyan-400/20 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            ASK AI ADVISOR
+        </div>
+</button>
+<!-- Bottom Navigation Bar (Mobile) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 py-3 pb-6 bg-[#101413]/80 backdrop-blur-2xl z-50 rounded-t-3xl border-t border-white/10 shadow-[0_-4px_20px_rgba(0,230,255,0.05)]">
+<a class="flex flex-col items-center justify-center bg-cyan-500/20 text-cyan-300 rounded-full px-5 py-2 hover:scale-110 transition-transform cubic-bezier(0.4, 0, 0.2, 1)" href="#">
+<span class="material-symbols-outlined" data-icon="directions_car">directions_car</span>
+<span class="font-['Inter'] text-[10px] font-medium uppercase tracking-widest mt-1">Catalog</span>
+</a>
+<a class="flex flex-col items-center justify-center text-gray-500 hover:scale-110 transition-transform cubic-bezier(0.4, 0, 0.2, 1)" href="#">
+<span class="material-symbols-outlined" data-icon="psychology">psychology</span>
+<span class="font-['Inter'] text-[10px] font-medium uppercase tracking-widest mt-1">Advisor</span>
+</a>
+<a class="flex flex-col items-center justify-center text-gray-500 hover:scale-110 transition-transform cubic-bezier(0.4, 0, 0.2, 1)" href="#">
+<span class="material-symbols-outlined" data-icon="sell">sell</span>
+<span class="font-['Inter'] text-[10px] font-medium uppercase tracking-widest mt-1">Sell</span>
+</a>
+<a class="flex flex-col items-center justify-center text-gray-500 hover:scale-110 transition-transform cubic-bezier(0.4, 0, 0.2, 1)" href="#">
+<span class="material-symbols-outlined" data-icon="bookmark">bookmark</span>
+<span class="font-['Inter'] text-[10px] font-medium uppercase tracking-widest mt-1">Saved</span>
+</a>
+</nav>
+</body></html>

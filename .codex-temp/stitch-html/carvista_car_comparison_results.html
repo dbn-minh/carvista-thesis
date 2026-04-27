@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Compare Results | CARVISTA</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-tint": "#00daf2",
+                        "secondary-fixed-dim": "#dab9ff",
+                        "surface-dim": "#101413",
+                        "secondary-fixed": "#eedbff",
+                        "inverse-surface": "#e0e3e1",
+                        "on-primary": "#00363d",
+                        "secondary": "#dab9ff",
+                        "on-tertiary-fixed": "#131e1c",
+                        "on-secondary": "#460084",
+                        "secondary-container": "#6517b3",
+                        "surface-container-highest": "#323634",
+                        "outline": "#849396",
+                        "primary-fixed-dim": "#00daf2",
+                        "surface": "#101413",
+                        "on-error-container": "#ffdad6",
+                        "surface-container-high": "#272b2a",
+                        "tertiary-fixed-dim": "#bdc9c6",
+                        "error": "#ffb4ab",
+                        "on-tertiary-container": "#515c5a",
+                        "on-surface": "#e0e3e1",
+                        "on-primary-fixed": "#001f24",
+                        "on-primary-container": "#00636f",
+                        "primary-container": "#00e6ff",
+                        "inverse-primary": "#006874",
+                        "on-secondary-fixed": "#2a0053",
+                        "tertiary-fixed": "#d9e5e2",
+                        "on-primary-fixed-variant": "#004f58",
+                        "surface-container-low": "#181c1b",
+                        "primary-fixed": "#9af0ff",
+                        "error-container": "#93000a",
+                        "on-secondary-container": "#cfa7ff",
+                        "surface-bright": "#363a39",
+                        "on-surface-variant": "#bac9cc",
+                        "surface-container-lowest": "#0b0f0e",
+                        "on-background": "#e0e3e1",
+                        "on-tertiary": "#283231",
+                        "on-error": "#690005",
+                        "surface-container": "#1c201f",
+                        "on-tertiary-fixed-variant": "#3e4947",
+                        "on-secondary-fixed-variant": "#6312b1",
+                        "inverse-on-surface": "#2d3130",
+                        "tertiary": "#e4f0ed",
+                        "primary": "#c5f6ff",
+                        "surface-variant": "#323634",
+                        "outline-variant": "#3b494c",
+                        "tertiary-container": "#c8d4d1",
+                        "background": "#101413"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(16, 20, 19, 0.7);
+            backdrop-filter: blur(20px);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-primary selection:text-on-primary">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 bg-[#101413]/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
+<div class="flex items-center justify-between px-8 py-4 w-full max-w-screen-2xl mx-auto">
+<div class="text-2xl font-bold tracking-tighter text-[#c5f6ff] font-['Space_Grotesk']">CARVISTA</div>
+<div class="hidden md:flex items-center gap-8 font-['Space_Grotesk'] tracking-tight">
+<a class="text-gray-400 hover:text-[#c5f6ff] transition-colors" href="#">Inventory</a>
+<a class="text-gray-400 hover:text-[#c5f6ff] transition-colors" href="#">Showroom</a>
+<a class="text-[#c5f6ff] border-b-2 border-[#c5f6ff] pb-1" href="#">Compare</a>
+<a class="text-gray-400 hover:text-[#c5f6ff] transition-colors" href="#">Finance</a>
+<a class="text-gray-400 hover:text-[#c5f6ff] transition-colors" href="#">Journal</a>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 hover:bg-[#c5f6ff]/10 rounded-full transition-all duration-300 scale-95 active:scale-90 text-[#c5f6ff]">
+<span class="material-symbols-outlined">favorite</span>
+</button>
+<button class="p-2 hover:bg-[#c5f6ff]/10 rounded-full transition-all duration-300 scale-95 active:scale-90 text-[#c5f6ff]">
+<span class="material-symbols-outlined">person</span>
+</button>
+</div>
+</div>
+</nav>
+<main class="pt-24 pb-20">
+<!-- Section 1: Quick Verdict Hero -->
+<section class="px-8 mb-24 max-w-screen-2xl mx-auto">
+<div class="relative py-16 px-12 rounded-xl bg-surface-container-low overflow-hidden">
+<!-- Background visual element -->
+<div class="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-primary/5 to-transparent pointer-events-none"></div>
+<div class="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+<div>
+<div class="inline-flex items-center gap-2 px-3 py-1 bg-primary text-on-primary rounded-full mb-6">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="text-xs font-bold tracking-widest uppercase">Verdict: Velocity Winner</span>
+</div>
+<h1 class="font-headline text-5xl md:text-7xl font-bold tracking-tighter mb-4 leading-none">
+                            McLaren <span class="text-primary">720S</span>
+</h1>
+<p class="text-on-surface-variant text-xl mb-8 max-w-xl">
+                            The 911 GT3 remains the benchmark for surgical precision, but the 720S commands the throne through pure visceral dominance and superior tech integration.
+                        </p>
+<div class="space-y-4">
+<div class="flex items-start gap-4">
+<span class="material-symbols-outlined text-primary mt-1">check_circle</span>
+<div>
+<h4 class="font-bold text-on-surface">Unrivaled Power-to-Weight</h4>
+<p class="text-sm text-on-surface-variant">Class-leading aerodynamics coupled with the M840T V8 powerhouse.</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<span class="material-symbols-outlined text-primary mt-1">check_circle</span>
+<div>
+<h4 class="font-bold text-on-surface">Future-Forward Interior</h4>
+<p class="text-sm text-on-surface-variant">Folding Driver Display and adaptive cockpit telemetry for the digital age.</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<span class="material-symbols-outlined text-primary mt-1">check_circle</span>
+<div>
+<h4 class="font-bold text-on-surface">Active Suspension Pro 2</h4>
+<p class="text-sm text-on-surface-variant">Defies physics by balancing track-ready stiffness with GT comfort.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="relative aspect-video rounded-xl overflow-hidden shadow-2xl">
+<img alt="McLaren 720S front profile" class="w-full h-full object-cover" data-alt="Sleek McLaren 720S in ceramic grey parked on a coastal road at sunset with dramatic side lighting and oceanic background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDFMrDLNYtkyo1Q1bVPkGLT7p58ZwH7XxXxybYhxoLaceX6RfJrx7JG4ygic1y6Ip71PabB-zAXIFlacLjm3FFnFDCPcCRcV-NVVltWMh8DfQUu0awDCM7aZ2Q0gfniiN0G0dmVCsRfLivOBU-Yq6y3PulA7LZBXB9im0I9RK9aExDurPgUptRUq0yc_y7xdruy_iKNqR9T49KBPQ8eYAW3tDrpH4SQclGCMbSVDW-XcD134O_KimKDhziv4-cGBRyITa5YFTYPIChR"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-low/80 to-transparent"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 2: Visual Comparison Side-by-Side -->
+<section class="mb-32">
+<div class="max-w-screen-2xl mx-auto px-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="group relative overflow-hidden rounded-xl bg-surface-container">
+<div class="aspect-[16/10]">
+<img alt="Porsche 911 GT3" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="Shark Blue Porsche 911 GT3 with distinctive rear wing on a professional racetrack with motion blur background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDg70kN6KDdZNJgInumrAQPGGfPtaVZFMRoFHf7vucB_HIqezTnEb_y-DEEm2nE9XtQEYQ6n5v6LcRvMoZ-t172j3CMnzsZ9U3iYx9OEHVu3cLmD4zS8sm_7ibf8d0LRfuBvkoGj6Ubj7MK_yPTW3NYY2vczpYuGpQPI7uwETMRuXf9Vrb82M2qQce86ODXVKaDXK-3beJz2WVCkMHVs-aEnT7qe_CY0pGFve7iXudkZLElyZgamJiT25o-2dI-XcvtgSgMSDtUd2pQ"/>
+</div>
+<div class="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-surface-container-lowest to-transparent">
+<h3 class="font-headline text-3xl font-bold tracking-tight">Porsche 911 GT3</h3>
+<p class="text-primary text-sm tracking-widest uppercase mt-2">The Purist's Choice</p>
+</div>
+</div>
+<div class="group relative overflow-hidden rounded-xl bg-surface-container">
+<div class="aspect-[16/10]">
+<img alt="McLaren 720S" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="Vivid orange McLaren 720S with dihedral doors open in a modern architectural setting with glass and concrete" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDruKHUo0UBloA7vfS94O-TnHUfJwTbbibwkENmo2yxoo8YfxStelpptEe45hw6qY34MV5vdbg5pSCkAMwoEXx0PJJIfS9TtDt4D5yY593qN_5KkIQR_PEO8xQnXNW04aHBsHuF9b4yiE77AQ4T3haL3AtJEE04ekTLjEfUOPCReZYVn_CZnIU3RX7sab6-ZQRDfdQRC4JEfz1s6_0F1qz6oRp_QQu7Y0Yb2AXY-QE4HtbKJdWA2-e5jbexf3OJJtteITnZFVeEeFeL"/>
+</div>
+<div class="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-surface-container-lowest to-transparent text-right">
+<h3 class="font-headline text-3xl font-bold tracking-tight">McLaren 720S</h3>
+<p class="text-secondary text-sm tracking-widest uppercase mt-2">The Supercar Disruptor</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 3: Pros & Cons / Snapshots -->
+<section class="px-8 mb-32 max-w-screen-2xl mx-auto">
+<h2 class="font-headline text-3xl font-bold mb-12 tracking-tight">Executive Summary</h2>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-16">
+<!-- Vehicle A -->
+<div class="space-y-8">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center font-headline font-bold">A</div>
+<h3 class="text-2xl font-bold">911 GT3 Analysis</h3>
+</div>
+<div class="p-8 bg-surface-container-low rounded-xl border border-outline-variant/15">
+<div class="mb-6">
+<span class="text-on-surface-variant label-sm uppercase tracking-widest">Market Est.</span>
+<div class="text-3xl font-headline font-bold text-on-surface">$197,200</div>
+</div>
+<div class="space-y-6">
+<div>
+<h5 class="text-primary font-bold mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">thumb_up</span> Highlights
+                                </h5>
+<ul class="space-y-2 text-on-surface-variant text-sm">
+<li class="flex gap-2"><span>•</span> Naturally aspirated flat-six scream at 9,000 RPM</li>
+<li class="flex gap-2"><span>•</span> Unmatched steering feedback and mechanical grip</li>
+<li class="flex gap-2"><span>•</span> Heritage-driven design with modern aero efficiency</li>
+</ul>
+</div>
+<div>
+<h5 class="text-error font-bold mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">warning</span> Watch-outs
+                                </h5>
+<ul class="space-y-2 text-on-surface-variant text-sm">
+<li class="flex gap-2"><span>•</span> Harsh ride for extended daily driving</li>
+<li class="flex gap-2"><span>•</span> Minimal storage capacity even by GT standards</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<!-- Vehicle B -->
+<div class="space-y-8">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center font-headline font-bold">B</div>
+<h3 class="text-2xl font-bold">720S Analysis</h3>
+</div>
+<div class="p-8 bg-surface-container-low rounded-xl border border-outline-variant/15">
+<div class="mb-6">
+<span class="text-on-surface-variant label-sm uppercase tracking-widest">Market Est.</span>
+<div class="text-3xl font-headline font-bold text-on-surface">$310,500</div>
+</div>
+<div class="space-y-6">
+<div>
+<h5 class="text-secondary font-bold mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">thumb_up</span> Highlights
+                                </h5>
+<ul class="space-y-2 text-on-surface-variant text-sm">
+<li class="flex gap-2"><span>•</span> Explosive acceleration via twin-turbo V8</li>
+<li class="flex gap-2"><span>•</span> Revolutionary Monocage II chassis stiffness</li>
+<li class="flex gap-2"><span>•</span> Dihedral door entry creates theater every time</li>
+</ul>
+</div>
+<div>
+<h5 class="text-error font-bold mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">warning</span> Watch-outs
+                                </h5>
+<ul class="space-y-2 text-on-surface-variant text-sm">
+<li class="flex gap-2"><span>•</span> High maintenance complexity and costs</li>
+<li class="flex gap-2"><span>•</span> Infotainment UI feels dated compared to the chassis</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 4: Technical Specifications Comparison Table -->
+<section class="px-8 mb-32 max-w-screen-2xl mx-auto">
+<h2 class="font-headline text-3xl font-bold mb-12 tracking-tight">Full Technical Benchmarking</h2>
+<div class="overflow-hidden rounded-xl bg-surface-container-low border border-outline-variant/15">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container">
+<th class="p-6 font-headline font-bold text-on-surface-variant uppercase tracking-widest text-xs border-b border-outline-variant/10">Specification</th>
+<th class="p-6 font-headline font-bold text-primary uppercase tracking-widest text-xs border-b border-outline-variant/10">911 GT3 (992)</th>
+<th class="p-6 font-headline font-bold text-secondary uppercase tracking-widest text-xs border-b border-outline-variant/10">McLaren 720S</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/10">
+<tr class="hover:bg-surface-container-high transition-colors">
+<td class="p-6 text-on-surface-variant font-medium">Model Year</td>
+<td class="p-6 font-headline">2024</td>
+<td class="p-6 font-headline">2024</td>
+</tr>
+<tr class="hover:bg-surface-container-high transition-colors">
+<td class="p-6 text-on-surface-variant font-medium">Body Style</td>
+<td class="p-6">2-Door Coupe</td>
+<td class="p-6">2-Door Coupe</td>
+</tr>
+<tr class="hover:bg-surface-container-high transition-colors">
+<td class="p-6 text-on-surface-variant font-medium">Engine</td>
+<td class="p-6">4.0L Naturally Aspirated Flat-6</td>
+<td class="p-6">4.0L Twin-Turbo V8</td>
+</tr>
+<tr class="hover:bg-surface-container-high transition-colors">
+<td class="p-6 text-on-surface-variant font-medium">Horsepower</td>
+<td class="p-6 font-headline">502 hp</td>
+<td class="p-6 font-headline text-primary">710 hp</td>
+</tr>
+<tr class="hover:bg-surface-container-high transition-colors">
+<td class="p-6 text-on-surface-variant font-medium">Transmission</td>
+<td class="p-6">7-Speed PDK / 6-Speed Manual</td>
+<td class="p-6">7-Speed SSG</td>
+</tr>
+<tr class="hover:bg-surface-container-high transition-colors">
+<td class="p-6 text-on-surface-variant font-medium">0-60 MPH</td>
+<td class="p-6 font-headline">3.2 seconds</td>
+<td class="p-6 font-headline text-primary">2.8 seconds</td>
+</tr>
+<tr class="hover:bg-surface-container-high transition-colors">
+<td class="p-6 text-on-surface-variant font-medium">Top Speed</td>
+<td class="p-6 font-headline">197 mph</td>
+<td class="p-6 font-headline text-primary">212 mph</td>
+</tr>
+<tr class="hover:bg-surface-container-high transition-colors">
+<td class="p-6 text-on-surface-variant font-medium">Est. Market Price</td>
+<td class="p-6 font-headline text-on-surface font-bold">$197,200</td>
+<td class="p-6 font-headline text-on-surface font-bold">$310,500</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="mt-12 flex flex-col md:flex-row gap-6 justify-center">
+<button class="px-12 py-4 bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold rounded-full scale-95 active:scale-90 transition-transform shadow-lg shadow-primary/20">
+                    Configure McLaren 720S
+                </button>
+<button class="px-12 py-4 border border-outline-variant/30 text-on-surface font-bold rounded-full hover:bg-surface-container-highest transition-all scale-95 active:scale-90">
+                    Download Comparison PDF
+                </button>
+</div>
+</section>
+</main>
+<!-- AI Advisor FAB -->
+<button class="fixed bottom-8 right-8 w-16 h-16 rounded-full bg-primary text-on-primary shadow-2xl flex items-center justify-center group hover:scale-110 transition-transform z-50">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+<div class="absolute right-full mr-4 px-4 py-2 bg-surface-container-highest text-on-surface text-sm rounded-lg opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity">
+            Ask AI Advisor about these models
+        </div>
+</button>
+<!-- Footer -->
+<footer class="bg-[#0b0f0e] w-full py-12 px-8">
+<div class="flex flex-col md:flex-row justify-between items-center gap-6 w-full border-t border-[#3b494c]/15 pt-12">
+<div class="text-[#c5f6ff] font-black font-['Inter']">CARVISTA</div>
+<div class="flex gap-8 font-['Inter'] text-xs uppercase tracking-widest text-gray-500">
+<a class="hover:text-[#c5f6ff] transition-colors" href="#">Terms</a>
+<a class="hover:text-[#c5f6ff] transition-colors" href="#">Privacy</a>
+<a class="hover:text-[#c5f6ff] transition-colors" href="#">Press</a>
+<a class="hover:text-[#c5f6ff] transition-colors" href="#">Contact</a>
+</div>
+<div class="font-['Inter'] text-xs uppercase tracking-widest text-gray-500 opacity-80">
+                © 2024 CARVISTA EDITORIAL VELOCITY. ALL RIGHTS RESERVED.
+            </div>
+</div>
+</footer>
+</body></html>
