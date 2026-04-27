@@ -74,7 +74,7 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
       {children}
       <Dialog open={open} onOpenChange={setOpen}>
         {open ? (
-          <DialogContent className="max-w-[520px] border-0 bg-transparent p-0 shadow-none">
+          <DialogContent className="max-h-[calc(100vh-1rem)] w-[calc(100vw-1rem)] max-w-[980px] overflow-y-auto border-0 bg-transparent p-0 shadow-none sm:w-[min(94vw,980px)]">
             <DialogTitle className="sr-only">
               {mode === "login" ? "Login to CarVista" : "Register for CarVista"}
             </DialogTitle>

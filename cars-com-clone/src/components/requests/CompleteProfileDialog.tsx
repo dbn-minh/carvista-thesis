@@ -96,10 +96,10 @@ export default function CompleteProfileDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="rounded-[28px] border-cars-gray-light/80 bg-background p-0 shadow-[0_28px_70px_rgba(15,45,98,0.18)] sm:max-w-xl">
-        <div className="p-6 sm:p-7">
+      <DialogContent className="w-[calc(100vw-1rem)] max-w-xl rounded-[28px] border-cars-gray-light/80 bg-background p-0 shadow-[0_28px_70px_rgba(15,45,98,0.18)]">
+        <div className="p-5 sm:p-7">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-apercu-bold text-cars-primary">
+            <DialogTitle className="text-xl font-apercu-bold text-cars-primary sm:text-2xl">
               {title}
             </DialogTitle>
             <DialogDescription className="mt-2 text-sm leading-6 text-cars-gray">
@@ -156,11 +156,11 @@ export default function CompleteProfileDialog({
             </select>
           </div>
 
-          <DialogFooter className="mt-6 gap-2 sm:gap-3">
+          <DialogFooter className="mt-6 grid gap-2 sm:flex sm:justify-end sm:gap-3">
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="rounded-full border border-cars-primary/15 px-4 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+              className="inline-flex h-11 w-full items-center justify-center rounded-full border border-cars-primary/15 px-4 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white sm:w-auto"
             >
               Not now
             </button>
@@ -168,7 +168,7 @@ export default function CompleteProfileDialog({
               type="button"
               onClick={() => void handleSave()}
               disabled={saving}
-              className="rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-cars-accent disabled:cursor-not-allowed disabled:opacity-70"
+              className="inline-flex h-11 w-full items-center justify-center rounded-full bg-cars-primary px-5 text-sm font-semibold text-white transition hover:bg-cars-accent disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
             >
               {saving ? "Saving..." : submitLabel}
             </button>

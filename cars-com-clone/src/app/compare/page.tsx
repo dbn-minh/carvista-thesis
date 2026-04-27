@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   ArrowLeftRight,
@@ -628,19 +628,22 @@ function CompareSearchPanel({
   onClear: () => void;
 }) {
   return (
-    <div className="rounded-[28px] border border-cars-gray-light/70 bg-white p-5 shadow-[0_18px_40px_rgba(15,45,98,0.06)]">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">{title}</p>
-          <p className="mt-2 text-sm leading-6 text-cars-gray">
-            Search the compare-ready catalog only. Select an exact supported variant before comparing.
+    <div className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(28,32,31,0.96),rgba(16,20,19,0.96))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.32)] sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cars-accent">
+            {title}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-white/60">
+            Search the compare-ready catalog only. Select an exact supported variant before
+            comparing.
           </p>
         </div>
         {selected ? (
           <button
             type="button"
             onClick={onClear}
-            className="rounded-full border border-cars-primary/15 px-3 py-1.5 text-xs font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+            className="inline-flex h-10 items-center justify-center self-start rounded-full border border-white/10 px-4 text-xs font-semibold text-white/82 transition-colors hover:bg-white/6"
           >
             Change
           </button>
@@ -651,24 +654,24 @@ function CompareSearchPanel({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder="Search compare-ready year, make, model, or trim"
-        className="mt-4 h-12 w-full rounded-2xl border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+        className="mt-4 h-12 w-full rounded-2xl border border-white/8 bg-white/5 px-4 text-sm text-white outline-none transition placeholder:text-white/35 focus:border-cars-accent/40 focus:ring-2 focus:ring-cars-accent/10"
       />
 
       {selected ? (
-        <div className="mt-4 rounded-[22px] bg-cars-off-white px-4 py-4">
-          <p className="text-sm font-semibold text-cars-primary">{selected.label}</p>
+        <div className="mt-4 rounded-[22px] border border-white/8 bg-white/6 px-4 py-4">
+          <p className="break-words text-sm font-semibold text-white">{selected.label}</p>
           {selected.resolutionNote ? (
-            <p className="mt-2 text-xs leading-5 text-cars-gray">{selected.resolutionNote}</p>
+            <p className="mt-2 text-xs leading-5 text-white/58">{selected.resolutionNote}</p>
           ) : null}
         </div>
       ) : null}
 
       {searchState.loading ? (
-        <p className="mt-4 text-sm text-cars-gray">Searching vehicles...</p>
+        <p className="mt-4 text-sm text-white/58">Searching vehicles...</p>
       ) : null}
 
       {searchState.error ? (
-        <p className="mt-4 rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <p className="mt-4 rounded-[18px] border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
           {searchState.error}
         </p>
       ) : null}
@@ -677,8 +680,8 @@ function CompareSearchPanel({
         <p
           className={`mt-4 rounded-[18px] border px-4 py-3 text-sm ${
             helperTone === "error"
-              ? "border-red-200 bg-red-50 text-red-700"
-              : "border-slate-200 bg-slate-50 text-slate-700"
+              ? "border-red-500/30 bg-red-500/10 text-red-100"
+              : "border-white/8 bg-white/6 text-white/70"
           }`}
         >
           {helperNote}
@@ -687,7 +690,7 @@ function CompareSearchPanel({
 
       {!selected && searchState.options.length > 0 ? (
         <div className="mt-4 space-y-2">
-          <p className="px-1 text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
+          <p className="px-1 text-xs font-semibold uppercase tracking-[0.18em] text-cars-accent">
             Supported variants
           </p>
           {searchState.options.map((item) => (
@@ -695,10 +698,12 @@ function CompareSearchPanel({
               key={item.variant_id}
               type="button"
               onClick={() => onSelect(item)}
-              className="flex w-full flex-col rounded-[20px] border border-cars-gray-light/70 px-4 py-3 text-left transition-colors hover:border-cars-accent/30 hover:bg-cars-off-white"
+              className="flex w-full flex-col rounded-[20px] border border-white/8 bg-white/4 px-4 py-3 text-left transition-colors hover:border-cars-accent/28 hover:bg-white/8"
             >
-              <span className="text-sm font-semibold text-cars-primary">{buildVariantLabel(item)}</span>
-              <span className="mt-1 text-xs text-cars-gray">
+              <span className="break-words text-sm font-semibold text-white">
+                {buildVariantLabel(item)}
+              </span>
+              <span className="mt-1 text-xs text-white/58">
                 {formatBodyType(item.body_type)} · {formatFuelType(item.fuel_type)} · {formatTransmission(item.transmission)}
               </span>
             </button>
@@ -718,35 +723,35 @@ function CompareFollowUpAnswer({
     <div
       className={
         message.role === "user"
-          ? "ml-auto max-w-[85%] rounded-[24px] rounded-br-md bg-cars-primary px-4 py-3 text-sm leading-6 text-white"
-          : "max-w-[92%] rounded-[24px] rounded-bl-md border border-cars-gray-light/80 bg-white px-4 py-3 text-sm leading-6 text-cars-primary shadow-sm"
+          ? "ml-auto w-full max-w-full rounded-[24px] rounded-br-md bg-[linear-gradient(135deg,rgba(0,230,255,0.18),rgba(101,23,179,0.28))] px-4 py-3 text-sm leading-6 text-white sm:max-w-[85%]"
+          : "w-full max-w-full rounded-[24px] rounded-bl-md border border-white/8 bg-white/5 px-4 py-3 text-sm leading-6 text-white/86 shadow-[0_16px_40px_rgba(0,0,0,0.24)] sm:max-w-[92%]"
       }
     >
       <p>{message.content}</p>
       {message.confidence ? (
-        <div className="mt-3 inline-flex rounded-full bg-[#eef4ff] px-3 py-1 text-xs font-semibold text-cars-primary">
+        <div className="mt-3 inline-flex rounded-full bg-cars-accent/12 px-3 py-1 text-xs font-semibold text-cars-accent">
           {message.confidence.label}
         </div>
       ) : null}
       {message.cards?.length ? (
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {message.cards.slice(0, 4).map((card, index) => (
-            <div key={`${card.title}-${index}`} className="rounded-[18px] bg-cars-off-white px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cars-accent">
+            <div key={`${card.title}-${index}`} className="rounded-[18px] border border-white/8 bg-black/18 px-4 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cars-accent">
                 {card.title}
               </p>
               {card.value != null ? (
-                <p className="mt-2 text-base font-apercu-bold text-cars-primary">
+                <p className="mt-2 text-base font-apercu-bold text-white">
                   {typeof card.value === "number" ? toCurrency(card.value) : String(card.value)}
                 </p>
               ) : null}
-              <p className="mt-2 text-sm leading-6 text-cars-gray">{card.description}</p>
+              <p className="mt-2 text-sm leading-6 text-white/62">{card.description}</p>
             </div>
           ))}
         </div>
       ) : null}
       {message.caveats?.length ? (
-        <div className="mt-3 rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
+        <div className="mt-3 rounded-[18px] border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-xs leading-5 text-amber-100">
           {message.caveats[0]}
         </div>
       ) : null}
@@ -755,7 +760,7 @@ function CompareFollowUpAnswer({
           {message.followUps.slice(0, 3).map((followUp) => (
             <span
               key={followUp}
-              className="rounded-full bg-cars-off-white px-3 py-2 text-xs font-medium text-cars-primary"
+              className="rounded-full border border-white/8 bg-white/6 px-3 py-2 text-xs font-medium text-white/80"
             >
               {followUp}
             </span>
@@ -904,7 +909,7 @@ function ComparePageContent() {
     return () => {
       cancelled = true;
     };
-  }, [ready, searchParams]);
+  }, [ready, searchParams, leftHasInitialInput, rightHasInitialInput]);
 
   function resetResults() {
     setResult(null);
@@ -987,7 +992,7 @@ function ComparePageContent() {
         return;
       }
 
-        setter((prev) => ({ ...prev, loading: true, error: "" }));
+      setter((prev) => ({ ...prev, loading: true, error: "" }));
 
       try {
         const response = await fetchCompareReadyVariants(trimmed);
@@ -1046,41 +1051,46 @@ function ComparePageContent() {
     };
   }, [ready, leftQuery, rightQuery, leftSelection, rightSelection]);
 
-  async function runCompare(activeLeft = leftSelection, activeRight = rightSelection) {
-    if (!activeLeft?.variantId || !activeRight?.variantId) {
-      setTone("error");
-      setMessage("Compare only works with vehicles that already exist in the CarVista catalog. Search and choose two supported models to continue.");
-      return;
-    }
-    if (activeLeft.variantId === activeRight.variantId) {
-      setTone("error");
-      setMessage("Pick two different vehicles so the comparison stays useful.");
-      return;
-    }
+  const runCompare = useCallback(
+    async (activeLeft = leftSelection, activeRight = rightSelection) => {
+      if (!activeLeft?.variantId || !activeRight?.variantId) {
+        setTone("error");
+        setMessage(
+          "Compare only works with vehicles that already exist in the CarVista catalog. Search and choose two supported models to continue."
+        );
+        return;
+      }
+      if (activeLeft.variantId === activeRight.variantId) {
+        setTone("error");
+        setMessage("Pick two different vehicles so the comparison stays useful.");
+        return;
+      }
 
-    setComparing(true);
-    setTone("info");
-    setMessage("Building a grounded comparison from CarVista specs, pricing, and market data.");
+      setComparing(true);
+      setTone("info");
+      setMessage("Building a grounded comparison from CarVista specs, pricing, and market data.");
 
-    try {
-      const advisorProfile = getStoredAdvisorProfile();
-      const response = await aiApi.compare({
-        variant_ids: [activeLeft.variantId, activeRight.variantId],
-        market_id: marketId,
-        price_type: "avg_market",
-        buyer_profile: advisorProfile,
-      });
+      try {
+        const advisorProfile = getStoredAdvisorProfile();
+        const response = await aiApi.compare({
+          variant_ids: [activeLeft.variantId, activeRight.variantId],
+          market_id: marketId,
+          price_type: "avg_market",
+          buyer_profile: advisorProfile,
+        });
 
-      setResult(response);
-      setTone("success");
-      setMessage("Comparison ready. Review the verdict, trade-offs, and next actions below.");
-    } catch (error) {
-      setTone("error");
-      setMessage(error instanceof Error ? error.message : "Compare failed.");
-    } finally {
-      setComparing(false);
-    }
-  }
+        setResult(response);
+        setTone("success");
+        setMessage("Comparison ready. Review the verdict, trade-offs, and next actions below.");
+      } catch (error) {
+        setTone("error");
+        setMessage(error instanceof Error ? error.message : "Compare failed.");
+      } finally {
+        setComparing(false);
+      }
+    },
+    [leftSelection, marketId, rightSelection]
+  );
 
   const compareKey = useMemo(() => {
     if (!leftSelection?.variantId || !rightSelection?.variantId) return "";
@@ -1093,7 +1103,7 @@ function ComparePageContent() {
 
     autoRunKeyRef.current = compareKey;
     void runCompare();
-  }, [ready, loadingSelections, compareKey]);
+  }, [ready, loadingSelections, compareKey, runCompare]);
 
   const leftItem = useMemo(() => findCompareItem(result, leftSelection), [result, leftSelection]);
   const rightItem = useMemo(() => findCompareItem(result, rightSelection), [result, rightSelection]);
@@ -1260,25 +1270,26 @@ function ComparePageContent() {
   return (
     <>
       <Header />
-      <main className="container-cars py-8">
-        <section className="section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(233,241,255,0.92))] p-6 md:p-8">
+      <main className="container-cars py-6 sm:py-8">
+        <section className="section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(233,241,255,0.92))] p-5 sm:p-6 md:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
                 Compare
               </p>
-              <h1 className="mt-2 text-4xl font-apercu-bold text-cars-primary">
+              <h1 className="mt-2 text-3xl font-apercu-bold text-cars-primary sm:text-4xl lg:text-[2.75rem] lg:leading-tight">
                 {compareTitle === "Selected vehicles" ? "Compare two vehicles" : compareTitle}
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
-                Review the trade-offs, verdicts, and buyer-fit guidance from a grounded comparison instead of starting with a blank chat.
+                Review the trade-offs, verdicts, and buyer-fit guidance from a grounded
+                comparison instead of starting with a blank chat.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="grid w-full gap-3 sm:w-auto sm:grid-cols-1 lg:flex lg:flex-wrap">
               <Link
                 href="/listings"
-                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-white"
+                className="inline-flex h-11 w-full items-center justify-center rounded-full border border-cars-primary/15 px-4 text-sm font-semibold text-cars-primary transition-colors hover:bg-white sm:w-auto"
               >
                 Browse listings
               </Link>
@@ -1290,8 +1301,8 @@ function ComparePageContent() {
           <StatusBanner tone={tone}>{message}</StatusBanner>
         </div>
 
-        <section className="mt-6 grid gap-5 xl:grid-cols-[1fr_auto_1fr] xl:items-start">
-      <CompareSearchPanel
+        <section className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-start lg:gap-5">
+          <CompareSearchPanel
             title="Vehicle A"
             value={leftQuery}
             onChange={(value) => updateSide("left", null, value)}
@@ -1303,9 +1314,9 @@ function ComparePageContent() {
             onClear={() => updateSide("left", null, "")}
           />
 
-          <div className="flex items-center justify-center xl:pt-20">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-cars-primary text-white shadow-[0_18px_40px_rgba(15,45,98,0.18)]">
-              <ArrowLeftRight className="h-5 w-5" />
+          <div className="flex items-center justify-center lg:pt-20">
+            <div className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-cars-primary text-white shadow-[0_18px_40px_rgba(15,45,98,0.18)] sm:h-12 sm:w-12">
+              <ArrowLeftRight className="h-5 w-5 rotate-90 lg:rotate-0" />
             </div>
           </div>
 
@@ -1336,10 +1347,10 @@ function ComparePageContent() {
         ) : null}
 
         {loadingSelections || comparing ? (
-          <section className="mt-6 grid gap-4 lg:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, index) => (
+          <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {["compare-skeleton-a", "compare-skeleton-b", "compare-skeleton-c"].map((key) => (
               <div
-                key={index}
+                key={key}
                 className="rounded-[28px] border border-cars-gray-light/70 bg-white px-5 py-5 shadow-[0_18px_40px_rgba(15,45,98,0.06)]"
               >
                 <div className="h-4 w-24 animate-pulse rounded-full bg-cars-gray-light/70" />
@@ -1352,13 +1363,13 @@ function ComparePageContent() {
 
         {result ? (
           <>
-            <section className="mt-6 section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(15,45,98,0.98),rgba(27,76,160,0.92),rgba(95,150,255,0.82))] p-6 text-white md:p-8">
+            <section className="mt-6 section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(15,45,98,0.98),rgba(27,76,160,0.92),rgba(95,150,255,0.82))] p-5 text-white sm:p-6 md:p-8">
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.22em] text-white/70">
                     Quick verdict
                   </p>
-                  <h2 className="mt-2 text-3xl font-apercu-bold">
+                  <h2 className="mt-2 text-2xl font-apercu-bold sm:text-3xl">
                     {recommendedItem ? `${buildCompareItemLabel(recommendedItem)} comes out ahead overall.` : "Comparison ready"}
                   </h2>
                   <p className="mt-4 text-sm leading-7 text-white/85">
@@ -1399,7 +1410,7 @@ function ComparePageContent() {
               </div>
             </section>
 
-            <section className="mt-6 grid gap-4 xl:grid-cols-3">
+            <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {verdictCards.map((card) => (
                 <article
                   key={card.key}
@@ -1428,7 +1439,7 @@ function ComparePageContent() {
                     key={selection?.variantId ?? index}
                     className="flex h-full flex-col overflow-hidden rounded-[30px] border border-cars-gray-light/70 bg-white shadow-[0_20px_44px_rgba(15,45,98,0.08)]"
                   >
-                    <div className="relative h-56 bg-cars-off-white">
+                    <div className="relative aspect-[4/3] bg-cars-off-white sm:aspect-[16/10]">
                       {getSelectionImage(selection) ? (
                         <img
                           src={getSelectionImage(selection) || undefined}
@@ -1447,21 +1458,21 @@ function ComparePageContent() {
                       ) : null}
                     </div>
 
-                    <div className="flex flex-1 flex-col p-5">
-                      <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div>
+                    <div className="flex flex-1 flex-col p-4 sm:p-5">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
                           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
                             Vehicle {index === 0 ? "A" : "B"}
                           </p>
-                          <h3 className="mt-2 text-2xl font-apercu-bold text-cars-primary">
+                          <h3 className="mt-2 break-words text-2xl font-apercu-bold text-cars-primary">
                             {selection?.label || (item ? buildCompareItemLabel(item) : "Vehicle")}
                           </h3>
                         </div>
-                        <div className="text-right">
+                        <div className="sm:text-right">
                           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
                             {selection?.listing ? "Asking price" : "Market price"}
                           </p>
-                          <p className="mt-2 text-xl font-apercu-bold text-cars-primary">
+                          <p className="mt-2 break-words text-xl font-apercu-bold text-cars-primary">
                             {selection?.listing
                               ? formatListingPrice(selection.listing.listing.asking_price)
                               : formatListingPrice(item?.latest_price ?? item?.msrp_base)}
@@ -1469,7 +1480,7 @@ function ComparePageContent() {
                         </div>
                       </div>
 
-                      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                      <div className="mt-5 grid gap-3 xl:grid-cols-2">
                         <div className="rounded-[20px] bg-cars-off-white px-4 py-4">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cars-accent">
                             Key snapshot
@@ -1511,7 +1522,7 @@ function ComparePageContent() {
                         </div>
                       </div>
 
-                      <div className="mt-5 grid flex-1 gap-4 lg:grid-cols-2">
+                      <div className="mt-5 grid flex-1 gap-4 sm:grid-cols-2">
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
                             Pros
@@ -1534,18 +1545,18 @@ function ComparePageContent() {
                         </div>
                       </div>
 
-                      <div className="mt-auto flex flex-wrap gap-3 pt-5">
+                      <div className="mt-auto grid gap-3 pt-5 sm:flex sm:flex-wrap">
                         {selection?.listingId ? (
                           <Link
                             href={`/listings/${selection.listingId}`}
-                            className="inline-flex min-h-10 min-w-[132px] items-center justify-center whitespace-nowrap rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white"
+                            className="inline-flex min-h-10 w-full items-center justify-center rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white sm:min-w-[132px] sm:w-auto"
                           >
                             View listing
                           </Link>
                         ) : selection?.variantId ? (
                           <Link
                             href={`/catalog/${selection.variantId}`}
-                            className="inline-flex min-h-10 min-w-[132px] items-center justify-center whitespace-nowrap rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white"
+                            className="inline-flex min-h-10 w-full items-center justify-center rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white sm:min-w-[132px] sm:w-auto"
                           >
                             View vehicle
                           </Link>
@@ -1557,7 +1568,7 @@ function ComparePageContent() {
               )}
             </section>
 
-            <section className="mt-6 section-shell p-6">
+            <section className="mt-6 section-shell p-4 sm:p-5 md:p-6">
               <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cars-accent">
@@ -1566,20 +1577,23 @@ function ComparePageContent() {
                   <h2 className="mt-2 text-2xl font-apercu-bold text-cars-primary">
                     What changes between these two?
                   </h2>
+                  <p className="mt-2 text-sm leading-6 text-cars-gray sm:hidden">
+                    Swipe inside the compare table to see every field on smaller screens.
+                  </p>
                 </div>
               </div>
 
-              <div className="mt-5 overflow-x-auto">
-                <table className="min-w-full border-separate border-spacing-y-3">
+              <div className="-mx-2 mt-5 overflow-x-auto px-2 pb-2 overscroll-x-contain">
+                <table className="min-w-[720px] w-full border-separate border-spacing-y-3">
                   <thead>
                     <tr>
-                      <th className="px-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
+                      <th className="sticky left-0 z-10 min-w-[180px] bg-white px-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
                         Category
                       </th>
-                      <th className="px-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
+                      <th className="min-w-[240px] px-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
                         {vehicleLabels[0] || "Vehicle A"}
                       </th>
-                      <th className="px-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
+                      <th className="min-w-[240px] px-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
                         {vehicleLabels[1] || "Vehicle B"}
                       </th>
                     </tr>
@@ -1587,10 +1601,10 @@ function ComparePageContent() {
                   <tbody>
                     {comparisonRows.map((row) => (
                       <tr key={row.key}>
-                        <td className="rounded-l-[18px] bg-cars-off-white px-4 py-3 text-sm font-semibold text-cars-primary">
+                        <td className="sticky left-0 rounded-l-[18px] bg-cars-off-white px-4 py-3 text-sm font-semibold text-cars-primary">
                           {row.label}
                         </td>
-                        <td className="bg-white px-4 py-3 text-sm text-cars-gray">
+                        <td className="max-w-[280px] break-words bg-white px-4 py-3 align-top text-sm leading-6 text-cars-gray">
                           {row.key === "body_type"
                             ? formatBodyType(row.left as string | null | undefined)
                             : row.key === "fuel_type_base"
@@ -1603,7 +1617,7 @@ function ComparePageContent() {
                                     ? formatMileage(row.left as number | null | undefined)
                                     : formatCompareValue(row.key, row.left)}
                         </td>
-                        <td className="rounded-r-[18px] bg-white px-4 py-3 text-sm text-cars-gray">
+                        <td className="max-w-[280px] break-words rounded-r-[18px] bg-white px-4 py-3 align-top text-sm leading-6 text-cars-gray">
                           {row.key === "body_type"
                             ? formatBodyType(row.right as string | null | undefined)
                             : row.key === "fuel_type_base"
@@ -1624,7 +1638,7 @@ function ComparePageContent() {
             </section>
 
             <section className="mt-6 grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-              <article className="section-shell p-6">
+              <article className="section-shell p-4 sm:p-5 md:p-6">
                 <div className="flex items-center gap-3">
                   <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-cars-off-white text-cars-accent">
                     <Bot className="h-5 w-5" />
@@ -1645,7 +1659,7 @@ function ComparePageContent() {
                       key={suggestion}
                       type="button"
                       onClick={() => void sendFollowUp(suggestion)}
-                      className="rounded-full border border-cars-primary/10 bg-white px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+                      className="rounded-full border border-cars-primary/10 bg-white px-3 py-2 text-left text-xs font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
                     >
                       {suggestion}
                     </button>
@@ -1669,7 +1683,7 @@ function ComparePageContent() {
                     <button
                       type="submit"
                       disabled={sendingFollowUp || !followUpInput.trim()}
-                      className="inline-flex items-center gap-2 rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
                     >
                       {sendingFollowUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                       Ask follow-up
@@ -1686,7 +1700,7 @@ function ComparePageContent() {
                 ) : null}
               </article>
 
-              <article className="section-shell p-6">
+              <article className="section-shell p-4 sm:p-5 md:p-6">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
                   Confidence & caveats
                 </p>
@@ -1718,7 +1732,7 @@ function ComparePageContent() {
 
                 <div className="mt-5 rounded-[22px] border border-cars-gray-light/70 bg-white px-4 py-4">
                   <p className="text-sm font-semibold text-cars-primary">Next actions</p>
-                  <div className="mt-4 flex flex-wrap gap-3">
+                  <div className="mt-4 grid gap-3 sm:flex sm:flex-wrap">
                     <Link
                       href={buildCompareHref({
                         leftVariantId: leftSelection?.variantId ?? undefined,
@@ -1726,13 +1740,13 @@ function ComparePageContent() {
                         leftListingId: leftSelection?.listingId ?? undefined,
                         marketId,
                       })}
-                      className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+                      className="inline-flex h-11 w-full items-center justify-center rounded-full border border-cars-primary/15 px-4 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white sm:w-auto"
                     >
                       Compare against another car
                     </Link>
                     <Link
                       href="/listings"
-                      className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+                      className="inline-flex h-11 w-full items-center justify-center rounded-full border border-cars-primary/15 px-4 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white sm:w-auto"
                     >
                       Browse live listings
                     </Link>

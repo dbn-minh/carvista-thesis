@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import ListingCard from "@/components/cards/ListingCard";
 import EmptyState from "@/components/common/EmptyState";
 import StatusBanner from "@/components/common/StatusBanner";
@@ -36,7 +36,7 @@ export default function GaragePage() {
 
   if (!ready) return null;
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setMessage("");
 
@@ -80,11 +80,11 @@ export default function GaragePage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   async function removeSaved(listingId: number) {
     try {
@@ -103,20 +103,22 @@ export default function GaragePage() {
   return (
     <>
       <Header />
-      <main className="container-cars py-8">
-        <section className="section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(233,241,255,0.9))] p-6 md:p-8">
+      <main className="container-cars py-6 sm:py-8">
+        <section className="section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(233,241,255,0.9))] p-5 sm:p-6 md:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
                 Saved cars
               </p>
-              <h1 className="mt-2 text-4xl font-apercu-bold text-cars-primary">Saved Cars</h1>
+              <h1 className="mt-2 text-3xl font-apercu-bold text-cars-primary sm:text-4xl lg:text-[2.75rem] lg:leading-tight">
+                Saved Cars
+              </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
                 Keep the cars you want to revisit, review in detail, or contact the seller about.
               </p>
             </div>
 
-            <div className="rounded-[28px] bg-cars-primary p-5 text-white shadow-[0_18px_44px_rgba(15,45,98,0.18)]">
+            <div className="rounded-[28px] bg-cars-primary p-5 text-white shadow-[0_18px_44px_rgba(15,45,98,0.18)] sm:min-w-[220px]">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/70">
                 Your shortlist
               </p>
@@ -132,8 +134,8 @@ export default function GaragePage() {
           <StatusBanner tone={tone}>{message}</StatusBanner>
         </div>
 
-        <section className="mt-6 flex flex-col gap-4 rounded-[28px] border border-cars-gray-light/70 bg-white p-5 shadow-[0_18px_40px_rgba(15,45,98,0.06)] md:flex-row md:items-center md:justify-between">
-          <div>
+        <section className="mt-6 flex flex-col gap-4 rounded-[28px] border border-cars-gray-light/70 bg-white p-4 shadow-[0_18px_40px_rgba(15,45,98,0.06)] sm:p-5 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cars-accent">
               Saved inventory
             </p>
@@ -144,11 +146,11 @@ export default function GaragePage() {
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="grid gap-3 sm:flex sm:flex-wrap sm:items-center">
             <select
               value={sort}
               onChange={(event) => setSort(event.target.value as SavedSort)}
-              className="h-11 rounded-full border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+              className="h-11 w-full rounded-full border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 sm:w-auto"
             >
               <option value="newest">Newest listings</option>
               <option value="price-asc">Price low to high</option>
@@ -156,7 +158,7 @@ export default function GaragePage() {
             </select>
             <Link
               href="/listings"
-              className="inline-flex h-11 items-center justify-center rounded-full border border-cars-primary/15 px-4 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+              className="inline-flex h-11 w-full items-center justify-center rounded-full border border-cars-primary/15 px-4 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white sm:w-auto"
             >
               Browse listings
             </Link>
@@ -164,9 +166,9 @@ export default function GaragePage() {
         </section>
 
         {loading ? (
-          <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <ListingCardSkeleton key={index} />
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 2xl:grid-cols-3">
+            {["garage-skeleton-1", "garage-skeleton-2", "garage-skeleton-3"].map((key) => (
+              <ListingCardSkeleton key={key} />
             ))}
           </div>
         ) : null}
@@ -180,7 +182,7 @@ export default function GaragePage() {
             <div className="mt-4">
               <Link
                 href="/listings"
-                className="inline-flex rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white"
+                className="inline-flex w-full items-center justify-center rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white sm:w-auto"
               >
                 Browse listings
               </Link>
@@ -189,7 +191,7 @@ export default function GaragePage() {
         ) : null}
 
         {!loading && sortedItems.length > 0 ? (
-          <div className="mt-6 grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 2xl:grid-cols-3">
             {sortedItems.map((item) => (
               <ListingCard key={item.listing_id} item={item} saved onToggleSave={removeSaved} />
             ))}

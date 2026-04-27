@@ -19,37 +19,37 @@ export default function ListingImage({
   return (
     <Link
       href={href}
-      className="group relative block overflow-hidden rounded-[28px] bg-[linear-gradient(180deg,rgba(235,242,255,1),rgba(247,250,255,1))]"
+      className="group relative block aspect-[4/3] overflow-hidden rounded-[24px] bg-[radial-gradient(circle_at_top,rgba(143,180,255,0.18),transparent_40%),linear-gradient(180deg,rgba(16,21,31,0.98),rgba(8,12,18,0.98))] sm:aspect-[16/10] sm:rounded-[28px]"
     >
       {image ? (
         <img
           src={image}
           alt={title}
-          className="h-60 w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
         />
       ) : (
-        <div className="flex h-60 flex-col items-center justify-center gap-3 px-6 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-cars-primary shadow-sm">
+        <div className="flex h-full flex-col items-center justify-center gap-3 px-5 text-center sm:px-6">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-white/10 text-slate-100 shadow-sm">
             <CarFront className="h-7 w-7" />
           </div>
-          <div>
-            <p className="text-sm font-semibold text-cars-primary">No photo uploaded yet</p>
-            <p className="mt-1 text-xs leading-5 text-cars-gray">
+          <div className="max-w-[18rem]">
+            <p className="text-sm font-semibold text-slate-50">No photo uploaded yet</p>
+            <p className="mt-1 text-xs leading-5 text-slate-400">
               This listing is live, but the seller has not added vehicle photos yet.
             </p>
           </div>
         </div>
       )}
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-4">
+      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3 sm:p-4">
         <div className="flex flex-wrap gap-2">
           <span className="inline-flex items-center gap-1 rounded-full bg-black/55 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
             <Camera className="h-3.5 w-3.5" />
             {imageCount > 0 ? `${imageCount} photo${imageCount > 1 ? "s" : ""}` : "Photos pending"}
           </span>
           {photoSourceLabel ? (
-            <span className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cars-primary shadow-sm">
-              {photoSourceLabel}
+            <span className="inline-flex max-w-[11rem] items-center rounded-full border border-white/10 bg-[#0b111a]/88 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-200 shadow-sm">
+              <span className="break-words leading-4">{photoSourceLabel}</span>
             </span>
           ) : null}
         </div>

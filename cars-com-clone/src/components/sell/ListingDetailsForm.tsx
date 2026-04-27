@@ -23,9 +23,11 @@ export default function ListingDetailsForm({
   errors,
 }: Props) {
   return (
-    <section className="section-shell p-6">
+    <section className="section-shell p-4 sm:p-5 md:p-6">
       <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">Step 3</p>
-      <h2 className="mt-2 text-3xl font-apercu-bold text-cars-primary">Vehicle details</h2>
+      <h2 className="mt-2 text-2xl font-apercu-bold text-cars-primary sm:text-3xl">
+        Vehicle details
+      </h2>
       <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
         Add the practical details buyers care about most when comparing used cars.
       </p>

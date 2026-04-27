@@ -5,9 +5,9 @@ type Props = {
 
 export default function EmptyState({ title, description }: Props) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600 dark:border-cars-gray-light/40 dark:text-slate-300">
-      <p className="font-medium text-slate-800 dark:text-white">{title}</p>
-      {description ? <p className="mt-2">{description}</p> : null}
+    <div className="rounded-[28px] border border-dashed border-white/12 bg-white/5 px-5 py-6 text-center text-sm leading-6 text-slate-300 backdrop-blur-sm sm:px-6">
+      <p className="text-base font-medium leading-7 text-white">{title}</p>
+      {description ? <p className="mt-2 break-words">{description}</p> : null}
     </div>
   );
 }

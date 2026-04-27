@@ -163,8 +163,8 @@ export class DbImageStorageService extends ImageStorageService {
       sortOrder: Number(plain?.sort_order ?? 0),
       storage: plain?.provider || EXTERNAL_URL_STORAGE,
       provider: plain?.provider || EXTERNAL_URL_STORAGE,
-      publicId: plain?.public_id ?? null,
-      assetId: plain?.asset_id ?? null,
+      publicId: plain?.public_id ?? plain?.publicId ?? null,
+      assetId: plain?.asset_id ?? plain?.assetId ?? null,
       width: toNullableNumber(plain?.width),
       height: toNullableNumber(plain?.height),
       format: plain?.format ?? inferFormatFromUrl(storedValue),
@@ -222,6 +222,12 @@ export class DbImageStorageService extends ImageStorageService {
 
     await row.destroy();
     return this.normalizeListingImageRecord(plain);
+  }
+
+  async cleanupListingImages({ images = [] }) {
+    const normalizedImages = this.normalizeListingImageRecords(images);
+    await cleanupUploadedAssets(this.mediaProvider, normalizedImages, this.logger);
+    return normalizedImages;
   }
 
   async reorderListingImages({ listingId, imageIds = [] }) {

@@ -52,6 +52,10 @@ export class ListingImageService {
     return this.storage.deleteListingImage({ listingId, imageId });
   }
 
+  async cleanupImages(images = []) {
+    return this.storage.cleanupListingImages({ images });
+  }
+
   async reorderImages(listingId, imageIds = []) {
     return this.storage.reorderListingImages({ listingId, imageIds });
   }

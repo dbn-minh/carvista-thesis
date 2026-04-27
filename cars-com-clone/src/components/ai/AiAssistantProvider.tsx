@@ -692,11 +692,11 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
       <div className="fixed bottom-5 right-5 z-[60] flex flex-col items-end gap-3">
         {open ? (
           <section className="w-[min(92vw,400px)] overflow-hidden rounded-[30px] border border-cars-primary/10 bg-white shadow-[0_24px_80px_rgba(15,45,98,0.22)] dark:border-white/10 dark:bg-[#091222] dark:shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
-            <div className="bg-[linear-gradient(135deg,rgba(15,45,98,0.98),rgba(27,76,160,0.92),rgba(95,150,255,0.82))] px-5 py-4 text-white">
+            <div className="bg-[linear-gradient(135deg,rgba(15,45,98,0.98),rgba(27,76,160,0.92),rgba(95,150,255,0.82))] px-5 py-4 text-primary-foreground">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-2xl font-apercu-bold">CarVista Advisor</h2>
-                  <p className="mt-2 text-sm leading-6 text-white/85">
+                  <p className="mt-2 text-sm leading-6 text-primary-foreground/85">
                     Ask for recommendations, compare cars, forecast pricing, or understand TCO.
                   </p>
                 </div>
@@ -704,7 +704,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                   <button
                     type="button"
                     onClick={startNewConversation}
-                    className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+                    className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-white/35 bg-white/92 px-3 py-2 text-xs font-semibold text-cars-primary shadow-sm transition-colors hover:bg-white dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
                     Refresh
@@ -712,7 +712,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                   <button
                     type="button"
                     onClick={() => setOpen(false)}
-                    className="rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
+                    className="rounded-full border border-white/35 bg-white/92 p-2 text-cars-primary shadow-sm transition-colors hover:bg-white dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -720,15 +720,15 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
               </div>
 
               {focusVariantLabel ? (
-                <div className="mt-3 rounded-[18px] bg-white/10 px-3 py-2 text-sm leading-6 text-white/85">
+                <div className="mt-3 rounded-[18px] bg-white/10 px-3 py-2 text-sm leading-6 text-primary-foreground/85">
                   Focused vehicle:{" "}
-                  <span className="font-semibold text-white">{focusVariantLabel}</span>
+                  <span className="font-semibold text-primary-foreground">{focusVariantLabel}</span>
                 </div>
               ) : null}
               {compareContext.labels.length >= 2 ? (
-                <div className="mt-3 rounded-[18px] bg-white/10 px-3 py-2 text-sm leading-6 text-white/85">
+                <div className="mt-3 rounded-[18px] bg-white/10 px-3 py-2 text-sm leading-6 text-primary-foreground/85">
                   Comparing:{" "}
-                  <span className="font-semibold text-white">
+                  <span className="font-semibold text-primary-foreground">
                     {buildComparePairLabel(compareContext.labels)}
                   </span>
                 </div>
@@ -747,7 +747,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                   <div
                     className={
                       message.role === "user"
-                        ? "max-w-[85%] break-words rounded-[24px] rounded-br-md bg-cars-primary px-4 py-3 text-sm leading-6 text-white dark:bg-[#18376f]"
+                        ? "max-w-[85%] break-words rounded-[24px] rounded-br-md bg-cars-primary px-4 py-3 text-sm leading-6 text-primary-foreground dark:bg-[#18376f]"
                         : "max-w-[92%] break-words rounded-[24px] rounded-bl-md border border-cars-gray-light/80 bg-white px-4 py-3 text-sm leading-6 text-cars-primary shadow-sm dark:border-white/10 dark:bg-[#101a2d] dark:text-white/88"
                     }
                   >
@@ -823,14 +823,14 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                       void sendMessage();
                     }
                   }}
-                  className="min-h-[76px] flex-1 rounded-[22px] border border-cars-gray-light px-4 py-3 text-sm leading-6 text-cars-primary outline-none focus:border-cars-accent dark:border-white/10 dark:bg-[#101a2d] dark:text-white/90 dark:placeholder:text-white/38 dark:focus:border-[#7da7ff]"
+                  className="min-h-[76px] flex-1 rounded-[22px] border border-cars-gray-light bg-white px-4 py-3 text-sm leading-6 text-cars-primary outline-none placeholder:text-cars-gray focus:border-cars-accent dark:border-white/10 dark:bg-[#101a2d] dark:text-white/90 dark:placeholder:text-white/38 dark:focus:border-[#7da7ff]"
                   placeholder="Example: Family use, SUV, under 1 billion."
                 />
                 <button
                   type="button"
                   onClick={() => void sendMessage()}
                   disabled={sending || input.trim().length === 0}
-                  className="flex h-[76px] w-[60px] items-center justify-center rounded-[22px] bg-cars-primary text-white disabled:opacity-60"
+                  className="flex h-[76px] w-[60px] items-center justify-center rounded-[22px] bg-cars-primary text-primary-foreground disabled:opacity-60"
                 >
                   <SendHorizonal className="h-5 w-5" />
                 </button>
@@ -842,13 +842,13 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
         <button
           type="button"
           onClick={() => openAssistant()}
-          className="group inline-flex items-center gap-3 rounded-full bg-cars-primary px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_42px_rgba(15,45,98,0.24)] transition-transform hover:-translate-y-0.5 hover:bg-cars-primary-light"
+          className="group inline-flex items-center gap-3 rounded-full bg-cars-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-[0_18px_42px_rgba(15,45,98,0.24)] transition-transform hover:-translate-y-0.5 hover:bg-cars-primary-light"
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/12">
-            <MessageCircleMore className="h-5 w-5" />
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm dark:bg-white/12 dark:shadow-none">
+            <MessageCircleMore className="h-5 w-5 text-cars-primary dark:text-primary-foreground" />
           </span>
           <span className="hidden sm:inline">Ask CarVista AI</span>
-          <Sparkles className="h-4 w-4 text-white/75" />
+          <Sparkles className="h-4 w-4 text-primary-foreground/75" />
         </button>
       </div>
 
@@ -871,14 +871,14 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
               Choose another variant and review the AI comparison summary.
             </DialogDescription>
 
-            <div className="border-b border-cars-gray-light/70 bg-[linear-gradient(135deg,rgba(15,45,98,0.98),rgba(27,76,160,0.92),rgba(95,150,255,0.82))] px-6 py-6 text-white">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+            <div className="border-b border-cars-gray-light/70 bg-[linear-gradient(135deg,rgba(15,45,98,0.98),rgba(27,76,160,0.92),rgba(95,150,255,0.82))] px-6 py-6 text-primary-foreground">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-foreground/70">
                 Compare with AI
               </p>
               <h2 className="mt-2 text-3xl font-apercu-bold">
                 Find the better fit, not just the better spec sheet
               </h2>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/85">
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-primary-foreground/85">
                 Keep the current car as your baseline, then search and pick a second variant to
                 compare value, practicality, and ownership signals.
               </p>
@@ -949,7 +949,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                     type="button"
                     onClick={() => void runCompare()}
                     disabled={!compareState.selectedVariant || compareState.loading}
-                    className="mt-4 inline-flex items-center gap-2 rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                    className="mt-4 inline-flex items-center gap-2 rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
                   >
                     {compareState.loading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />

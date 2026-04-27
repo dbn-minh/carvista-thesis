@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
@@ -29,44 +29,50 @@ export default function HeroSection() {
   }
 
   return (
-    <section className="relative overflow-hidden border-b border-cars-gray-light/70 bg-[#e9f1ff]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(47,111,237,0.22),_transparent_30%),linear-gradient(120deg,_rgba(15,45,98,0.94),_rgba(27,76,160,0.88)_52%,_rgba(47,111,237,0.4))]" />
-      <div className="container-cars relative z-10 grid gap-10 py-12 md:grid-cols-[1.15fr_0.85fr] md:items-center md:py-16">
-        <div className="text-white">
-          <p className="mb-4 text-sm font-semibold uppercase tracking-[0.22em] text-white/70">
-            Buy, sell, and compare
+    <section className="relative overflow-hidden border-b border-cars-primary/10 bg-[#f1f6fc] dark:border-white/5 dark:bg-[#070b0f]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(111,145,221,0.18),_transparent_32%),radial-gradient(circle_at_78%_18%,_rgba(125,226,255,0.12),_transparent_22%),linear-gradient(135deg,_rgba(248,251,255,0.98),_rgba(239,245,252,0.96)_42%,_rgba(227,236,248,0.92)_72%,_rgba(241,246,252,0.98))] dark:bg-[radial-gradient(circle_at_top_left,_rgba(129,164,255,0.24),_transparent_32%),radial-gradient(circle_at_78%_18%,_rgba(125,226,255,0.18),_transparent_22%),linear-gradient(135deg,_rgba(7,10,16,0.98),_rgba(10,19,32,0.96)_42%,_rgba(17,28,54,0.9)_72%,_rgba(10,13,18,0.98))]" />
+      <div className="absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(180deg,transparent,rgba(227,236,248,0.86))] dark:bg-[linear-gradient(180deg,transparent,rgba(6,8,10,0.86))]" />
+
+      <div className="container-cars relative z-10 grid gap-10 py-12 sm:py-14 lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:py-20">
+        <div className="text-foreground dark:text-white">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-cars-primary/12 bg-white/80 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-cars-primary backdrop-blur-xl dark:border-white/10 dark:bg-white/5 dark:text-[#b6c4ec]">
+            <span className="h-2 w-2 rounded-full bg-cars-primary-light dark:bg-[#7de2ff]" />
+            Editorial marketplace
+          </div>
+          <p className="mb-4 text-sm font-semibold uppercase tracking-[0.24em] text-cars-gray dark:text-[#b7c4df]">
+            Buy, sell, compare, and decide with context
           </p>
-          <h1 className="max-w-2xl text-4xl font-apercu-bold leading-tight md:text-6xl">
-            Find the right car faster.
+          <h1 className="editorial-heading max-w-3xl text-[2.65rem] leading-[0.96] sm:text-5xl lg:text-[5.15rem]">
+            Find the right car before the market moves.
           </h1>
-          <p className="mt-5 max-w-2xl text-base leading-7 text-white/85 md:text-lg">
-            Research models, browse live listings, and use built-in tools for pricing,
-            comparison, and ownership cost.
+          <p className="mt-6 max-w-2xl text-base leading-7 text-cars-gray dark:text-slate-300 md:text-lg md:leading-8">
+            Research models, browse live listings, compare trims side by side, and use
+            built-in pricing intelligence before you make a call.
           </p>
 
           <form
             onSubmit={onSubmit}
-            className="mt-8 section-shell max-w-2xl rounded-[28px] p-4 text-cars-primary shadow-[0_24px_80px_rgba(7,20,44,0.28)]"
+            className="section-shell theme-surface-card mt-8 max-w-2xl rounded-[28px] border-white/10 bg-white/5 p-4 text-foreground shadow-[0_30px_90px_rgba(0,0,0,0.4)] dark:text-white sm:p-5"
           >
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="flex-1">
                 <Input
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search make, model, or trim"
-                  className="h-12 rounded-full border-cars-gray-light px-5 text-base"
+                  className="h-12 rounded-full border-input bg-surface-elevated px-5 text-base text-input-foreground placeholder:text-placeholder dark:border-white/10 dark:bg-[#0e1420]/90 dark:text-white dark:placeholder:text-slate-500"
                 />
               </div>
               <Button
                 type="submit"
-                className="h-12 rounded-full bg-cars-accent px-6 text-sm font-semibold text-white hover:bg-cars-primary-light"
+                className="editorial-button h-12 w-full rounded-full px-6 text-sm font-semibold text-slate-950 hover:brightness-105 sm:w-auto"
               >
                 Search
               </Button>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-5 flex flex-wrap gap-2.5">
               {quickActions.map((item) => (
                 <button
                   key={item.href}
@@ -82,35 +88,76 @@ export default function HeroSection() {
                     }
                     router.push(item.href);
                   }}
-                  className="rounded-full bg-cars-off-white px-4 py-2 text-sm font-medium text-cars-primary transition-colors hover:bg-cars-primary hover:text-white"
+                  className="rounded-full border border-cars-primary/12 bg-white/80 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-cars-primary/40 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:hover:border-[#8fb4ff]/40 dark:hover:bg-white/10"
                 >
                   {item.label}
                 </button>
               ))}
             </div>
           </form>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <div className="glass-panel rounded-[22px] p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-cars-primary dark:text-[#8fb4ff]">
+                Live context
+              </p>
+              <p className="mt-2 text-sm leading-6 text-cars-gray dark:text-slate-200">
+                Compare the market, trim differences, and ownership cost in one flow.
+              </p>
+            </div>
+            <div className="glass-panel rounded-[22px] p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-cars-primary dark:text-[#7de2ff]">
+                Faster shortlist
+              </p>
+              <p className="mt-2 text-sm leading-6 text-cars-gray dark:text-slate-200">
+                Save candidates, review pricing history, and keep your shortlist organized.
+              </p>
+            </div>
+            <div className="glass-panel rounded-[22px] p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-cars-primary dark:text-[#c5f6ff]">
+                Seller ready
+              </p>
+              <p className="mt-2 text-sm leading-6 text-cars-gray dark:text-slate-200">
+                List your car with the same detail depth buyers use to evaluate it.
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="relative min-h-[360px] md:min-h-[460px]">
-          <div className="absolute right-0 top-0 h-full w-full rounded-[36px] border border-white/20 bg-white/10 backdrop-blur-sm" />
-          <div className="absolute -left-6 bottom-10 z-20 max-w-[220px] rounded-[28px] bg-white p-5 text-cars-primary shadow-[0_20px_60px_rgba(7,20,44,0.2)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cars-accent">
+        <div className="relative min-h-[360px] sm:min-h-[420px] lg:min-h-[560px]">
+          <div className="absolute inset-0 rounded-[32px] border border-cars-primary/10 bg-[radial-gradient(circle_at_54%_42%,rgba(255,255,255,0.22),rgba(255,255,255,0.08)_46%,rgba(255,255,255,0)_76%),linear-gradient(180deg,rgba(255,255,255,0.18),rgba(241,246,252,0.08))] shadow-[0_28px_80px_rgba(15,45,98,0.12)] dark:border-white/10 dark:bg-[radial-gradient(circle_at_54%_42%,rgba(255,255,255,0.08),rgba(255,255,255,0.03)_46%,rgba(255,255,255,0)_76%),linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.01))] dark:shadow-[0_28px_80px_rgba(0,0,0,0.4)] sm:rounded-[40px]" />
+          <div className="absolute left-4 right-4 top-5 z-20 flex items-center justify-between rounded-full border border-cars-primary/10 bg-white/58 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-cars-primary shadow-[0_16px_30px_rgba(15,45,98,0.08)] backdrop-blur-md dark:border-white/10 dark:bg-[#0b1017]/52 dark:text-[#c5f6ff] dark:shadow-[0_16px_30px_rgba(0,0,0,0.24)] sm:left-6 sm:right-6">
+            <span>Pricing intelligence</span>
+            <span className="text-cars-gray dark:text-[#9fb2d9]">Catalog + live listings</span>
+          </div>
+          <div className="absolute bottom-4 left-4 z-20 max-w-[250px] rounded-[26px] border border-cars-primary/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.68),rgba(255,255,255,0.28))] p-4 text-foreground shadow-[0_22px_50px_rgba(15,45,98,0.1)] backdrop-blur-md dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(11,16,23,0.78),rgba(11,16,23,0.48))] dark:text-white dark:shadow-[0_22px_50px_rgba(0,0,0,0.35)] sm:bottom-8 sm:left-6 sm:p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cars-primary dark:text-[#8fb4ff]">
               Why people use CarVista
             </p>
-            <ul className="mt-3 space-y-3 text-sm leading-6">
-              <li>Compare trims side by side</li>
-              <li>Save cars and track listings</li>
-              <li>Estimate running costs</li>
+            <ul className="mt-3 space-y-3 text-sm leading-6 text-cars-gray dark:text-slate-200">
+              <li>Compare trims side by side with AI guidance.</li>
+              <li>Track price history before you contact a seller.</li>
+              <li>Estimate ownership cost before you commit.</li>
             </ul>
           </div>
-          <div className="absolute inset-x-8 bottom-0 top-8">
+          <div className="absolute inset-x-4 bottom-6 top-14 sm:inset-x-8 sm:bottom-8 sm:top-16">
             <Image
               src="https://www.cars.com/images/sell/sale-dealer-woman-brand-colors.png"
               alt="CarVista hero vehicle"
               fill
               priority
-              className="object-contain object-center drop-shadow-[0_28px_48px_rgba(4,10,24,0.45)]"
+              className="object-contain object-center drop-shadow-[0_36px_60px_rgba(2,6,16,0.72)]"
             />
+          </div>
+          <div className="absolute inset-0 z-10 rounded-[32px] bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0)_28%,rgba(247,250,255,0.22)_100%)] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0)_26%,rgba(8,11,18,0.22)_100%)] sm:rounded-[40px]" />
+          <div className="absolute right-4 top-20 z-20 hidden rounded-[24px] border border-cars-primary/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.68),rgba(255,255,255,0.3))] p-4 text-foreground shadow-[0_20px_44px_rgba(15,45,98,0.1)] backdrop-blur-md dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(17,24,40,0.76),rgba(17,24,40,0.44))] dark:text-white dark:shadow-[0_20px_44px_rgba(0,0,0,0.34)] sm:block lg:right-6 lg:top-24 lg:max-w-[220px]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cars-primary dark:text-[#7de2ff]">
+              Market snapshot
+            </p>
+            <p className="mt-2 text-2xl font-semibold text-foreground dark:text-slate-50">12.4M</p>
+            <p className="mt-1 text-sm text-cars-gray dark:text-slate-300">
+              Median list price across current premium stock.
+            </p>
           </div>
         </div>
       </div>

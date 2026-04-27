@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import { buildListingFilterOptions } from "@/components/listings/listing-utils";
@@ -45,10 +45,10 @@ function formatLabel(value: string) {
 function rankValues(values: Array<string | null | undefined>) {
   const counts = new Map<string, number>();
 
-  values.forEach((value) => {
-    if (!value) return;
+  for (const value of values) {
+    if (!value) continue;
     counts.set(value, (counts.get(value) ?? 0) + 1);
-  });
+  }
 
   return Array.from(counts.entries())
     .map(([value, count]) => ({ value, count }))
@@ -97,7 +97,9 @@ function buildDynamicShortcuts(items: Listing[]): Shortcut[] {
     pushShortcut({
       key: `body:${bodyCounts[0].value}`,
       label: formatBodyShortcutLabel(bodyCounts[0].value),
-      description: `${bodyCounts[0].count} ${formatBodyShortcutLabel(bodyCounts[0].value).toLowerCase()} currently on the marketplace.`,
+      description: `${bodyCounts[0].count} ${formatBodyShortcutLabel(
+        bodyCounts[0].value
+      ).toLowerCase()} currently on the marketplace.`,
       filters: { bodyType: bodyCounts[0].value },
     });
   }
@@ -137,7 +139,9 @@ function buildDynamicShortcuts(items: Listing[]): Shortcut[] {
     pushShortcut({
       key: `body:${bodyCounts[1].value}`,
       label: formatBodyShortcutLabel(bodyCounts[1].value),
-      description: `${bodyCounts[1].count} ${formatBodyShortcutLabel(bodyCounts[1].value).toLowerCase()} currently available.`,
+      description: `${bodyCounts[1].count} ${formatBodyShortcutLabel(
+        bodyCounts[1].value
+      ).toLowerCase()} currently available.`,
       filters: { bodyType: bodyCounts[1].value },
     });
   }
@@ -148,27 +152,30 @@ function buildDynamicShortcuts(items: Listing[]): Shortcut[] {
 function CatalogPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const searchKey = searchParams.toString();
   const { openAssistant } = useAiAssistant();
   const [availableListings, setAvailableListings] = useState<Listing[]>([]);
   const [loadingInventory, setLoadingInventory] = useState(true);
   const [inventoryError, setInventoryError] = useState("");
+  const searchQuery = searchParams.get("query") || searchParams.get("q") || "";
+  const searchMake = searchParams.get("make") || "";
+  const searchBodyType = searchParams.get("bodyType") || "";
+  const searchFuelType = searchParams.get("fuelType") || searchParams.get("fuel") || "";
 
-  const initialDraft = useMemo<SearchDraft>(
-    () => ({
-      query: searchParams.get("query") || searchParams.get("q") || "",
-      make: searchParams.get("make") || "",
-      bodyType: searchParams.get("bodyType") || "",
-      fuelType: searchParams.get("fuelType") || searchParams.get("fuel") || "",
-    }),
-    [searchKey]
-  );
-
-  const [draft, setDraft] = useState<SearchDraft>(initialDraft);
+  const [draft, setDraft] = useState<SearchDraft>({
+    query: searchQuery,
+    make: searchMake,
+    bodyType: searchBodyType,
+    fuelType: searchFuelType,
+  });
 
   useEffect(() => {
-    setDraft(initialDraft);
-  }, [initialDraft]);
+    setDraft({
+      query: searchQuery,
+      make: searchMake,
+      bodyType: searchBodyType,
+      fuelType: searchFuelType,
+    });
+  }, [searchBodyType, searchFuelType, searchMake, searchQuery]);
 
   useEffect(() => {
     let cancelled = false;
@@ -178,15 +185,15 @@ function CatalogPageContent() {
       setInventoryError("");
 
       try {
-        const response = await apiFetch<{ items: Listing[] }>(
-          "/listings?status=active&limit=1000"
-        );
+        const response = await apiFetch<{ items: Listing[] }>("/listings?status=active&limit=1000");
         if (cancelled) return;
         setAvailableListings(response.items);
       } catch (error) {
         if (cancelled) return;
         setInventoryError(
-          error instanceof Error ? error.message : "Could not load live marketplace data right now."
+          error instanceof Error
+            ? error.message
+            : "Could not load live marketplace data right now."
         );
         setAvailableListings([]);
       } finally {
@@ -231,7 +238,8 @@ function CatalogPageContent() {
     if (availableListings.length === 0) {
       return {
         title: "No live listings to feature yet",
-        description: "Featured filters stay hidden until there are active marketplace cars to back them up.",
+        description:
+          "Featured filters stay hidden until there are active marketplace cars to back them up.",
       };
     }
 
@@ -272,35 +280,41 @@ function CatalogPageContent() {
   }
 
   return (
-    <main className="container-cars py-8">
-      <section className="section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(233,241,255,0.9),rgba(255,255,255,1))] p-6 md:p-8">
-        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr] xl:items-end">
+    <main className="container-cars py-6 sm:py-8">
+      <section className="section-shell overflow-hidden border-white/10 bg-[linear-gradient(135deg,rgba(14,20,31,0.98),rgba(12,18,27,0.98),rgba(18,27,42,0.94))] p-5 sm:p-6 md:p-8">
+        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#8fb4ff]">
               Search by model
             </p>
-            <h1 className="mt-2 text-4xl font-apercu-bold text-cars-primary">Catalog</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
-              Search by make, model, or keyword, then jump straight into cars that are currently for sale.
+            <h1 className="mt-2 text-3xl font-apercu-bold text-slate-50 sm:text-4xl">
+              Catalog
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
+              Search by make, model, or keyword, then jump straight into cars that are currently
+              for sale.
             </p>
           </div>
 
-          <div className="rounded-[24px] bg-white px-5 py-4 shadow-[0_18px_40px_rgba(15,45,98,0.08)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
+          <div className="rounded-[24px] border border-white/10 bg-white/5 px-4 py-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)] sm:px-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#7de2ff]">
               Live right now
             </p>
-            <p className="mt-2 text-lg font-apercu-bold text-cars-primary">
+            <p className="mt-2 text-lg font-apercu-bold text-slate-50">
               {availabilityMessage.title}
             </p>
-            <p className="mt-2 text-sm leading-6 text-cars-gray">
+            <p className="mt-2 text-sm leading-6 text-slate-300">
               {availabilityMessage.description}
             </p>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-8 grid gap-3 xl:grid-cols-[1.35fr_repeat(3,minmax(0,0.7fr))]">
+        <form
+          onSubmit={handleSubmit}
+          className="mt-8 grid gap-3 md:grid-cols-2 xl:grid-cols-[1.35fr_repeat(3,minmax(0,0.7fr))]"
+        >
           <input
-            className="h-12 rounded-full border border-cars-gray-light bg-white px-5 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className="h-12 rounded-full border border-white/10 bg-[#0d141f] px-5 text-sm text-white outline-none transition focus:border-[#8fb4ff] focus:ring-2 focus:ring-[#8fb4ff]/20 placeholder:text-slate-500 md:col-span-2 xl:col-span-1"
             placeholder="Search make, model, trim, or keyword"
             value={draft.query}
             onChange={(event) => setDraft((current) => ({ ...current, query: event.target.value }))}
@@ -309,7 +323,7 @@ function CatalogPageContent() {
             value={draft.make}
             onChange={(event) => setDraft((current) => ({ ...current, make: event.target.value }))}
             disabled={loadingInventory || filterOptions.makes.length === 0}
-            className="h-12 rounded-full border border-cars-gray-light bg-white px-5 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className="h-12 rounded-full border border-white/10 bg-[#0d141f] px-5 text-sm text-white outline-none transition focus:border-[#8fb4ff] focus:ring-2 focus:ring-[#8fb4ff]/20"
           >
             <option value="">Any brand</option>
             {filterOptions.makes.map((make) => (
@@ -324,7 +338,7 @@ function CatalogPageContent() {
               setDraft((current) => ({ ...current, bodyType: event.target.value }))
             }
             disabled={loadingInventory || filterOptions.bodyTypes.length === 0}
-            className="h-12 rounded-full border border-cars-gray-light bg-white px-5 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className="h-12 rounded-full border border-white/10 bg-[#0d141f] px-5 text-sm text-white outline-none transition focus:border-[#8fb4ff] focus:ring-2 focus:ring-[#8fb4ff]/20"
           >
             <option value="">Any body style</option>
             {filterOptions.bodyTypes.map((bodyType) => (
@@ -339,7 +353,7 @@ function CatalogPageContent() {
               setDraft((current) => ({ ...current, fuelType: event.target.value }))
             }
             disabled={loadingInventory || filterOptions.fuelTypes.length === 0}
-            className="h-12 rounded-full border border-cars-gray-light bg-white px-5 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+            className="h-12 rounded-full border border-white/10 bg-[#0d141f] px-5 text-sm text-white outline-none transition focus:border-[#8fb4ff] focus:ring-2 focus:ring-[#8fb4ff]/20"
           >
             <option value="">Any fuel type</option>
             {filterOptions.fuelTypes.map((fuelType) => (
@@ -350,9 +364,9 @@ function CatalogPageContent() {
           </select>
         </form>
 
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <button
-            className="h-12 rounded-full bg-cars-primary px-6 text-sm font-semibold text-white"
+            className="editorial-button inline-flex h-12 w-full items-center justify-center rounded-full px-6 text-sm font-semibold text-slate-950"
             type="button"
             onClick={(event) => {
               event.preventDefault();
@@ -363,39 +377,42 @@ function CatalogPageContent() {
           </button>
           <Link
             href="/listings"
-            className="inline-flex h-12 items-center justify-center rounded-full border border-cars-primary/15 px-6 text-sm font-semibold text-cars-primary transition-colors hover:bg-white"
+            className="inline-flex h-12 w-full items-center justify-center rounded-full border border-white/10 bg-white/5 px-6 text-sm font-semibold text-slate-100 transition-colors hover:bg-white/10"
           >
             Browse all listings
           </Link>
           <button
             type="button"
             onClick={() => openAssistant()}
-            className="inline-flex h-12 items-center justify-center rounded-full border border-cars-primary/15 px-6 text-sm font-semibold text-cars-primary transition-colors hover:bg-white"
+            className="inline-flex h-12 w-full items-center justify-center rounded-full border border-white/10 bg-white/5 px-6 text-sm font-semibold text-slate-100 transition-colors hover:bg-white/10"
           >
             Ask AI for help
           </button>
         </div>
 
-        <p className="mt-4 text-sm leading-6 text-cars-gray">
-          Results open in Listings so you always see cars that are actually available on the marketplace.
+        <p className="mt-4 text-sm leading-6 text-slate-300">
+          Results open in Listings so you always see cars that are actually available on the
+          marketplace.
         </p>
       </section>
 
       {!loadingInventory && shortcuts.length > 0 ? (
-        <section className="mt-6 grid gap-4 xl:grid-cols-4">
+        <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {shortcuts.map((shortcut) => (
             <button
               key={shortcut.key}
               type="button"
               onClick={() => applyShortcut(shortcut)}
-              className="section-shell flex flex-col items-start p-5 text-left transition-transform hover:-translate-y-1"
+                className="section-shell flex h-full flex-col items-start border-white/10 bg-[linear-gradient(180deg,rgba(19,26,37,0.96),rgba(11,15,22,0.98))] p-4 text-left transition-transform hover:-translate-y-1 sm:p-5"
             >
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8fb4ff]">
                 Quick search
               </p>
-              <h2 className="mt-3 text-xl font-apercu-bold text-cars-primary">{shortcut.label}</h2>
-              <p className="mt-2 text-sm leading-6 text-cars-gray">{shortcut.description}</p>
-              <span className="mt-5 text-sm font-semibold text-cars-primary">View listings</span>
+                  <h2 className="mt-3 text-xl font-apercu-bold text-slate-50">
+                {shortcut.label}
+              </h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">{shortcut.description}</p>
+                  <span className="mt-5 text-sm font-semibold text-slate-100">View listings</span>
             </button>
           ))}
         </section>
@@ -408,7 +425,13 @@ export default function CatalogPage() {
   return (
     <>
       <Header />
-      <Suspense fallback={<main className="container-cars py-8 text-sm text-cars-gray">Loading catalog...</main>}>
+      <Suspense
+        fallback={
+          <main className="container-cars py-6 text-sm text-cars-gray sm:py-8">
+            Loading catalog...
+          </main>
+        }
+      >
         <CatalogPageContent />
       </Suspense>
     </>

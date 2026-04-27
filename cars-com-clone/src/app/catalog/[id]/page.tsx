@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useParams } from "next/navigation";
 import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import PageIntelligencePanel from "@/components/ai/PageIntelligencePanel";
@@ -22,6 +22,16 @@ function getImageUrl(image: Record<string, unknown>): string | null {
   const value = image.url ?? image.image_url ?? image.src ?? image.image;
   return typeof value === "string" && value ? value : null;
 }
+
+function getReviewKey(review: CarReview) {
+  return String(
+    review.car_review_id ||
+      `${review.title || "car-review"}-${review.comment || ""}-${review.created_at || ""}`
+  );
+}
+
+const reviewControlClass =
+  "w-full border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition placeholder:text-cars-gray focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:border-white/10 dark:bg-slate-950/60 dark:text-white dark:placeholder:text-slate-400";
 
 export default function CatalogDetailPage() {
   const params = useParams<{ id: string }>();
@@ -45,51 +55,51 @@ export default function CatalogDetailPage() {
   const [title, setTitle] = useState("Good car");
   const [comment, setComment] = useState("Solid value for money.");
 
-  async function load(
-    activeMarketId = Number(marketId),
-    activeOwnershipYears = Number(ownershipYears)
-  ) {
-    setLoading(true);
-    setMessage("");
-    try {
-      const [detailRes, historyRes, reviewsRes, ownershipRes] = await Promise.allSettled([
-        catalogApi.variantDetail(id),
-        catalogApi.variantPriceHistory(id, activeMarketId),
-        reviewsApi.carReviews(id),
-        catalogApi.variantOwnershipSummary(id, {
-          marketId: activeMarketId,
-          ownershipYears: activeOwnershipYears,
-        }),
-      ]);
+  const load = useCallback(
+    async (activeMarketId = Number(marketId), activeOwnershipYears = Number(ownershipYears)) => {
+      setLoading(true);
+      setMessage("");
+      try {
+        const [detailRes, historyRes, reviewsRes, ownershipRes] = await Promise.allSettled([
+          catalogApi.variantDetail(id),
+          catalogApi.variantPriceHistory(id, activeMarketId),
+          reviewsApi.carReviews(id),
+          catalogApi.variantOwnershipSummary(id, {
+            marketId: activeMarketId,
+            ownershipYears: activeOwnershipYears,
+          }),
+        ]);
 
-      if (detailRes.status !== "fulfilled") {
-        throw detailRes.reason;
+        if (detailRes.status !== "fulfilled") {
+          throw detailRes.reason;
+        }
+
+        setDetail(detailRes.value);
+        setPriceHistory(historyRes.status === "fulfilled" ? historyRes.value.items : []);
+        setReviews(reviewsRes.status === "fulfilled" ? reviewsRes.value.items : []);
+        setOwnershipSummary(ownershipRes.status === "fulfilled" ? ownershipRes.value : null);
+        setOwnershipError(
+          ownershipRes.status === "rejected"
+            ? ownershipRes.reason instanceof Error
+              ? ownershipRes.reason.message
+              : "Ownership estimate is unavailable for this market."
+            : ""
+        );
+      } catch (error) {
+        setTone("error");
+        setMessage(error instanceof Error ? error.message : "Could not load variant detail");
+      } finally {
+        setLoading(false);
       }
-
-      setDetail(detailRes.value);
-      setPriceHistory(historyRes.status === "fulfilled" ? historyRes.value.items : []);
-      setReviews(reviewsRes.status === "fulfilled" ? reviewsRes.value.items : []);
-      setOwnershipSummary(ownershipRes.status === "fulfilled" ? ownershipRes.value : null);
-      setOwnershipError(
-        ownershipRes.status === "rejected"
-          ? ownershipRes.reason instanceof Error
-            ? ownershipRes.reason.message
-            : "Ownership estimate is unavailable for this market."
-          : ""
-      );
-    } catch (error) {
-      setTone("error");
-      setMessage(error instanceof Error ? error.message : "Could not load variant detail");
-    } finally {
-      setLoading(false);
-    }
-  }
+    },
+    [id, marketId, ownershipYears]
+  );
 
   useEffect(() => {
     if (Number.isFinite(id)) {
-      load();
+      void load();
     }
-  }, [id]);
+  }, [id, load]);
 
   const gallery = useMemo(
     () => (detail?.images || []).map(getImageUrl).filter((item): item is string => Boolean(item)),
@@ -100,7 +110,7 @@ export default function CatalogDetailPage() {
     setSelectedImage(gallery[0] || null);
   }, [gallery]);
 
-  async function saveVariant() {
+  const saveVariant = useCallback(async () => {
     if (!hasToken()) {
       openAuth({ mode: "login", next: `/catalog/${id}` });
       return;
@@ -114,36 +124,42 @@ export default function CatalogDetailPage() {
       setTone("error");
       setMessage(error instanceof Error ? error.message : "Could not save variant");
     }
-  }
+  }, [id, openAuth]);
 
-  async function submitReview(e: FormEvent) {
-    e.preventDefault();
-    if (!hasToken()) {
-      openAuth({ mode: "login", next: `/catalog/${id}` });
-      return;
-    }
+  const submitReview = useCallback(
+    async (event: FormEvent) => {
+      event.preventDefault();
+      if (!hasToken()) {
+        openAuth({ mode: "login", next: `/catalog/${id}` });
+        return;
+      }
 
-    try {
-      await reviewsApi.createCarReview({
-        variant_id: id,
-        rating,
-        title,
-        comment,
-      });
-      setTone("success");
-      setMessage("Car review submitted.");
-      const refreshed = await reviewsApi.carReviews(id);
-      setReviews(refreshed.items);
-    } catch (error) {
-      setTone("error");
-      setMessage(error instanceof Error ? error.message : "Review failed");
-    }
-  }
+      try {
+        await reviewsApi.createCarReview({
+          variant_id: id,
+          rating,
+          title,
+          comment,
+        });
+        setTone("success");
+        setMessage("Car review submitted.");
+        const refreshed = await reviewsApi.carReviews(id);
+        setReviews(refreshed.items);
+      } catch (error) {
+        setTone("error");
+        setMessage(error instanceof Error ? error.message : "Review failed");
+      }
+    },
+    [comment, id, openAuth, rating, title]
+  );
 
-  async function changeOwnershipYears(nextValue: string) {
-    setOwnershipYears(nextValue);
-    await load(Number(marketId), Number(nextValue));
-  }
+  const changeOwnershipYears = useCallback(
+    async (nextValue: string) => {
+      setOwnershipYears(nextValue);
+      await load(Number(marketId), Number(nextValue));
+    },
+    [load, marketId]
+  );
 
   const heading = useMemo(() => {
     const variant = detail?.variant;
@@ -152,17 +168,22 @@ export default function CatalogDetailPage() {
     const makeName = getText(variant.make_name);
     const modelName = getText(variant.model_name);
     const trim = getText(variant.trim_name);
-    return [modelYear, makeName, modelName, trim].filter((part) => part && part !== "-").join(" ");
-  }, [detail, id]);
+    return [modelYear, makeName, modelName, trim]
+      .filter((part) => part && part !== "-")
+      .join(" ");
+  }, [detail]);
 
-  const specCards = [
-    { label: "Body type", value: detail?.variant?.body_type },
-    { label: "Fuel", value: detail?.variant?.fuel_type },
-    { label: "Engine", value: detail?.variant?.engine },
-    { label: "Transmission", value: detail?.variant?.transmission },
-    { label: "Drivetrain", value: detail?.variant?.drivetrain },
-    { label: "MSRP", value: toCurrency(detail?.variant?.msrp_base) },
-  ];
+  const specCards = useMemo(
+    () => [
+      { label: "Body type", value: detail?.variant?.body_type },
+      { label: "Fuel", value: detail?.variant?.fuel_type },
+      { label: "Engine", value: detail?.variant?.engine },
+      { label: "Transmission", value: detail?.variant?.transmission },
+      { label: "Drivetrain", value: detail?.variant?.drivetrain },
+      { label: "MSRP", value: toCurrency(detail?.variant?.msrp_base) },
+    ],
+    [detail]
+  );
 
   const listingsHref = useMemo(() => {
     const variant = detail?.variant;
@@ -184,37 +205,39 @@ export default function CatalogDetailPage() {
   return (
     <>
       <Header />
-      <main className="container-cars py-8">
-        <section className="section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(233,241,255,0.9))] p-6 md:p-8">
+      <main className="container-cars py-6 sm:py-8">
+        <section className="section-shell overflow-hidden border-white/10 bg-[linear-gradient(135deg,rgba(14,20,31,0.98),rgba(12,18,27,0.98),rgba(18,27,42,0.94))] p-5 sm:p-6 md:p-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#8fb4ff]">
                 Catalog detail
               </p>
-              <h1 className="mt-2 text-4xl font-apercu-bold text-cars-primary">{heading}</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
+              <h1 className="mt-2 text-3xl font-apercu-bold text-slate-50 sm:text-4xl lg:text-[2.75rem] lg:leading-tight">
+                {heading}
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
                 Use this screen to review visuals, specs, price history, and user feedback before
                 saving the car or moving into marketplace and AI flows.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 md:justify-end">
+            <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-auto xl:flex xl:flex-wrap xl:justify-end">
               <Link
                 href={listingsHref}
-                className="rounded-full border border-cars-accent/20 bg-cars-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-cars-primary"
+                className="editorial-button inline-flex h-11 w-full items-center justify-center rounded-full px-4 text-sm font-semibold text-slate-950 transition-colors hover:brightness-105 sm:w-auto"
               >
                 View listings
               </Link>
               <button
                 type="button"
                 onClick={saveVariant}
-                className="rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white"
+                className="inline-flex h-11 w-full items-center justify-center rounded-full border border-white/10 bg-white/5 px-4 text-sm font-semibold text-slate-100 transition-colors hover:bg-white/10 sm:w-auto"
               >
                 Save to watchlist
               </button>
               <Link
                 href="/catalog"
-                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-white"
+                className="inline-flex h-11 w-full items-center justify-center rounded-full border border-white/10 bg-white/5 px-4 text-sm font-semibold text-slate-100 transition-colors hover:bg-white/10 sm:w-auto"
               >
                 Back to catalog
               </Link>
@@ -226,28 +249,36 @@ export default function CatalogDetailPage() {
           <StatusBanner tone={tone}>{message}</StatusBanner>
         </div>
 
-        {loading ? <p className="text-sm text-cars-gray">Loading variant detail...</p> : null}
+        {loading ? <p className="text-sm text-slate-300">Loading variant detail...</p> : null}
 
         {detail?.variant ? (
-          <section className="mb-8 grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-            <div className="section-shell p-6">
-              <h2 className="text-2xl font-apercu-bold text-cars-primary">Photo gallery</h2>
+          <section className="mb-8 grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)] xl:items-start">
+            <div className="section-shell p-4 sm:p-5 md:p-6">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-apercu-bold text-cars-primary sm:text-2xl">
+                    Photo gallery
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-cars-gray">
+                    Browse official catalog imagery before opening live marketplace matches.
+                  </p>
+                </div>
+              </div>
+
               {selectedImage ? (
-                <div className="mt-5 overflow-hidden rounded-[28px] bg-cars-off-white">
-                  <img
-                    src={selectedImage}
-                    alt={heading}
-                    className="h-[360px] w-full object-cover"
-                  />
+                <div className="mt-5 overflow-hidden rounded-[24px] bg-[radial-gradient(circle_at_top,rgba(143,180,255,0.16),transparent_48%),linear-gradient(180deg,rgba(16,22,32,0.96),rgba(10,14,20,0.98))] sm:rounded-[28px]">
+                  <div className="aspect-[16/10] sm:aspect-[16/9]">
+                    <img src={selectedImage} alt={heading} className="h-full w-full object-contain" />
+                  </div>
                 </div>
               ) : (
-                <div className="mt-5 flex h-[360px] items-center justify-center rounded-[28px] bg-cars-off-white text-sm font-medium text-cars-gray">
+                <div className="mt-5 flex aspect-[16/10] items-center justify-center rounded-[24px] bg-[radial-gradient(circle_at_top,rgba(143,180,255,0.16),transparent_48%),linear-gradient(180deg,rgba(16,22,32,0.96),rgba(10,14,20,0.98))] px-6 text-center text-sm font-medium text-slate-300 sm:rounded-[28px] sm:aspect-[16/9]">
                   Photos coming soon.
                 </div>
               )}
 
               {gallery.length > 1 ? (
-                <div className="mt-4 grid grid-cols-4 gap-3">
+                <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
                   {gallery.map((image) => (
                     <button
                       key={image}
@@ -259,22 +290,45 @@ export default function CatalogDetailPage() {
                           : "overflow-hidden rounded-[18px] border border-cars-gray-light/70"
                       }
                     >
-                      <img src={image} alt={heading} className="h-20 w-full object-cover" />
+                      <div className="aspect-[4/3]">
+                        <img src={image} alt={heading} className="h-full w-full object-cover" />
+                      </div>
                     </button>
                   ))}
                 </div>
               ) : null}
             </div>
 
-            <div className="section-shell p-6">
-              <h2 className="text-2xl font-apercu-bold text-cars-primary">Overview</h2>
-              <div className="mt-5 grid gap-3">
+            <div className="section-shell self-start p-4 sm:p-5 md:p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
+                    Overview
+                  </p>
+                  <h2 className="mt-2 text-2xl font-apercu-bold leading-tight text-cars-primary sm:text-3xl">
+                    {heading}
+                  </h2>
+                </div>
+                <Link
+                  href={listingsHref}
+                  className="inline-flex h-10 items-center justify-center self-start rounded-full border border-white/10 bg-white/5 px-4 text-sm font-semibold text-slate-100 transition-colors hover:bg-white/10"
+                >
+                  Match listings
+                </Link>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
                 {specCards.map((item) => (
-                  <div key={item.label} className="rounded-[20px] bg-cars-off-white px-4 py-3 text-sm">
+                  <div
+                    key={item.label}
+                    className="rounded-[20px] border border-white/8 bg-white/5 px-4 py-3 text-sm"
+                  >
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
                       {item.label}
                     </p>
-                    <p className="mt-2 font-medium text-cars-primary">{getText(item.value)}</p>
+                    <p className="mt-2 break-words font-medium leading-6 text-cars-primary">
+                      {getText(item.value)}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -300,10 +354,12 @@ export default function CatalogDetailPage() {
         ) : null}
 
         <section className="mb-8 grid gap-6 xl:grid-cols-2">
-          <div className="section-shell p-6">
+          <div className="section-shell p-4 sm:p-5 md:p-6">
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
-                <h2 className="text-2xl font-apercu-bold text-cars-primary">Price history</h2>
+                <h2 className="text-xl font-apercu-bold text-cars-primary sm:text-2xl">
+                  Price history
+                </h2>
                 <p className="mt-3 text-sm leading-6 text-cars-gray">
                   Review the recent market trail for this exact vehicle before judging the current
                   market position.
@@ -313,21 +369,23 @@ export default function CatalogDetailPage() {
             <PriceHistoryChart rows={priceHistory} />
           </div>
 
-          <div className="section-shell p-6">
+          <div className="section-shell p-4 sm:p-5 md:p-6">
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
-                <h2 className="text-2xl font-apercu-bold text-cars-primary">Estimated TCO</h2>
+                <h2 className="text-xl font-apercu-bold text-cars-primary sm:text-2xl">
+                  Estimated TCO
+                </h2>
                 <p className="mt-3 text-sm leading-6 text-cars-gray">
                   Ownership estimate is now part of the detail view, so buyers can see a practical
                   drive-away and long-term cost snapshot before deciding.
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap">
                 <select
                   value={ownershipYears}
-                  onChange={(e) => void changeOwnershipYears(e.target.value)}
-                  className="h-10 rounded-full border border-cars-gray-light px-3 text-sm text-cars-primary"
+                  onChange={(event) => void changeOwnershipYears(event.target.value)}
+                  className="h-10 rounded-full border border-cars-primary/10 bg-white px-3 text-sm text-cars-primary shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
                 >
                   <option value="3">3 years</option>
                   <option value="5">5 years</option>
@@ -343,7 +401,7 @@ export default function CatalogDetailPage() {
                       variantLabel: heading,
                     })
                   }
-                  className="rounded-full border border-cars-primary/15 px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+                  className="inline-flex h-10 items-center justify-center rounded-full border border-cars-primary/10 bg-white px-4 text-xs font-semibold text-cars-primary transition-colors hover:bg-cars-off-white dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10"
                 >
                   Discuss estimate
                 </button>
@@ -352,21 +410,21 @@ export default function CatalogDetailPage() {
 
             {ownershipSummary?.estimate ? (
               <div className="mt-5 space-y-4">
-                <div className="rounded-[22px] bg-cars-off-white px-4 py-4 text-sm leading-7 text-cars-primary">
+                <div className="rounded-[22px] border border-white/10 bg-white/5 px-4 py-4 text-sm leading-7 text-slate-200">
                   {ownershipSummary.estimate.assistant_message}
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
                   {ownershipSummary.estimate.insight_cards.map((card) => (
                     <article
                       key={card.title}
-                      className="rounded-[22px] border border-cars-gray-light/70 px-4 py-4"
+                      className="rounded-[22px] border border-white/10 bg-white/5 px-4 py-4"
                     >
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
                         {card.title}
                       </p>
                       {card.value != null ? (
-                        <p className="mt-2 text-lg font-apercu-bold text-cars-primary">
+                        <p className="mt-2 break-words text-lg font-apercu-bold text-cars-primary">
                           {typeof card.value === "number" ? toCurrency(card.value) : card.value}
                         </p>
                       ) : null}
@@ -380,7 +438,7 @@ export default function CatalogDetailPage() {
                     {ownershipSummary.estimate.highlights.map((highlight) => (
                       <div
                         key={highlight}
-                        className="rounded-[18px] bg-white px-4 py-3 text-sm text-cars-primary shadow-sm"
+                        className="rounded-[18px] border border-white/8 bg-white/5 px-4 py-3 text-sm leading-6 text-slate-200 shadow-sm"
                       >
                         {highlight}
                       </div>
@@ -389,39 +447,41 @@ export default function CatalogDetailPage() {
                 ) : null}
               </div>
             ) : (
-              <div className="mt-5 rounded-[22px] border border-dashed border-cars-primary/20 bg-cars-off-white px-4 py-4 text-sm leading-7 text-cars-gray">
+              <div className="mt-5 rounded-[22px] border border-dashed border-white/10 bg-white/5 px-4 py-4 text-sm leading-7 text-slate-300">
                 {ownershipError || "Ownership estimate is not available for this market yet."}
               </div>
             )}
           </div>
         </section>
 
-        <section className="section-shell mb-8 p-6">
-          <h2 className="text-2xl font-apercu-bold text-cars-primary">Create car review</h2>
+        <section className="section-shell mb-8 p-4 sm:p-5 md:p-6">
+          <h2 className="text-xl font-apercu-bold text-cars-primary sm:text-2xl">
+            Create car review
+          </h2>
           <p className="mt-3 text-sm leading-6 text-cars-gray">
             Reviews require login and help build the user-generated feedback layer of CarVista.
           </p>
           <form onSubmit={submitReview} className="mt-5 space-y-3">
-            <div className="rounded-[24px] border border-cars-gray-light/70 bg-cars-off-white/60 px-4 py-4 dark:bg-slate-950/40">
+            <div className="rounded-[24px] border border-white/10 bg-white/5 px-4 py-4 dark:bg-slate-950/40">
               <p className="text-sm font-semibold text-cars-primary">Your rating</p>
-              <div className="mt-3">
+              <div className="mt-3 overflow-x-auto">
                 <StarRating value={rating} onChange={setRating} size="lg" showValue={false} />
               </div>
             </div>
             <input
-              className="h-11 w-full rounded-full border border-cars-gray-light px-4 text-sm"
+              className={`h-11 rounded-full ${reviewControlClass}`}
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(event) => setTitle(event.target.value)}
               placeholder="title"
             />
             <textarea
-              className="min-h-[120px] w-full rounded-[24px] border border-cars-gray-light px-4 py-3 text-sm"
+              className={`min-h-[120px] rounded-[24px] py-3 ${reviewControlClass}`}
               value={comment}
-              onChange={(e) => setComment(e.target.value)}
+              onChange={(event) => setComment(event.target.value)}
               placeholder="comment"
             />
             <button
-              className="rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white"
+              className="editorial-button inline-flex w-full items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold text-slate-950 sm:w-auto"
               type="submit"
             >
               Submit review
@@ -429,16 +489,16 @@ export default function CatalogDetailPage() {
           </form>
         </section>
 
-        <section className="section-shell p-6">
-          <h2 className="text-2xl font-apercu-bold text-cars-primary">Car reviews</h2>
+        <section className="section-shell p-4 sm:p-5 md:p-6">
+          <h2 className="text-xl font-apercu-bold text-cars-primary sm:text-2xl">Car reviews</h2>
           <div className="mt-5 space-y-3">
             {reviews.length === 0 ? <p className="text-sm text-cars-gray">No reviews yet.</p> : null}
-            {reviews.map((review, index) => (
+            {reviews.map((review) => (
               <div
-                key={review.car_review_id || index}
-                className="rounded-[22px] border border-cars-gray-light/70 p-4 text-sm"
+                key={getReviewKey(review)}
+                className="rounded-[22px] border border-white/10 bg-white/5 p-4 text-sm"
               >
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="font-medium text-cars-primary">{review.title || "Car review"}</p>
                   <StarRating value={Number(review.rating || 0)} size="sm" showValue={false} />
                 </div>

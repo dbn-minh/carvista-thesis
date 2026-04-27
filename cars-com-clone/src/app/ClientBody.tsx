@@ -11,14 +11,14 @@ export default function ClientBody({
   children: React.ReactNode;
 }) {
   useEffect(() => {
-    document.body.classList.add("antialiased", "font-apercu-regular");
+    document.body.classList.add("antialiased", "font-dm-sans");
   }, []);
 
   return (
     <ThemeProvider>
       <AuthModalProvider>
         <AiAssistantProvider>
-          <div className="antialiased font-apercu-regular">{children}</div>
+          <div className="antialiased font-dm-sans">{children}</div>
         </AiAssistantProvider>
       </AuthModalProvider>
     </ThemeProvider>
