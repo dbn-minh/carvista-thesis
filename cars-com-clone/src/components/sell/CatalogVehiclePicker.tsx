@@ -132,7 +132,7 @@ export default function CatalogVehiclePicker({
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
             Selected catalog vehicle
           </p>
-          <h3 className="mt-3 text-xl font-apercu-bold text-cars-primary">
+          <h3 className="mt-3 break-words text-xl font-apercu-bold text-cars-primary">
             {buildVariantTitle(selectedVariant)}
           </h3>
           <p className="mt-2 text-sm leading-6 text-cars-gray">{buildVariantSubtitle(selectedVariant)}</p>

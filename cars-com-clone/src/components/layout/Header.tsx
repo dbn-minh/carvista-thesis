@@ -3,12 +3,19 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Heart, Inbox, UserRound, type LucideIcon } from "lucide-react";
+import { Heart, Inbox, Menu, UserRound, type LucideIcon } from "lucide-react";
 import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import ThemeToggle from "@/components/theme/ThemeToggle";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { requestsApi } from "@/lib/carvista-api";
-import { clearStoredToken, getStoredToken } from "@/lib/api-client";
+import { getStoredToken } from "@/lib/api-client";
 
 type NavItem = {
   href: string;
@@ -26,6 +33,8 @@ const nav: NavItem[] = [
   { href: "/garage", label: "Saved Cars", icon: Heart, iconOnly: true },
   { href: "/requests", label: "Viewing Requests", icon: Inbox, iconOnly: true },
 ];
+const primaryNav = nav.filter((item) => !item.iconOnly);
+const utilityNav = nav.filter((item) => item.iconOnly);
 
 export default function Header() {
   const pathname = usePathname();
@@ -33,10 +42,12 @@ export default function Header() {
   const { openAssistant } = useAiAssistant();
   const { openAuth } = useAuthModal();
   const [loggedIn, setLoggedIn] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [pendingRequestCount, setPendingRequestCount] = useState(0);
   const protectedRoutes = new Set(["/sell", "/garage", "/my-listings", "/requests", "/profile"]);
 
   useEffect(() => {
+    void pathname;
     const refresh = () => setLoggedIn(Boolean(getStoredToken()));
     refresh();
     window.addEventListener("storage", refresh);
@@ -48,6 +59,7 @@ export default function Header() {
   }, [pathname]);
 
   useEffect(() => {
+    void pathname;
     if (!loggedIn) {
       setPendingRequestCount(0);
       return;
@@ -59,9 +71,7 @@ export default function Header() {
       try {
         const inbox = await requestsApi.inbox();
         if (!disposed) {
-          setPendingRequestCount(
-            inbox.items.filter((item) => item.status === "new").length
-          );
+          setPendingRequestCount(inbox.items.filter((item) => item.status === "new").length);
         }
       } catch {
         if (!disposed) {
@@ -83,48 +93,79 @@ export default function Header() {
     };
   }, [loggedIn, pathname]);
 
+  useEffect(() => {
+    void pathname;
+    setMenuOpen(false);
+  }, [pathname]);
+
   function handleLogout() {
-    clearStoredToken();
-    router.push("/");
+    setMenuOpen(false);
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("carvista_token");
+      window.location.replace("/");
+      return;
+    }
+
+    router.replace("/");
+  }
+
+  function handleProtectedLink(href: string) {
+    setMenuOpen(false);
+    if (!loggedIn && protectedRoutes.has(href)) {
+      openAuth({ mode: "login", next: href });
+      return;
+    }
+    router.push(href);
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/70 bg-white/92 backdrop-blur-xl dark:border-cars-gray-light/30 dark:bg-slate-950/90">
-      <div className="bg-cars-primary text-white">
-        <div className="container-cars flex items-center justify-between gap-4 py-2 text-xs md:text-sm">
-          <p className="font-medium">
+    <header className="sticky top-0 z-50 border-b border-white/6 bg-[#0f1414]/88 backdrop-blur-2xl">
+      <div className="border-b border-white/6 bg-[linear-gradient(90deg,rgba(111,145,221,0.16),rgba(197,246,255,0.08),rgba(218,185,255,0.08))] text-white">
+        <div className="container-cars flex flex-col gap-2 py-2 text-[11px] sm:flex-row sm:items-center sm:justify-between sm:text-xs md:text-sm">
+          <p className="max-w-3xl font-medium leading-5 text-white/72">
             CarVista blends marketplace flows with AI compare, forecasting, and TCO insights.
           </p>
           <button
             type="button"
             onClick={() => openAssistant()}
-            className="font-semibold text-white/90 hover:text-white"
+            className="inline-flex w-full items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white/88 transition-colors hover:bg-white/10 hover:text-white sm:w-auto sm:px-4 sm:py-2"
           >
             Explore AI tools
           </button>
         </div>
       </div>
 
-        <div className="container-cars flex flex-col gap-4 py-4 lg:grid lg:grid-cols-[auto_1fr_auto] lg:items-center">
-        <div className="flex items-center gap-4">
+      <div className="container-cars flex items-center justify-between gap-3 py-3 lg:grid lg:grid-cols-[auto_1fr_auto] lg:items-center lg:gap-6 lg:py-4">
+        <div className="min-w-0 flex items-center gap-4">
           <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cars-primary text-lg font-apercu-bold text-white shadow-lg shadow-cars-primary/25">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,rgba(111,145,221,1),rgba(197,246,255,0.88))] text-lg font-apercu-bold text-slate-950 shadow-[0_18px_42px_rgba(197,246,255,0.2)]">
               CV
             </div>
-            <div>
-              <p className="text-xl font-apercu-bold text-cars-primary">CarVista</p>
-              <p className="text-xs text-cars-gray">AI-powered intelligent car platform</p>
+            <div className="min-w-0">
+              <p className="truncate text-lg font-apercu-bold text-white sm:text-xl">CarVista</p>
+              <p className="truncate text-[11px] leading-4 text-slate-400 sm:text-xs">
+                AI-powered intelligent car platform
+              </p>
             </div>
           </Link>
         </div>
 
-        <nav className="flex flex-wrap items-center gap-2 text-sm lg:justify-center">
+        <nav className="hidden flex-wrap items-center gap-2 text-sm lg:flex lg:justify-center">
           {nav.map((item) => {
             const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
             const Icon = item.icon;
             const badgeCount = item.href === "/requests" ? pendingRequestCount : 0;
             const accessibleLabel =
               badgeCount > 0 ? `${item.label} (${badgeCount} pending)` : item.label;
+
+            const stateClass = item.iconOnly
+              ? active
+                ? "relative inline-flex h-10 w-10 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(111,145,221,1),rgba(146,175,238,0.95))] text-slate-950 shadow-sm"
+                : "relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/8 bg-white/4 text-white transition-colors hover:bg-white/8"
+              : active
+                ? "rounded-full bg-[linear-gradient(135deg,rgba(111,145,221,1),rgba(146,175,238,0.95))] px-4 py-2 font-semibold text-slate-950 shadow-sm"
+                : "rounded-full border border-white/8 bg-white/4 px-4 py-2 font-medium text-white transition-colors hover:bg-white/8";
+
             return (
               <Link
                 key={item.href}
@@ -137,15 +178,7 @@ export default function Header() {
                     openAuth({ mode: "login", next: item.href });
                   }
                 }}
-                className={
-                  item.iconOnly
-                    ? active
-                      ? "relative inline-flex h-10 w-10 items-center justify-center rounded-full bg-cars-primary text-white shadow-sm"
-                      : "relative inline-flex h-10 w-10 items-center justify-center rounded-full text-cars-primary transition-colors hover:bg-cars-off-white"
-                    : active
-                      ? "rounded-full bg-cars-primary px-4 py-2 font-semibold text-white shadow-sm"
-                      : "rounded-full px-4 py-2 font-medium text-cars-primary transition-colors hover:bg-cars-off-white"
-                }
+                className={stateClass}
               >
                 {Icon ? <Icon className="h-4 w-4" /> : item.label}
                 {badgeCount > 0 ? (
@@ -159,21 +192,21 @@ export default function Header() {
           })}
         </nav>
 
-        <div className="flex items-center gap-3 text-sm lg:justify-end">
+        <div className="hidden items-center gap-3 text-sm lg:flex lg:justify-end">
           <ThemeToggle />
           {!loggedIn ? (
             <>
               <button
                 type="button"
                 onClick={() => openAuth({ mode: "login", next: pathname || "/" })}
-                className="rounded-full border border-cars-primary/15 px-4 py-2 font-medium text-cars-primary transition-colors hover:bg-cars-off-white"
+                className="rounded-full border border-white/10 bg-white/5 px-4 py-2 font-medium text-white transition-colors hover:bg-white/10"
               >
                 Login
               </button>
               <button
                 type="button"
                 onClick={() => openAuth({ mode: "register", next: pathname || "/" })}
-                className="rounded-full bg-cars-accent px-4 py-2 font-semibold text-white shadow-lg shadow-cars-accent/25 transition-transform hover:-translate-y-0.5 hover:bg-cars-primary-light"
+                className="editorial-button rounded-full px-4 py-2 font-semibold text-slate-950 transition-transform hover:-translate-y-0.5 hover:brightness-105"
               >
                 Create account
               </button>
@@ -182,7 +215,7 @@ export default function Header() {
             <>
               <Link
                 href="/profile"
-                className="inline-flex items-center gap-2 rounded-full border border-cars-primary/15 px-4 py-2 font-medium text-cars-primary transition-colors hover:bg-cars-off-white"
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 font-medium text-white transition-colors hover:bg-white/10"
               >
                 <UserRound className="h-4 w-4" />
                 Profile
@@ -190,14 +223,144 @@ export default function Header() {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="rounded-full border border-cars-primary/15 px-4 py-2 font-medium text-cars-primary transition-colors hover:bg-cars-off-white"
+                className="rounded-full border border-white/10 bg-white/5 px-4 py-2 font-medium text-white transition-colors hover:bg-white/10"
               >
                 Logout
               </button>
             </>
           )}
         </div>
+
+        <div className="flex items-center gap-2 lg:hidden">
+          <ThemeToggle />
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Open navigation menu"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white transition-colors hover:bg-white/10"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        </div>
       </div>
+
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+        <SheetContent
+          side="right"
+          className="flex h-full w-[min(88vw,360px)] flex-col border-l border-white/10 bg-[#111616]/98 px-5 pb-6 pt-12 text-left text-white sm:max-w-none"
+        >
+          <SheetHeader className="text-left">
+            <SheetTitle className="text-white">Navigate CarVista</SheetTitle>
+            <SheetDescription>
+              Browse research, listings, AI tools, and account actions without leaving the current page.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6 flex flex-col gap-2">
+            {primaryNav.map((item) => {
+              const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+              return (
+                <button
+                  key={item.href}
+                  type="button"
+                  onClick={() => handleProtectedLink(item.href)}
+                  className={
+                    active
+                      ? "flex w-full items-center justify-between rounded-2xl bg-[linear-gradient(135deg,rgba(111,145,221,1),rgba(146,175,238,0.95))] px-4 py-3 text-left text-sm font-semibold text-slate-950 shadow-sm"
+                      : "flex w-full items-center justify-between rounded-2xl border border-white/8 bg-white/4 px-4 py-3 text-left text-sm font-medium text-white/88 transition-colors hover:bg-white/8"
+                  }
+                >
+                  <span>{item.label}</span>
+                  {protectedRoutes.has(item.href) && !loggedIn ? (
+                    <span className={active ? "text-slate-900/70" : "text-white/42"}>
+                      Login required
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            {utilityNav.map((item) => {
+              const Icon = item.icon;
+              const badgeCount = item.href === "/requests" ? pendingRequestCount : 0;
+              return (
+                <button
+                  key={item.href}
+                  type="button"
+                  onClick={() => handleProtectedLink(item.href)}
+                  className="relative flex min-h-[88px] flex-col items-start justify-between rounded-[24px] border border-white/8 bg-white/4 px-4 py-4 text-left text-white/88 transition-colors hover:bg-white/8"
+                >
+                  {Icon ? <Icon className="h-5 w-5" /> : null}
+                  <span className="text-sm font-semibold leading-5">{item.label}</span>
+                  {badgeCount > 0 ? (
+                    <span className="absolute right-3 top-3 inline-flex min-h-[1.2rem] min-w-[1.2rem] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                      {badgeCount > 9 ? "9+" : badgeCount}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              openAssistant();
+            }}
+            className="editorial-button mt-6 inline-flex w-full items-center justify-center rounded-full px-4 py-3 text-sm font-semibold text-slate-950 transition-colors hover:brightness-105"
+          >
+            Open AI tools
+          </button>
+
+          <div className="mt-auto flex flex-col gap-3 pt-6">
+            {!loggedIn ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    openAuth({ mode: "login", next: pathname || "/" });
+                  }}
+                  className="inline-flex w-full items-center justify-center rounded-full border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-white/10"
+                >
+                  Login
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    openAuth({ mode: "register", next: pathname || "/" });
+                  }}
+                  className="editorial-button inline-flex w-full items-center justify-center rounded-full px-4 py-3 text-sm font-semibold text-slate-950 transition-colors hover:brightness-105"
+                >
+                  Create account
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleProtectedLink("/profile")}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-white/10"
+                >
+                  <UserRound className="h-4 w-4" />
+                  Profile
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="inline-flex w-full items-center justify-center rounded-full border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-white/10"
+                >
+                  Logout
+                </button>
+              </>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </header>
   );
 }

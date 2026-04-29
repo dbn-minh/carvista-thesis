@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Camera, ImagePlus, LoaderCircle, MapPin, MoveHorizontal, PencilLine, Trash2 } from "lucide-react";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import EmptyState from "@/components/common/EmptyState";
 import StatusBanner from "@/components/common/StatusBanner";
 import Header from "@/components/layout/Header";
@@ -54,9 +54,9 @@ function buildEditState(item: Listing): ListingFormState {
 function mergeSellerListings(groups: Listing[][]): Listing[] {
   const map = new Map<number, Listing>();
 
-  groups.flat().forEach((item) => {
+  for (const item of groups.flat()) {
     map.set(item.listing_id, item);
-  });
+  }
 
   return [...map.values()].sort(
     (left, right) =>
@@ -89,6 +89,7 @@ export default function MyListingsPage() {
   const [tone, setTone] = useState<"success" | "error" | "info">("info");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingListingId, setDeletingListingId] = useState<number | null>(null);
   const [editingItem, setEditingItem] = useState<Listing | null>(null);
   const [editingImages, setEditingImages] = useState<ListingImageRecord[]>([]);
   const [loadingImages, setLoadingImages] = useState(false);
@@ -115,49 +116,52 @@ export default function MyListingsPage() {
 
   if (!ready) return null;
 
-  async function load(options: { preserveMessage?: boolean; showSpinner?: boolean } = {}) {
-    const { preserveMessage = false, showSpinner = true } = options;
+  const load = useCallback(
+    async (options: { preserveMessage?: boolean; showSpinner?: boolean } = {}) => {
+      const { preserveMessage = false, showSpinner = true } = options;
 
-    if (showSpinner) setLoading(true);
-    if (!preserveMessage) setMessage("");
+      if (showSpinner) setLoading(true);
+      if (!preserveMessage) setMessage("");
 
-    try {
-      const me = await authApi.me();
-      setUser(me.user);
+      try {
+        const me = await authApi.me();
+        setUser(me.user);
 
-      const results = await Promise.allSettled(
-        SELLER_LISTING_STATUSES.map((status) =>
-          listingsApi.list({ status, ownerId: me.user.user_id })
-        )
-      );
-
-      const fulfilled = results
-        .filter(
-          (
-            result
-          ): result is PromiseFulfilledResult<Awaited<ReturnType<typeof listingsApi.list>>> =>
-            result.status === "fulfilled"
-        )
-        .map((result) => result.value.items);
-
-      if (fulfilled.length === 0) {
-        const firstError = results.find(
-          (result): result is PromiseRejectedResult => result.status === "rejected"
+        const results = await Promise.allSettled(
+          SELLER_LISTING_STATUSES.map((status) =>
+            listingsApi.list({ status, ownerId: me.user.user_id })
+          )
         );
-        throw firstError?.reason || new Error("Could not load your listings.");
-      }
 
-      const merged = mergeSellerListings(fulfilled);
-      setItems(merged);
-      return merged;
-    } catch (error) {
-      setTone("error");
-      setMessage(error instanceof Error ? error.message : "Could not load my listings");
-      return [] as Listing[];
-    } finally {
-      if (showSpinner) setLoading(false);
-    }
-  }
+        const fulfilled = results
+          .filter(
+            (
+              result
+            ): result is PromiseFulfilledResult<Awaited<ReturnType<typeof listingsApi.list>>> =>
+              result.status === "fulfilled"
+          )
+          .map((result) => result.value.items);
+
+        if (fulfilled.length === 0) {
+          const firstError = results.find(
+            (result): result is PromiseRejectedResult => result.status === "rejected"
+          );
+          throw firstError?.reason || new Error("Could not load your listings.");
+        }
+
+        const merged = mergeSellerListings(fulfilled);
+        setItems(merged);
+        return merged;
+      } catch (error) {
+        setTone("error");
+        setMessage(error instanceof Error ? error.message : "Could not load my listings");
+        return [] as Listing[];
+      } finally {
+        if (showSpinner) setLoading(false);
+      }
+    },
+    []
+  );
 
   async function refreshListingCards(listingId?: number) {
     const updated = await load({ preserveMessage: true, showSpinner: false });
@@ -186,7 +190,7 @@ export default function MyListingsPage() {
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   function confirmDiscardChanges() {
     if (!hasUnsavedChanges || typeof window === "undefined") return true;
@@ -214,12 +218,16 @@ export default function MyListingsPage() {
     }
   }
 
-  function closeEditor() {
-    if (!confirmDiscardChanges()) return;
+  function resetEditor() {
     setEditingItem(null);
     setEditingImages([]);
     setFormState(null);
     setFormSnapshot(null);
+  }
+
+  function closeEditor() {
+    if (!confirmDiscardChanges()) return;
+    resetEditor();
   }
 
   function updateForm<K extends keyof ListingFormState>(key: K, value: ListingFormState[K]) {
@@ -310,6 +318,35 @@ export default function MyListingsPage() {
       setMessage(error instanceof Error ? error.message : "Could not remove this photo.");
     } finally {
       setPhotoActionKey(null);
+    }
+  }
+
+  async function handleDeleteListing(item: Listing) {
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm(
+        `Delete "${buildListingTitle(item)}" permanently? This removes its photos, saved entries, and viewing requests. Seller reviews remain on your profile.`
+      );
+
+      if (!confirmed) return;
+    }
+
+    setDeletingListingId(item.listing_id);
+
+    try {
+      await listingsApi.delete(item.listing_id);
+
+      if (editingItem?.listing_id === item.listing_id) {
+        resetEditor();
+      }
+
+      await load({ preserveMessage: true, showSpinner: false });
+      setTone("success");
+      setMessage(`Deleted ${buildListingTitle(item)}.`);
+    } catch (error) {
+      setTone("error");
+      setMessage(error instanceof Error ? error.message : "Could not delete this listing.");
+    } finally {
+      setDeletingListingId(null);
     }
   }
 
@@ -431,41 +468,47 @@ export default function MyListingsPage() {
   return (
     <>
       <Header />
-      <main className="container-cars py-8">
-        <section className="section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(233,241,255,0.9))] p-6 md:p-8">
+      <main className="container-cars py-6 sm:py-8">
+        <section className="section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(233,241,255,0.9))] p-5 sm:p-6 md:p-8">
           <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr] xl:items-end">
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
                 Seller control
               </p>
-              <h1 className="mt-2 text-4xl font-apercu-bold text-cars-primary">My listings</h1>
+              <h1 className="mt-2 text-3xl font-apercu-bold text-cars-primary sm:text-4xl lg:text-[2.75rem] lg:leading-tight">
+                My listings
+              </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
                 Keep your cars sale-ready with pricing updates, richer notes, status changes, and
                 a photo gallery buyers can trust.
               </p>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-[28px] bg-cars-primary p-5 text-white shadow-[0_18px_44px_rgba(15,45,98,0.18)] sm:col-span-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/70">
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+              <div className="rounded-[28px] bg-cars-primary p-5 text-primary-foreground shadow-[0_18px_44px_rgba(15,45,98,0.18)] sm:col-span-2 md:col-span-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-foreground/70">
                   Account owner
                 </p>
-                <p className="mt-2 text-2xl font-apercu-bold">{user?.name || "Loading..."}</p>
-                <p className="mt-1 text-sm text-white/80">{user?.email || "Fetching account"}</p>
+                <p className="mt-2 break-words text-2xl font-apercu-bold">
+                  {user?.name || "Loading..."}
+                </p>
+                <p className="mt-1 break-words text-sm text-primary-foreground/80">
+                  {user?.email || "Fetching account"}
+                </p>
               </div>
-              <div className="rounded-[24px] border border-cars-primary/10 bg-white px-4 py-4 text-cars-primary shadow-[0_16px_34px_rgba(15,45,98,0.08)]">
+              <div className="min-w-0 rounded-[24px] border border-cars-primary/10 bg-white px-4 py-4 text-cars-primary shadow-[0_16px_34px_rgba(15,45,98,0.08)]">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
                   Total listings
                 </p>
                 <p className="mt-2 text-2xl font-apercu-bold">{sellerStats.total}</p>
               </div>
-              <div className="rounded-[24px] border border-cars-primary/10 bg-white px-4 py-4 text-cars-primary shadow-[0_16px_34px_rgba(15,45,98,0.08)]">
+              <div className="min-w-0 rounded-[24px] border border-cars-primary/10 bg-white px-4 py-4 text-cars-primary shadow-[0_16px_34px_rgba(15,45,98,0.08)]">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
                   Live now
                 </p>
                 <p className="mt-2 text-2xl font-apercu-bold">{sellerStats.active}</p>
               </div>
-              <div className="rounded-[24px] border border-cars-primary/10 bg-white px-4 py-4 text-cars-primary shadow-[0_16px_34px_rgba(15,45,98,0.08)]">
+              <div className="min-w-0 rounded-[24px] border border-cars-primary/10 bg-white px-4 py-4 text-cars-primary shadow-[0_16px_34px_rgba(15,45,98,0.08)] sm:col-span-2 md:col-span-1">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
                   Photos added
                 </p>
@@ -479,7 +522,7 @@ export default function MyListingsPage() {
           <StatusBanner tone={tone}>{message}</StatusBanner>
         </div>
 
-        <div className="mt-6 flex items-center justify-between gap-4">
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-cars-gray">
             {loading
               ? "Loading your listings..."
@@ -487,7 +530,7 @@ export default function MyListingsPage() {
           </p>
           <Link
             href="/sell"
-            className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary"
+            className="inline-flex h-11 w-full items-center justify-center rounded-full border border-cars-primary/15 px-4 text-sm font-semibold text-cars-primary sm:w-auto"
           >
             Create another listing
           </Link>
@@ -503,95 +546,109 @@ export default function MyListingsPage() {
         ) : null}
 
         <div className="mt-6 grid gap-5 xl:grid-cols-2">
-          {items.map((item) => (
-            <article
-              key={item.listing_id}
-              className="section-shell overflow-hidden p-4 text-sm md:p-5"
-            >
-              <div className="grid gap-5 xl:grid-cols-[280px_1fr]">
-                <div>
-                  <ListingImage
-                    href={`/listings/${item.listing_id}`}
-                    title={buildListingMetaTitle(item)}
-                    image={getListingImages(item)[0] || null}
-                    imageCount={item.image_count || getListingImages(item).length}
-                    photoSourceLabel={
-                      item.photo_source === "listing"
-                        ? "Seller photos"
-                        : item.photo_source === "catalog"
-                          ? "Catalog photos"
-                          : null
-                    }
-                  />
-                </div>
+          {items.map((item) => {
+            const isDeleting = deletingListingId === item.listing_id;
 
-                <div className="flex flex-col">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
-                        {buildListingEyebrow(item)}
-                      </p>
-                      <h2 className="mt-2 text-2xl font-apercu-bold text-cars-primary">
-                        {buildListingTitle(item)}
-                      </h2>
-                      <p className="mt-3 text-2xl font-apercu-bold text-cars-primary">
-                        {formatListingPrice(item.asking_price)}
-                      </p>
+            return (
+              <article
+                key={item.listing_id}
+                className="section-shell overflow-hidden p-4 text-sm md:p-5"
+              >
+                <div className="grid gap-5 lg:grid-cols-[240px_1fr] xl:grid-cols-[280px_1fr]">
+                  <div>
+                    <ListingImage
+                      href={`/listings/${item.listing_id}`}
+                      title={buildListingMetaTitle(item)}
+                      image={getListingImages(item)[0] || null}
+                      imageCount={item.image_count || getListingImages(item).length}
+                      photoSourceLabel={
+                        item.photo_source === "listing"
+                          ? "Seller photos"
+                          : item.photo_source === "catalog"
+                            ? "Catalog photos"
+                            : null
+                      }
+                    />
+                  </div>
+
+                  <div className="flex flex-col">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
+                          {buildListingEyebrow(item)}
+                        </p>
+                        <h2 className="mt-2 break-words text-2xl font-apercu-bold text-cars-primary">
+                          {buildListingTitle(item)}
+                        </h2>
+                        <p className="mt-3 text-2xl font-apercu-bold text-cars-primary">
+                          {formatListingPrice(item.asking_price)}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-cars-off-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-cars-primary">
+                        {formatLabel(item.status)}
+                      </span>
                     </div>
-                    <span className="rounded-full bg-cars-off-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-cars-primary">
-                      {formatLabel(item.status)}
-                    </span>
-                  </div>
 
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    <span className="inline-flex items-center gap-2 rounded-full bg-cars-off-white px-3 py-2 text-xs font-medium text-cars-primary">
-                      <Camera className="h-3.5 w-3.5 text-cars-accent" />
-                      {formatPhotoCount(item.image_count || getListingImages(item).length)}
-                    </span>
-                    <span className="inline-flex items-center gap-2 rounded-full bg-cars-off-white px-3 py-2 text-xs font-medium text-cars-primary">
-                      <MapPin className="h-3.5 w-3.5 text-cars-accent" />
-                      {formatLocation(item.location_city, item.location_country_code)}
-                    </span>
-                    <span className="inline-flex items-center gap-2 rounded-full bg-cars-off-white px-3 py-2 text-xs font-medium text-cars-primary">
-                      <PencilLine className="h-3.5 w-3.5 text-cars-accent" />
-                      {formatMileage(item.mileage_km)}
-                    </span>
-                  </div>
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      <span className="inline-flex min-w-0 items-center gap-2 rounded-full bg-cars-off-white px-3 py-2 text-xs font-medium text-cars-primary">
+                        <Camera className="h-3.5 w-3.5 text-cars-accent" />
+                        {formatPhotoCount(item.image_count || getListingImages(item).length)}
+                      </span>
+                      <span className="inline-flex min-w-0 items-center gap-2 rounded-full bg-cars-off-white px-3 py-2 text-xs font-medium text-cars-primary">
+                        <MapPin className="h-3.5 w-3.5 text-cars-accent" />
+                        <span className="break-words">
+                          {formatLocation(item.location_city, item.location_country_code)}
+                        </span>
+                      </span>
+                      <span className="inline-flex min-w-0 items-center gap-2 rounded-full bg-cars-off-white px-3 py-2 text-xs font-medium text-cars-primary">
+                        <PencilLine className="h-3.5 w-3.5 text-cars-accent" />
+                        {formatMileage(item.mileage_km)}
+                      </span>
+                    </div>
 
-                  <p className="mt-4 line-clamp-3 leading-6 text-cars-gray">
-                    {item.description ||
-                      "Add seller notes to highlight condition, service history, and anything a buyer should know before they contact you."}
-                  </p>
+                    <p className="mt-4 line-clamp-3 leading-6 text-cars-gray">
+                      {item.description ||
+                        "Add seller notes to highlight condition, service history, and anything a buyer should know before they contact you."}
+                    </p>
 
-                  <div className="mt-auto flex flex-wrap gap-2 pt-5">
+                    <div className="mt-auto grid gap-2 pt-5 sm:flex sm:flex-wrap">
                     <button
                       type="button"
                       onClick={() => void openEditor(item)}
-                      className="rounded-full bg-cars-primary px-4 py-2.5 text-sm font-semibold text-white"
+                      disabled={isDeleting}
+                      className="inline-flex h-11 w-full items-center justify-center rounded-full bg-cars-primary px-4 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                     >
                       Manage listing
                     </button>
-                    <Link
-                      href={`/listings/${item.listing_id}`}
-                      className="rounded-full border border-cars-primary/15 px-4 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
-                    >
-                      View live
-                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteListing(item)}
+                      disabled={isDeleting}
+                      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-red-200 px-4 text-sm font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                      >
+                        {isDeleting ? (
+                          <LoaderCircle className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                        {isDeleting ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
 
         {editingItem && formState ? (
-          <section id="listing-editor" className="section-shell mt-8 overflow-hidden p-6">
+          <section id="listing-editor" className="section-shell mt-8 overflow-hidden p-4 sm:p-5 md:p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
                   Listing management
                 </p>
-                <h2 className="mt-2 text-3xl font-apercu-bold text-cars-primary">
+                <h2 className="mt-2 break-words text-2xl font-apercu-bold text-cars-primary sm:text-3xl">
                   {buildListingTitle(editingItem)}
                 </h2>
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
@@ -600,17 +657,30 @@ export default function MyListingsPage() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="grid gap-2 sm:flex sm:flex-wrap">
                 <Link
                   href={`/listings/${editingItem.listing_id}`}
-                  className="rounded-full border border-cars-primary/15 px-4 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+                  className="inline-flex h-11 w-full items-center justify-center rounded-full border border-cars-primary/15 px-4 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white sm:w-auto"
                 >
                   Preview live listing
                 </Link>
                 <button
                   type="button"
+                  onClick={() => void handleDeleteListing(editingItem)}
+                  disabled={deletingListingId === editingItem.listing_id || saving || Boolean(photoActionKey)}
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-red-200 px-4 text-sm font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                >
+                  {deletingListingId === editingItem.listing_id ? (
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  {deletingListingId === editingItem.listing_id ? "Deleting..." : "Delete listing"}
+                </button>
+                <button
+                  type="button"
                   onClick={closeEditor}
-                  className="rounded-full border border-cars-primary/15 px-4 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+                  className="inline-flex h-11 w-full items-center justify-center rounded-full border border-cars-primary/15 px-4 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white sm:w-auto"
                 >
                   Close editor
                 </button>
@@ -620,10 +690,10 @@ export default function MyListingsPage() {
             <div className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
               <form
                 onSubmit={saveEdit}
-                className="rounded-[28px] border border-cars-gray-light/70 bg-white p-5 shadow-[0_20px_44px_rgba(15,45,98,0.06)]"
+                className="rounded-[28px] border border-cars-gray-light/70 bg-white p-4 shadow-[0_20px_44px_rgba(15,45,98,0.06)] sm:p-5"
               >
-                <div className="flex items-center justify-between gap-4">
-                  <div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
                       Listing details
                     </p>
@@ -710,18 +780,19 @@ export default function MyListingsPage() {
                   </label>
                 </div>
 
-                <div className="mt-5 flex flex-wrap items-center gap-3">
+                <div className="mt-5 grid gap-3 sm:flex sm:flex-wrap sm:items-center">
                   <button
-                    className="rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-11 w-full items-center justify-center rounded-full bg-cars-primary px-5 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                     type="submit"
-                    disabled={saving || !hasUnsavedChanges}
+                    disabled={saving || !hasUnsavedChanges || deletingListingId === editingItem.listing_id}
                   >
                     {saving ? "Saving..." : "Save changes"}
                   </button>
                   <button
                     type="button"
                     onClick={closeEditor}
-                    className="rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary"
+                    disabled={deletingListingId === editingItem.listing_id}
+                    className="inline-flex h-11 w-full items-center justify-center rounded-full border border-cars-primary/15 px-5 text-sm font-semibold text-cars-primary disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                   >
                     Cancel
                   </button>
@@ -733,7 +804,7 @@ export default function MyListingsPage() {
                 </div>
               </form>
 
-              <div className="rounded-[28px] border border-cars-gray-light/70 bg-white p-5 shadow-[0_20px_44px_rgba(15,45,98,0.06)]">
+              <div className="rounded-[28px] border border-cars-gray-light/70 bg-white p-4 shadow-[0_20px_44px_rgba(15,45,98,0.06)] sm:p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
@@ -751,7 +822,13 @@ export default function MyListingsPage() {
                     </p>
                   </div>
 
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-cars-primary px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-cars-primary/20 transition hover:bg-cars-accent">
+                  <label
+                    className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-cars-primary px-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-cars-primary/20 transition hover:bg-cars-accent sm:w-auto ${
+                      deletingListingId === editingItem.listing_id
+                        ? "cursor-not-allowed opacity-60"
+                        : "cursor-pointer"
+                    }`}
+                  >
                     {photoActionKey === "upload" ? (
                       <LoaderCircle className="h-4 w-4 animate-spin" />
                     ) : (
@@ -764,7 +841,7 @@ export default function MyListingsPage() {
                       multiple
                       className="hidden"
                       onChange={(event) => void handleAddImages(event)}
-                      disabled={Boolean(photoActionKey)}
+                      disabled={Boolean(photoActionKey) || deletingListingId === editingItem.listing_id}
                     />
                   </label>
                 </div>
@@ -795,7 +872,8 @@ export default function MyListingsPage() {
                   <div className="mt-6 grid gap-4 sm:grid-cols-2">
                     {editingImages.map((image, index) => {
                       const imageId = image.listing_image_id;
-                      const busy = Boolean(photoActionKey);
+                      const busy =
+                        Boolean(photoActionKey) || deletingListingId === editingItem.listing_id;
 
                       return (
                         <article
@@ -815,7 +893,7 @@ export default function MyListingsPage() {
                               </div>
                             )}
                             <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-                              <span className="rounded-full bg-black/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur">
+                              <span className="rounded-full bg-black/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-foreground backdrop-blur">
                                 Photo {index + 1}
                               </span>
                               {index === 0 ? (
@@ -828,7 +906,7 @@ export default function MyListingsPage() {
 
                           <div className="p-4">
                             <div className="flex items-center justify-between gap-3">
-                              <p className="text-sm font-semibold text-cars-primary">
+                              <p className="break-words text-sm font-semibold text-cars-primary">
                                 {buildImageSummary(image)}
                               </p>
                               {image.bytes ? (
@@ -838,13 +916,13 @@ export default function MyListingsPage() {
                               ) : null}
                             </div>
 
-                            <div className="mt-4 flex flex-wrap gap-2">
+                            <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
                               {index > 0 && imageId ? (
                                 <button
                                   type="button"
                                   onClick={() => void setCoverImage(imageId)}
                                   disabled={busy}
-                                  className="rounded-full border border-cars-primary/15 px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                                  className="inline-flex min-h-9 items-center justify-center rounded-full border border-cars-primary/15 px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   Set cover
                                 </button>
@@ -856,7 +934,7 @@ export default function MyListingsPage() {
                                     type="button"
                                     onClick={() => void moveImage(imageId, "left")}
                                     disabled={busy || index === 0}
-                                    className="inline-flex items-center gap-1 rounded-full border border-cars-primary/15 px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="inline-flex min-h-9 items-center justify-center gap-1 rounded-full border border-cars-primary/15 px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                                   >
                                     <MoveHorizontal className="h-3.5 w-3.5" />
                                     Move earlier
@@ -865,12 +943,12 @@ export default function MyListingsPage() {
                                     type="button"
                                     onClick={() => void moveImage(imageId, "right")}
                                     disabled={busy || index === editingImages.length - 1}
-                                    className="inline-flex items-center gap-1 rounded-full border border-cars-primary/15 px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="inline-flex min-h-9 items-center justify-center gap-1 rounded-full border border-cars-primary/15 px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                                   >
                                     <MoveHorizontal className="h-3.5 w-3.5" />
                                     Move later
                                   </button>
-                                  <label className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-cars-primary/15 px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-white">
+                                  <label className="inline-flex min-h-9 cursor-pointer items-center justify-center gap-1 rounded-full border border-cars-primary/15 px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-white">
                                     Replace
                                     <input
                                       type="file"
@@ -886,7 +964,7 @@ export default function MyListingsPage() {
                                     type="button"
                                     onClick={() => void handleDeleteImage(imageId)}
                                     disabled={busy}
-                                    className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="inline-flex min-h-9 items-center justify-center gap-1 rounded-full border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
                                     Delete

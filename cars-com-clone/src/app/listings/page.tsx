@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type SetStateAction } from "react";
 import { useRouter, useSearchParams, type ReadonlyURLSearchParams } from "next/navigation";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import ListingCard from "@/components/cards/ListingCard";
@@ -36,6 +36,14 @@ const initialFilters: ListingFilterState = {
 };
 
 const LISTINGS_PAGE_SIZE = 24;
+const SKELETON_KEYS = [
+  "listing-skeleton-1",
+  "listing-skeleton-2",
+  "listing-skeleton-3",
+  "listing-skeleton-4",
+  "listing-skeleton-5",
+  "listing-skeleton-6",
+] as const;
 type ListingsMode = "browse" | "match";
 
 function parseListingsMode(
@@ -73,7 +81,6 @@ function parseSearchFilters(
 function ListingsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const searchKey = searchParams.toString();
   const { openAuth } = useAuthModal();
   const [items, setItems] = useState<Listing[]>([]);
   const [message, setMessage] = useState("");
@@ -85,7 +92,7 @@ function ListingsPageContent() {
   const [mode, setMode] = useState<ListingsMode>("browse");
   const [currentPage, setCurrentPage] = useState(1);
 
-  async function fetchListings(params: { status: string; variantId?: number | null }) {
+  const fetchListings = useCallback(async (params: { status: string; variantId?: number | null }) => {
     const qs = new URLSearchParams();
     qs.set("status", params.status);
     qs.set("limit", "1000");
@@ -93,9 +100,9 @@ function ListingsPageContent() {
       qs.set("variantId", String(params.variantId));
     }
     return apiFetch<{ items: Listing[]; limit?: number }>(`/listings?${qs.toString()}`);
-  }
+  }, []);
 
-  async function load(activeVariantId?: number | null) {
+  const load = useCallback(async (activeVariantId?: number | null) => {
     setLoading(true);
     setMessage("");
 
@@ -133,7 +140,12 @@ function ListingsPageContent() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [fetchListings]);
+
+  const handleSetFilters = useCallback((nextFilters: SetStateAction<ListingFilterState>) => {
+    setCurrentPage(1);
+    setFilters(nextFilters);
+  }, []);
 
   useEffect(() => {
     const nextMode = parseListingsMode(searchParams);
@@ -146,7 +158,7 @@ function ListingsPageContent() {
     setFilters(parseSearchFilters(searchParams, { lockToVariant: normalizedVariantId != null }));
     setCurrentPage(1);
     void load(normalizedVariantId);
-  }, [searchKey]);
+  }, [load, searchParams]);
 
   function clearMarketplaceFilters() {
     setFilters(initialFilters);
@@ -203,10 +215,6 @@ function ListingsPageContent() {
   }, [currentPage, totalPages]);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [filters, linkedVariantId]);
-
-  useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
@@ -215,8 +223,8 @@ function ListingsPageContent() {
   return (
     <>
       <Header />
-      <main className="container-cars py-8">
-        <ListingFilters filters={filters} setFilters={setFilters} options={filterOptions} />
+      <main className="container-cars py-6 sm:py-8">
+        <ListingFilters filters={filters} setFilters={handleSetFilters} options={filterOptions} />
 
         <div className="mt-6">
           <StatusBanner tone={tone}>{message}</StatusBanner>
@@ -236,9 +244,9 @@ function ListingsPageContent() {
         </div>
 
         {loading ? (
-          <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <ListingCardSkeleton key={index} />
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {SKELETON_KEYS.map((key) => (
+              <ListingCardSkeleton key={key} />
             ))}
           </div>
         ) : null}
@@ -246,10 +254,16 @@ function ListingsPageContent() {
         {!loading && items.length === 0 ? (
           <div className="mt-6">
             <EmptyState
-              title={linkedVariantId != null ? "No active listings for this vehicle yet" : "No active listings"}
+              title={
+                linkedVariantId != null
+                  ? "No active listings for this vehicle yet"
+                  : "No active listings"
+              }
               description={
                 linkedVariantId != null
-                  ? `We couldn't find any active marketplace listings for ${filters.query || "this vehicle"} right now. Try browsing all listings or check back later.`
+                  ? `We couldn't find any active marketplace listings for ${
+                      filters.query || "this vehicle"
+                    } right now. Try browsing all listings or check back later.`
                   : "There are no active marketplace listings yet. Check back later or browse another search."
               }
             />
@@ -258,7 +272,7 @@ function ListingsPageContent() {
                 <button
                   type="button"
                   onClick={clearMarketplaceFilters}
-                  className="rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+                  className="w-full rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white sm:w-auto"
                 >
                   Browse all listings
                 </button>
@@ -277,7 +291,7 @@ function ListingsPageContent() {
               <button
                 type="button"
                 onClick={clearMarketplaceFilters}
-                className="rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+                className="w-full rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white sm:w-auto"
               >
                 Reset marketplace filters
               </button>
@@ -286,7 +300,7 @@ function ListingsPageContent() {
         ) : null}
 
         {!loading && filteredItems.length > 0 ? (
-          <div className="mt-6 grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
+          <div className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {paginatedItems.map((item) => (
               <ListingCard
                 key={item.listing_id}
@@ -299,7 +313,7 @@ function ListingsPageContent() {
         ) : null}
 
         {!loading && filteredItems.length > LISTINGS_PAGE_SIZE ? (
-          <div className="mt-8 flex flex-col gap-4 rounded-[28px] border border-cars-primary/10 bg-cars-surface px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-white/5">
+          <div className="mt-8 flex flex-col gap-4 rounded-[28px] border border-cars-primary/10 bg-cars-surface px-4 py-4 sm:px-5 dark:border-white/10 dark:bg-white/5">
             <p className="text-sm text-cars-gray dark:text-slate-300">
               Showing{" "}
               <span className="font-semibold text-cars-primary dark:text-white">
@@ -313,7 +327,29 @@ function ListingsPageContent() {
               listings
             </p>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 sm:hidden">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                disabled={currentPage === 1}
+                className="inline-flex flex-1 items-center justify-center rounded-full border border-cars-primary/15 px-4 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:text-white dark:hover:bg-white/10"
+              >
+                Previous
+              </button>
+              <div className="min-w-[88px] text-center text-sm font-semibold text-cars-primary dark:text-white">
+                {currentPage} / {totalPages}
+              </div>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                disabled={currentPage === totalPages}
+                className="inline-flex flex-1 items-center justify-center rounded-full border border-cars-primary/15 px-4 py-2.5 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:text-white dark:hover:bg-white/10"
+              >
+                Next
+              </button>
+            </div>
+
+            <div className="hidden flex-wrap items-center gap-2 sm:flex">
               <button
                 type="button"
                 onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
@@ -333,7 +369,7 @@ function ListingsPageContent() {
                     1
                   </button>
                   {pageWindow[0] > 2 ? (
-                    <span className="px-1 text-sm text-cars-gray dark:text-slate-400">…</span>
+                    <span className="px-1 text-sm text-cars-gray dark:text-slate-400">...</span>
                   ) : null}
                 </>
               ) : null}
@@ -357,7 +393,7 @@ function ListingsPageContent() {
               {pageWindow[pageWindow.length - 1] < totalPages ? (
                 <>
                   {pageWindow[pageWindow.length - 1] < totalPages - 1 ? (
-                    <span className="px-1 text-sm text-cars-gray dark:text-slate-400">…</span>
+                    <span className="px-1 text-sm text-cars-gray dark:text-slate-400">...</span>
                   ) : null}
                   <button
                     type="button"
@@ -391,10 +427,10 @@ export default function ListingsPage() {
       fallback={
         <>
           <Header />
-          <main className="container-cars py-8">
-            <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <ListingCardSkeleton key={index} />
+          <main className="container-cars py-6 sm:py-8">
+            <div className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              {SKELETON_KEYS.map((key) => (
+                <ListingCardSkeleton key={key} />
               ))}
             </div>
           </main>

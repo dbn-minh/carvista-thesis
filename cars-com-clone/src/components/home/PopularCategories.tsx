@@ -56,16 +56,16 @@ function CompareColumn({
   onChange: (next: CompareSelection) => void;
 }) {
   return (
-    <div className="rounded-[28px] border border-cars-gray-light/80 bg-white p-5 shadow-[0_16px_38px_rgba(15,45,98,0.08)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cars-accent">{title}</p>
+    <div className="glass-panel min-w-0 rounded-[24px] p-4 shadow-[0_22px_46px_rgba(0,0,0,0.24)] sm:rounded-[28px] sm:p-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8fb4ff]">{title}</p>
       <div className="mt-4 grid gap-4">
         <div>
-          <label className="mb-2 block text-sm font-medium text-cars-primary">Make</label>
+          <label className="mb-2 block text-sm font-medium text-slate-100">Make</label>
           <Select
             value={selection.makeId}
             onValueChange={(value) => onChange({ makeId: value, modelId: "", year: "" })}
           >
-            <SelectTrigger className="h-11 rounded-2xl border-cars-gray-light bg-white text-cars-primary">
+            <SelectTrigger className="h-11 rounded-2xl border-white/10 bg-[#0f1520] text-white">
               <SelectValue placeholder="Choose a make" />
             </SelectTrigger>
             <SelectContent>
@@ -79,13 +79,13 @@ function CompareColumn({
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium text-cars-primary">Model</label>
+          <label className="mb-2 block text-sm font-medium text-slate-100">Model</label>
           <Select
             value={selection.modelId}
             onValueChange={(value) => onChange({ ...selection, modelId: value, year: "" })}
             disabled={!selection.makeId || loadingModels || models.length === 0}
           >
-            <SelectTrigger className="h-11 rounded-2xl border-cars-gray-light bg-white text-cars-primary">
+            <SelectTrigger className="h-11 rounded-2xl border-white/10 bg-[#0f1520] text-white">
               <SelectValue
                 placeholder={
                   !selection.makeId
@@ -107,15 +107,21 @@ function CompareColumn({
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium text-cars-primary">Year</label>
+          <label className="mb-2 block text-sm font-medium text-slate-100">Year</label>
           <Select
             value={selection.year}
             onValueChange={(value) => onChange({ ...selection, year: value })}
             disabled={!selection.modelId || years.length === 0}
           >
-            <SelectTrigger className="h-11 rounded-2xl border-cars-gray-light bg-white text-cars-primary">
+            <SelectTrigger className="h-11 rounded-2xl border-white/10 bg-[#0f1520] text-white">
               <SelectValue
-                placeholder={!selection.modelId ? "Choose a model first" : years.length === 0 ? "No years available" : "Select a year"}
+                placeholder={
+                  !selection.modelId
+                    ? "Choose a model first"
+                    : years.length === 0
+                      ? "No years available"
+                      : "Select a year"
+                }
               />
             </SelectTrigger>
             <SelectContent>
@@ -289,37 +295,35 @@ export default function PopularCategories() {
   return (
     <section className="py-10">
       <div className="container-cars">
-        <div className="section-shell overflow-hidden border border-cars-primary/10 bg-[linear-gradient(180deg,rgba(233,241,255,0.72),rgba(255,255,255,1))] p-6 md:p-8">
+        <div className="section-shell overflow-hidden p-6 md:p-8">
           <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#8fb4ff]">
                 Compare
               </p>
-              <h2 className="mt-2 text-3xl font-apercu-bold text-cars-primary">
-                Compare two cars
-              </h2>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
+              <h2 className="editorial-heading mt-2 text-2xl sm:text-3xl">Compare two cars</h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
                 Start with two shortlists and let CarVista highlight the trade-offs that matter most.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <Link
                 href="/listings"
-                className="inline-flex rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+                className="inline-flex w-full items-center justify-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 transition-colors hover:bg-white/10 sm:w-auto"
               >
                 Browse listings
               </Link>
               <Link
                 href="/tips"
-                className="inline-flex rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+                className="inline-flex w-full items-center justify-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 transition-colors hover:bg-white/10 sm:w-auto"
               >
                 Read buying tips
               </Link>
             </div>
           </div>
 
-          <div className="grid gap-5 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center lg:gap-5">
             <CompareColumn
               title="Car one"
               selection={left}
@@ -330,8 +334,8 @@ export default function PopularCategories() {
               onChange={setLeft}
             />
 
-            <div className="flex items-center justify-center">
-              <div className="rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-cars-primary/15">
+            <div className="flex items-center justify-center lg:px-1">
+              <div className="rounded-full border border-white/10 bg-[#0e1522] px-4 py-2 text-sm font-semibold uppercase tracking-[0.16em] text-[#c5f6ff] shadow-lg shadow-black/20">
                 vs
               </div>
             </div>
@@ -347,22 +351,24 @@ export default function PopularCategories() {
             />
           </div>
 
-          <div className="mt-6 flex flex-col gap-4 rounded-[26px] border border-cars-primary/10 bg-white px-5 py-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-cars-primary">
+          <div className="glass-panel mt-6 flex flex-col gap-4 rounded-[24px] px-4 py-4 sm:rounded-[26px] sm:px-5 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-50">
                 {loadingMakes ? "Loading compare options..." : compareSummary}
               </p>
-              <p className="mt-1 text-sm text-cars-gray">
+              <p className="mt-1 text-sm text-slate-300">
                 Only compare-ready vehicles already in the CarVista catalog appear here.
               </p>
-              {errorMessage ? <p className="mt-2 text-sm font-medium text-red-600">{errorMessage}</p> : null}
+              {errorMessage ? (
+                <p className="mt-2 text-sm font-medium text-rose-300">{errorMessage}</p>
+              ) : null}
             </div>
 
             <Button
               type="button"
               onClick={handleCompare}
               disabled={loadingMakes}
-              className="h-11 rounded-full bg-cars-primary px-6 text-sm font-semibold text-white hover:bg-cars-primary-light"
+              className="editorial-button h-11 w-full rounded-full px-6 text-sm font-semibold text-slate-950 hover:brightness-105 md:w-auto"
             >
               Compare now
             </Button>

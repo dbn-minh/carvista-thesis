@@ -208,13 +208,13 @@ export default function FeaturedEVs() {
         <div className="section-shell p-6 md:p-8">
           <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#7de2ff]">
                 Featured showroom
               </p>
-              <h2 className="mt-2 text-3xl font-apercu-bold text-cars-primary">
+              <h2 className="editorial-heading mt-2 text-2xl sm:text-3xl">
                 Curated standout cars
               </h2>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
                 A fixed lineup of halo cars, supercars, and premium performance models currently
                 backed by the CarVista catalog.
               </p>
@@ -222,46 +222,44 @@ export default function FeaturedEVs() {
 
             <Link
               href="/catalog"
-              className="inline-flex rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
+              className="inline-flex w-full items-center justify-center rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-100 transition-colors hover:bg-white/10 sm:w-auto"
             >
               Browse catalog
             </Link>
           </div>
 
-          {loading ? <p className="text-sm text-cars-gray">Loading featured cars...</p> : null}
+          {loading ? <p className="text-sm text-slate-300">Loading featured cars...</p> : null}
 
           {!loading && errorMessage ? (
-            <div className="rounded-[24px] border border-cars-accent/15 bg-white px-5 py-4 text-sm leading-6 text-cars-gray shadow-[0_16px_34px_rgba(15,45,98,0.08)]">
-              <p className="font-semibold text-cars-primary">
-                Featured vehicles are unavailable right now.
-              </p>
+            <div className="glass-panel rounded-[24px] px-5 py-4 text-sm leading-6 text-slate-300 shadow-[0_18px_40px_rgba(0,0,0,0.24)]">
+              <p className="font-semibold text-slate-50">Featured vehicles are unavailable right now.</p>
               <p className="mt-2">{errorMessage}</p>
             </div>
           ) : null}
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {cards.map((item) => (
               <Link
                 key={item.variantId}
                 href={item.href}
-                className="group overflow-hidden rounded-[28px] border border-cars-gray-light/80 bg-white transition-all hover:-translate-y-1 hover:border-cars-accent/25 hover:shadow-[0_18px_42px_rgba(15,45,98,0.12)]"
+                className="group overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(19,26,37,0.96),rgba(11,15,22,0.98))] transition-all hover:-translate-y-1 hover:border-[#8fb4ff]/30 hover:shadow-[0_22px_54px_rgba(0,0,0,0.32)]"
               >
                 {item.image ? (
-                  <div className="h-52 w-full overflow-hidden bg-[linear-gradient(180deg,rgba(233,241,255,0.9),rgba(255,255,255,1))]">
+                  <div className="h-48 w-full overflow-hidden bg-[radial-gradient(circle_at_top,rgba(143,180,255,0.16),transparent_48%),linear-gradient(180deg,rgba(16,22,32,0.96),rgba(10,14,20,0.98))] sm:h-52">
                     <img src={item.image} alt={item.title} className="h-full w-full object-cover" />
                   </div>
                 ) : (
-                  <div className="flex h-52 w-full items-center justify-center bg-[linear-gradient(180deg,rgba(233,241,255,0.9),rgba(255,255,255,1))] px-8 text-center text-sm font-semibold text-cars-primary">
+                  <div className="flex h-48 w-full items-center justify-center bg-[radial-gradient(circle_at_top,rgba(143,180,255,0.16),transparent_48%),linear-gradient(180deg,rgba(16,22,32,0.96),rgba(10,14,20,0.98))] px-8 text-center text-sm font-semibold text-slate-100 sm:h-52">
                     Catalog placeholder image
                   </div>
                 )}
                 <div className="p-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cars-accent">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8fb4ff]">
                     Curated performance pick
                   </p>
-                  <h3 className="mt-3 text-xl font-apercu-bold text-cars-primary">{item.title}</h3>
-                  <p className="mt-3 text-sm leading-6 text-cars-gray">{item.subtitle}</p>
-                  <span className="mt-5 inline-flex text-sm font-semibold text-cars-primary transition-colors group-hover:text-cars-accent">
+                  <h3 className="mt-3 text-xl font-apercu-bold text-slate-50">{item.title}</h3>
+                  <p className="mt-3 text-sm leading-6 text-slate-300">{item.subtitle}</p>
+                  <span className="mt-5 inline-flex text-sm font-semibold text-slate-100 transition-colors group-hover:text-[#7de2ff]">
                     View details
                   </span>
                 </div>

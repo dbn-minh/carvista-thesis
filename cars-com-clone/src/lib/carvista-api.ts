@@ -42,10 +42,10 @@ function appendAdvisorProfileParams(qs: URLSearchParams, profile?: AdvisorProfil
     ["new_vs_used", profile.new_vs_used],
   ];
 
-  entries.forEach(([key, value]) => {
-    if (value == null || value === "") return;
+  for (const [key, value] of entries) {
+    if (value == null || value === "") continue;
     qs.set(key, String(value));
-  });
+  }
 }
 
 export const authApi = {
@@ -263,13 +263,27 @@ export const listingsApi = {
     });
   },
 
+  delete(id: number) {
+    return apiFetch<{
+      ok: true;
+      removed: {
+        listing_id: number;
+        image_count: number;
+      };
+    }>(`/listings/${id}`, {
+      method: "DELETE",
+    });
+  },
+
   listImages(id: number) {
     return apiFetch<{ items: ListingImage[] }>(`/listings/${id}/images`);
   },
 
   uploadImages(id: number, files: File[]) {
     const formData = new FormData();
-    files.forEach((file) => formData.append("images", file));
+    for (const file of files) {
+      formData.append("images", file);
+    }
 
     return apiFetch<{
       listing_id: number;

@@ -148,7 +148,9 @@ export default function SellPage() {
 
   useEffect(() => {
     return () => {
-      photoUrlsRef.current.forEach((url) => revokeObjectPreviewUrl(url));
+      for (const url of photoUrlsRef.current) {
+        revokeObjectPreviewUrl(url);
+      }
     };
   }, []);
 
@@ -547,9 +549,9 @@ export default function SellPage() {
         );
       }
 
-      preparedFiles.forEach((file) => {
+      for (const file of preparedFiles) {
         formData.append("images", file, file.name);
-      });
+      }
 
       const response = await listingsApi.create(formData);
       const detailPath = response.detail_path || `/listings/${response.listing_id}`;
@@ -689,29 +691,32 @@ export default function SellPage() {
   return (
     <>
       <Header />
-      <main className="container-cars py-8">
-        <section className="rounded-[32px] border border-cars-gray-light/70 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(241,246,255,0.96))] p-6 shadow-[0_18px_44px_rgba(15,45,98,0.08)] dark:border-cars-gray-light/35 dark:bg-[linear-gradient(135deg,rgba(8,17,31,0.96),rgba(15,26,44,0.9))] md:p-8">
+      <main className="container-cars py-6 sm:py-8">
+        <section className="rounded-[32px] border border-cars-gray-light/70 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(241,246,255,0.96))] p-5 shadow-[0_18px_44px_rgba(15,45,98,0.08)] dark:border-cars-gray-light/35 dark:bg-[linear-gradient(135deg,rgba(8,17,31,0.96),rgba(15,26,44,0.9))] sm:p-6 md:p-8">
           <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
                 Seller workflow
               </p>
-              <h1 className="mt-2 text-4xl font-apercu-bold text-cars-primary">Sell your car</h1>
+              <h1 className="mt-2 text-3xl font-apercu-bold text-cars-primary sm:text-4xl lg:text-[2.75rem] lg:leading-tight">
+                Sell your car
+              </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
-                Build a listing the way real sellers expect to: pick the vehicle clearly, add photos early, review the listing, and publish with confidence.
+                Build a listing the way real sellers expect to: pick the vehicle clearly, add
+                photos early, review the listing, and publish with confidence.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="grid w-full gap-3 sm:w-auto sm:grid-cols-2 xl:flex xl:flex-wrap">
               <Link
                 href="/catalog"
-                className="rounded-full border border-cars-primary/15 px-4 py-2 text-sm font-semibold text-cars-primary transition-colors hover:bg-white dark:border-cars-gray-light/35 dark:bg-slate-950/35 dark:text-white"
+                className="inline-flex h-11 w-full items-center justify-center rounded-full border border-cars-primary/15 px-4 text-sm font-semibold text-cars-primary transition-colors hover:bg-white dark:border-cars-gray-light/35 dark:bg-slate-950/35 dark:text-white sm:w-auto"
               >
                 Browse catalog
               </Link>
               <Link
                 href="/my-listings"
-                className="rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white"
+                className="inline-flex h-11 w-full items-center justify-center rounded-full bg-cars-primary px-4 text-sm font-semibold text-primary-foreground sm:w-auto"
               >
                 Manage my listings
               </Link>
@@ -731,22 +736,23 @@ export default function SellPage() {
           <div className="space-y-6">
             {renderStep()}
 
-            <div className="section-shell flex flex-wrap items-center justify-between gap-3 p-6">
+            <div className="section-shell p-4 sm:p-5 md:p-6">
+              <div className="grid gap-3 sm:flex sm:items-center sm:justify-between">
               <button
                 type="button"
                 onClick={() => goToStep(sellSteps[Math.max(0, currentStepIndex - 1)].id)}
                 disabled={currentStepIndex === 0}
-                className="rounded-full border border-cars-primary/15 px-5 py-2.5 text-sm font-semibold text-cars-primary disabled:opacity-40"
+                className="inline-flex h-11 w-full items-center justify-center rounded-full border border-cars-primary/15 px-5 text-sm font-semibold text-cars-primary disabled:opacity-40 sm:w-auto"
               >
                 Back
               </button>
 
-              <div className="flex flex-wrap gap-3">
+              <div className="grid gap-3 sm:flex sm:flex-wrap">
                 {currentStep !== "review" ? (
                   <button
                     type="button"
                     onClick={() => goToStep(sellSteps[Math.min(sellSteps.length - 1, currentStepIndex + 1)].id)}
-                    className="rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white"
+                    className="inline-flex h-11 w-full items-center justify-center rounded-full bg-cars-primary px-5 text-sm font-semibold text-primary-foreground sm:w-auto"
                   >
                     Continue
                   </button>
@@ -755,11 +761,12 @@ export default function SellPage() {
                     type="button"
                     onClick={() => void publishListing()}
                     disabled={loading}
-                    className="rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                    className="inline-flex h-11 w-full items-center justify-center rounded-full bg-cars-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-60 sm:w-auto"
                   >
                     {loading ? "Publishing..." : "Publish listing"}
                   </button>
                 )}
+              </div>
               </div>
             </div>
           </div>

@@ -184,8 +184,8 @@ function buildListingTitle(variant) {
   return [make, model, trim].filter(Boolean).join(" ").trim() || null;
 }
 
-async function loadOwnedListing(ctx, listingId, userId) {
-  const listing = await ctx.models.Listings.findByPk(listingId);
+async function loadOwnedListing(ctx, listingId, userId, options = {}) {
+  const listing = await ctx.models.Listings.findByPk(listingId, options);
   if (!listing) {
     throw { status: 404, safe: true, message: "Listing not found." };
   }
@@ -194,7 +194,7 @@ async function loadOwnedListing(ctx, listingId, userId) {
     throw {
       status: 403,
       safe: true,
-      message: "You can only manage images for your own listings.",
+      message: "You can only manage your own listings.",
     };
   }
 
@@ -736,6 +736,10 @@ const UpdateListingSchema = z.object({
 const SOLD_LISTING_MARKET_ID = 1;
 const SOLD_LISTING_PRICE_TYPE = "avg_market";
 
+function buildSoldListingMarketSource(listingId) {
+  return `seller_sold_listing:${listingId}`;
+}
+
 function toFinitePrice(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
@@ -753,7 +757,7 @@ async function recordSoldListingMarketPrice({
   const resolvedVariantId = Number(variantId);
   if (!Number.isInteger(resolvedVariantId) || !soldPrice) return null;
 
-  const source = `seller_sold_listing:${listingId}`;
+  const source = buildSoldListingMarketSource(listingId);
   const existing = await VariantPriceHistory.findOne({
     where: {
       variant_id: resolvedVariantId,
@@ -787,6 +791,94 @@ async function recordSoldListingMarketPrice({
     { transaction }
   );
 }
+
+listingsRoutes.delete(
+  "/listings/:id",
+  requireAuth,
+  validate(ListingIdParamsSchema),
+  async (req, res, next) => {
+    let transaction = null;
+
+    try {
+      const listingId = req.validated.params.id;
+      const {
+        ListingImages,
+        ListingPriceHistory,
+        Listings,
+        SavedListings,
+        SellerReviews,
+        VariantPriceHistory,
+        ViewingRequests,
+      } = req.ctx.models;
+      const listingImageService = createListingImageService(req.ctx);
+
+      transaction = await req.ctx.sequelize.transaction();
+      const listing = await loadOwnedListing(req.ctx, listingId, req.user.userId, {
+        transaction,
+      });
+      const imageRows = await ListingImages.findAll({
+        where: { listing_id: listingId },
+        order: [["sort_order", "ASC"]],
+        transaction,
+      });
+      const removableImages = listingImageService.normalizeRecords(imageRows);
+
+      await SellerReviews.update(
+        { listing_id: null },
+        {
+          where: { listing_id: listingId },
+          transaction,
+        }
+      );
+      await ViewingRequests.destroy({
+        where: { listing_id: listingId },
+        transaction,
+      });
+      await SavedListings.destroy({
+        where: { listing_id: listingId },
+        transaction,
+      });
+      await ListingPriceHistory.destroy({
+        where: { listing_id: listingId },
+        transaction,
+      });
+      await VariantPriceHistory.destroy({
+        where: {
+          source: buildSoldListingMarketSource(listingId),
+          market_id: SOLD_LISTING_MARKET_ID,
+          price_type: SOLD_LISTING_PRICE_TYPE,
+        },
+        transaction,
+      });
+      await ListingImages.destroy({
+        where: { listing_id: listingId },
+        transaction,
+      });
+      await listing.destroy({ transaction });
+
+      await transaction.commit();
+      transaction = null;
+
+      await listingImageService.cleanupImages(removableImages).catch((cleanupError) => {
+        console.warn("[listings:delete] Failed to clean up one or more external listing images", {
+          listingId,
+          message: cleanupError?.message,
+        });
+      });
+
+      res.json({
+        ok: true,
+        removed: {
+          listing_id: listingId,
+          image_count: removableImages.length,
+        },
+      });
+    } catch (e) {
+      if (transaction) await transaction.rollback();
+      next(e);
+    }
+  }
+);
 
 listingsRoutes.put("/listings/:id", requireAuth, validate(UpdateListingSchema), async (req, res, next) => {
   let transaction = null;

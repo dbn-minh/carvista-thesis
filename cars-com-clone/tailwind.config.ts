@@ -20,16 +20,22 @@ const config = {
     },
     extend: {
       fontFamily: {
-        "apercu-regular": ["var(--font-apercu-regular)", ...fontFamily.sans],
-        "apercu-bold": ["var(--font-apercu-bold)", ...fontFamily.sans],
-        "dm-sans": ["var(--font-dm-sans)", ...fontFamily.sans],
+        "apercu-regular": ["var(--font-space-grotesk)", ...fontFamily.sans],
+        "apercu-bold": ["var(--font-space-grotesk)", ...fontFamily.sans],
+        "dm-sans": ["var(--font-inter)", ...fontFamily.sans],
       },
       colors: {
         border: "hsl(var(--border))",
+        "border-strong": "hsl(var(--border-strong))",
         input: "hsl(var(--input))",
+        "input-foreground": "hsl(var(--input-foreground))",
+        placeholder: "hsl(var(--placeholder))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        surface: "hsl(var(--surface))",
+        "surface-elevated": "hsl(var(--surface-elevated))",
+        "surface-muted": "hsl(var(--surface-muted))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -58,6 +64,12 @@ const config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        shadow: "hsl(var(--shadow))",
+        overlay: "hsl(var(--overlay))",
+        "hero-panel": "hsl(var(--hero-panel))",
+        "hero-foreground": "hsl(var(--hero-foreground))",
+        "metric-panel": "hsl(var(--metric-panel))",
+        "metric-foreground": "hsl(var(--metric-foreground))",
         // Cars.com specific colors
         "cars-primary": "rgb(var(--cars-primary) / <alpha-value>)",
         "cars-primary-light": "rgb(var(--cars-primary-light) / <alpha-value>)",
@@ -67,6 +79,7 @@ const config = {
         "cars-gray": "rgb(var(--cars-gray) / <alpha-value>)",
         "cars-gray-light": "rgb(var(--cars-gray-light) / <alpha-value>)",
         "cars-off-white": "rgb(var(--cars-off-white) / <alpha-value>)",
+        "cars-surface": "hsl(var(--surface))",
       },
       borderRadius: {
         lg: "var(--radius)",

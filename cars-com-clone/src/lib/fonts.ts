@@ -1,21 +1,26 @@
-import localFont from "next/font/local";
+import { Inter, Space_Grotesk } from "next/font/google";
 
-// Apercu fonts
-export const apercuRegular = localFont({
-  src: "../../public/fonts/Apercu-Regular.woff2",
-  variable: "--font-apercu-regular",
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-space-grotesk",
   display: "swap",
 });
 
-export const apercuBold = localFont({
-  src: "../../public/fonts/Apercu-Bold.woff2",
-  variable: "--font-apercu-bold",
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
   display: "swap",
 });
 
-// DM Sans font
-export const dmSans = localFont({
-  src: "../../public/fonts/DMSans-Variable.woff2",
-  variable: "--font-dm-sans",
-  display: "swap",
-});
+// Keep existing export names so shared Tailwind utilities continue to work.
+export const apercuRegular = {
+  variable: spaceGrotesk.variable,
+};
+
+export const apercuBold = {
+  variable: spaceGrotesk.variable,
+};
+
+export const dmSans = {
+  variable: inter.variable,
+};

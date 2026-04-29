@@ -1,8 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Facebook } from "lucide-react";
 import StatusBanner from "@/components/common/StatusBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +24,41 @@ const DEFAULT_PROVIDERS: AuthProvidersResponse = {
     facebook: false,
   },
 };
+
+function GoogleLogo() {
+  return (
+    <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24">
+      <path
+        d="M21.805 12.231c0-.727-.065-1.426-.186-2.097H12v3.969h5.5a4.703 4.703 0 0 1-2.04 3.088v2.563h3.305c1.935-1.782 3.04-4.409 3.04-7.523Z"
+        fill="#4285F4"
+      />
+      <path
+        d="M12 22c2.76 0 5.074-.915 6.766-2.478l-3.305-2.563c-.916.614-2.088.977-3.46.977-2.66 0-4.915-1.795-5.72-4.209H2.865v2.643A10.216 10.216 0 0 0 12 22Z"
+        fill="#34A853"
+      />
+      <path
+        d="M6.28 13.727A6.144 6.144 0 0 1 5.96 12c0-.599.108-1.18.32-1.727V7.63H2.865A10.216 10.216 0 0 0 1.8 12c0 1.646.393 3.204 1.065 4.37l3.415-2.643Z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M12 6.064c1.5 0 2.846.516 3.906 1.53l2.93-2.93C17.07 3.02 14.756 2 12 2a10.216 10.216 0 0 0-9.135 5.63l3.415 2.643c.805-2.414 3.06-4.209 5.72-4.209Z"
+        fill="#EA4335"
+      />
+    </svg>
+  );
+}
+
+function FacebookLogo() {
+  return (
+    <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" fill="#1877F2" r="10" />
+      <path
+        d="M13.307 19v-6.177h2.072l.31-2.407h-2.382V8.879c0-.697.193-1.172 1.192-1.172h1.273V5.553A17.214 17.214 0 0 0 13.917 5c-1.835 0-3.09 1.12-3.09 3.175v1.771H8.75v2.407h2.077V19h2.48Z"
+        fill="#fff"
+      />
+    </svg>
+  );
+}
 
 export default function AuthPanel({ mode, next, onModeChange, onSuccess }: Props) {
   const router = useRouter();
@@ -61,6 +95,7 @@ export default function AuthPanel({ mode, next, onModeChange, onSuccess }: Props
   }, []);
 
   useEffect(() => {
+    void mode;
     setMessage("");
     setTone("info");
     setPassword("");
@@ -90,10 +125,16 @@ export default function AuthPanel({ mode, next, onModeChange, onSuccess }: Props
   const socialLabel = mode === "login" ? "Or continue with" : "Or create your account with";
   const socialHelp =
     "Use a trusted account and we will connect it safely to your CarVista profile.";
+  const googleButtonLabel = mode === "login" ? "Sign in with Google" : "Continue with Google";
+  const facebookButtonLabel =
+    mode === "login" ? "Sign in with Facebook" : "Continue with Facebook";
   const canUseGoogle = providerStatus !== "ready" || providerInfo.social.google;
   const canUseFacebook = providerStatus !== "ready" || providerInfo.social.facebook;
   const noSocialProvidersAvailable =
     providerStatus === "ready" && !providerInfo.social.google && !providerInfo.social.facebook;
+  const fieldClassName =
+    "h-12 rounded-[18px] border-white/10 bg-white/5 px-4 text-primary-foreground placeholder:text-primary-foreground/34 focus-visible:border-cars-accent focus-visible:ring-cars-accent/35 sm:h-14";
+  const isRegister = mode === "register";
 
   async function finishAuth() {
     if (onSuccess) {
@@ -169,24 +210,28 @@ export default function AuthPanel({ mode, next, onModeChange, onSuccess }: Props
   }
 
   return (
-    <section className="overflow-hidden rounded-[32px] border border-white/10 bg-white shadow-[0_28px_90px_rgba(15,45,98,0.16)]">
-      <div className="bg-[linear-gradient(135deg,rgba(15,45,98,0.96),rgba(27,76,160,0.92),rgba(95,150,255,0.72))] px-6 py-6 text-white">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
+    <section className="overflow-hidden rounded-[32px] border border-white/8 bg-[#111616] shadow-[0_32px_120px_rgba(0,0,0,0.45)] sm:rounded-[36px]">
+      <div className="bg-[linear-gradient(135deg,rgba(23,29,30,1),rgba(41,56,92,0.96),rgba(111,145,221,0.78))] px-5 py-6 text-primary-foreground sm:px-7 sm:py-7">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cars-accent">
           {heading.eyebrow}
         </p>
-        <h2 className="mt-2 text-3xl font-apercu-bold">{heading.title}</h2>
-        <p className="mt-3 max-w-xl text-sm leading-6 text-white/85">{heading.description}</p>
+        <h2 className="mt-2 text-[2rem] font-apercu-bold leading-tight text-primary-foreground sm:text-3xl">
+          {heading.title}
+        </h2>
+        <p className="mt-3 max-w-xl text-sm leading-6 text-primary-foreground/74">
+          {heading.description}
+        </p>
       </div>
 
-      <div className="space-y-6 px-6 py-6">
-        <div className="flex rounded-full bg-cars-off-white p-1">
+      <div className="space-y-5 bg-[#111616] px-4 py-5 sm:space-y-6 sm:px-7 sm:py-7">
+        <div className="flex rounded-full border border-white/8 bg-white/5 p-1 lg:max-w-[380px]">
           <button
             type="button"
             onClick={() => handleModeSwitch("login")}
             className={
               mode === "login"
-                ? "flex-1 rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white"
-                : "flex-1 rounded-full px-4 py-2 text-sm font-semibold text-cars-primary"
+                ? "editorial-button flex min-h-11 flex-1 items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-950 shadow-[0_10px_24px_rgba(15,45,98,0.18)] dark:text-slate-950"
+                : "flex min-h-11 flex-1 items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-white/62"
             }
           >
             Login
@@ -196,131 +241,160 @@ export default function AuthPanel({ mode, next, onModeChange, onSuccess }: Props
             onClick={() => handleModeSwitch("register")}
             className={
               mode === "register"
-                ? "flex-1 rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white"
-                : "flex-1 rounded-full px-4 py-2 text-sm font-semibold text-cars-primary"
+                ? "editorial-button flex min-h-11 flex-1 items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-950 shadow-[0_10px_24px_rgba(15,45,98,0.18)] dark:text-slate-950"
+                : "flex min-h-11 flex-1 items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-white/62"
             }
           >
             Register
           </button>
         </div>
 
-        <form onSubmit={onPasswordSubmit} className="space-y-4">
-          {mode === "register" ? (
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-cars-primary">Name</label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="How should we address you?"
-                required
-              />
-            </div>
-          ) : null}
-
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-cars-primary">Email</label>
-            <Input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              type="email"
-              placeholder="you@example.com"
-              required
-            />
-          </div>
-
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <label className="block text-sm font-semibold text-cars-primary">Password</label>
-              {mode === "login" ? (
-                <span className="text-xs font-medium text-slate-400">
-                  Minimum 6 characters
-                </span>
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)] lg:gap-6">
+          <div className="space-y-4 sm:space-y-5">
+            <form
+              onSubmit={onPasswordSubmit}
+              className={isRegister ? "grid gap-4 sm:grid-cols-2 sm:gap-5" : "space-y-4 sm:space-y-5"}
+            >
+              {isRegister ? (
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-cars-accent">
+                    Name
+                  </label>
+                  <Input
+                    className={fieldClassName}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="How should we address you?"
+                    required
+                  />
+                </div>
               ) : null}
-            </div>
-            <Input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              type="password"
-              minLength={6}
-              placeholder={mode === "login" ? "Enter your password" : "Create a password"}
-              required
-            />
+
+              <div className={isRegister ? "" : undefined}>
+                <label className="mb-2 block text-sm font-semibold text-cars-accent">
+                  Email
+                </label>
+                <Input
+                  className={fieldClassName}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  type="email"
+                  placeholder="you@example.com"
+                  required
+                />
+              </div>
+
+              <div className={isRegister ? "" : undefined}>
+                <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <label className="block text-sm font-semibold text-cars-accent">
+                    Password
+                  </label>
+                  {!isRegister ? (
+                    <span className="text-xs font-medium text-primary-foreground/34">
+                      Minimum 6 characters
+                    </span>
+                  ) : null}
+                </div>
+                <Input
+                  className={fieldClassName}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  type="password"
+                  minLength={6}
+                  placeholder={isRegister ? "Create a password" : "Enter your password"}
+                  required
+                />
+              </div>
+
+              {isRegister ? (
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-cars-accent">
+                    Confirm password
+                  </label>
+                  <Input
+                    className={fieldClassName}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    type="password"
+                    minLength={6}
+                    placeholder="Re-enter your password"
+                    required
+                  />
+                </div>
+              ) : null}
+
+              <div className={isRegister ? "sm:col-span-2" : undefined}>
+                <Button
+                  className="editorial-button h-11 w-full rounded-full text-sm font-semibold text-slate-950 hover:brightness-105 sm:h-12"
+                  disabled={loading}
+                  type="submit"
+                >
+                  {loading
+                    ? isRegister
+                      ? "Creating account..."
+                      : "Signing in..."
+                    : heading.button}
+                </Button>
+              </div>
+            </form>
+
+            <StatusBanner tone={tone}>{message}</StatusBanner>
           </div>
 
-          {mode === "register" ? (
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-cars-primary">
-                Confirm password
-              </label>
-              <Input
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                type="password"
-                minLength={6}
-                placeholder="Re-enter your password"
-                required
-              />
+          <aside className="space-y-4 rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(24,30,38,0.96),rgba(16,20,19,0.96))] px-4 py-4 text-primary-foreground sm:px-5 sm:py-5">
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-foreground/50">
+                {socialLabel}
+              </p>
+              <p className="text-sm leading-6 text-primary-foreground/72">{socialHelp}</p>
             </div>
-          ) : null}
 
-          <Button
-            className="h-11 w-full rounded-full bg-cars-primary text-sm font-semibold text-white hover:bg-cars-primary-light"
-            disabled={loading}
-            type="submit"
-          >
-            {loading
-              ? mode === "login"
-                ? "Signing in..."
-                : "Creating account..."
-              : heading.button}
-          </Button>
-        </form>
+            <div className="grid gap-3">
+              <button
+                className={`flex min-h-12 w-full items-center gap-3 rounded-full border px-4 text-left transition ${
+                  canUseGoogle
+                    ? "border-white/18 bg-white/[0.02] text-primary-foreground shadow-[0_14px_34px_rgba(0,0,0,0.24)] hover:border-cars-accent/55 hover:bg-white/[0.08]"
+                    : "cursor-not-allowed border-white/10 bg-white/5 text-primary-foreground/35"
+                }`}
+                disabled={!canUseGoogle}
+                onClick={() => handleSocialLogin("google")}
+                type="button"
+              >
+                <GoogleLogo />
+                <span className="whitespace-normal font-semibold leading-5 text-primary-foreground">
+                  {googleButtonLabel}
+                </span>
+              </button>
+              <button
+                className={`flex min-h-12 w-full items-center gap-3 rounded-full border px-4 text-left transition ${
+                  canUseFacebook
+                    ? "border-white/18 bg-white/[0.02] text-primary-foreground shadow-[0_14px_34px_rgba(0,0,0,0.24)] hover:border-cars-accent/55 hover:bg-white/[0.08]"
+                    : "cursor-not-allowed border-white/10 bg-white/5 text-primary-foreground/35"
+                }`}
+                disabled={!canUseFacebook}
+                onClick={() => handleSocialLogin("facebook")}
+                type="button"
+              >
+                <FacebookLogo />
+                <span className="whitespace-normal font-semibold leading-5 text-primary-foreground">
+                  {facebookButtonLabel}
+                </span>
+              </button>
+            </div>
 
-        <div className="flex items-center gap-3">
-          <div className="h-px flex-1 bg-slate-200" />
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-            {socialLabel}
-          </p>
-          <div className="h-px flex-1 bg-slate-200" />
+            {providerStatus === "error" ? (
+              <p className="text-xs leading-5 text-primary-foreground/54">
+                We could not confirm provider availability just now, but you can still try a
+                social sign-in.
+              </p>
+            ) : null}
+            {noSocialProvidersAvailable ? (
+              <p className="text-xs leading-5 text-primary-foreground/54">
+                Social login buttons will appear here once the provider keys are configured.
+              </p>
+            ) : null}
+          </aside>
         </div>
-
-        <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-          <p className="text-sm text-slate-600">{socialHelp}</p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Button
-              className="h-11 rounded-full"
-              disabled={!canUseGoogle}
-              onClick={() => handleSocialLogin("google")}
-              type="button"
-              variant="outline"
-            >
-              <span className="font-semibold">Google</span>
-            </Button>
-            <Button
-              className="h-11 rounded-full"
-              disabled={!canUseFacebook}
-              onClick={() => handleSocialLogin("facebook")}
-              type="button"
-              variant="outline"
-            >
-              <Facebook className="h-4 w-4" />
-              <span className="font-semibold">Facebook</span>
-            </Button>
-          </div>
-          {providerStatus === "error" ? (
-            <p className="text-xs text-slate-500">
-              We could not confirm provider availability just now, but you can still try a social
-              sign-in.
-            </p>
-          ) : null}
-          {noSocialProvidersAvailable ? (
-            <p className="text-xs text-slate-500">
-              Social login buttons will appear here once the provider keys are configured.
-            </p>
-          ) : null}
-        </div>
-
-        <StatusBanner tone={tone}>{message}</StatusBanner>
       </div>
     </section>
   );

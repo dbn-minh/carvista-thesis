@@ -56,6 +56,7 @@ function parseDatabaseUrl(urlValue) {
 
 const nodeEnv = process.env.NODE_ENV || "development";
 const isProduction = nodeEnv === "production";
+const appHost = process.env.APP_HOST || "0.0.0.0";
 const appPort = toInt(process.env.PORT || process.env.APP_PORT, 4000);
 const appPublicUrl = trimSlash(process.env.APP_PUBLIC_URL || `http://localhost:${appPort}`);
 const frontendUrl = trimSlash(process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000");
@@ -85,6 +86,7 @@ function resolveSocialRedirectUri(envKey, providerPath) {
 export const env = {
   nodeEnv,
   isProduction,
+  appHost,
   appPort,
   appPublicUrl,
   frontendUrl,

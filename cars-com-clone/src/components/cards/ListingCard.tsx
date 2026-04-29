@@ -73,7 +73,7 @@ export default function ListingCard({
   ].filter(Boolean);
 
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-[30px] border border-cars-gray-light/70 bg-white shadow-[0_20px_44px_rgba(15,45,98,0.08)] transition-all duration-300 hover:-translate-y-1 hover:border-cars-accent/25 hover:shadow-[0_28px_54px_rgba(15,45,98,0.14)]">
+    <article className="flex h-full flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,26,36,0.98),rgba(10,14,20,0.99))] shadow-[0_24px_54px_rgba(0,0,0,0.28)] transition-all duration-300 hover:-translate-y-1 hover:border-[#8fb4ff]/30 hover:shadow-[0_28px_70px_rgba(0,0,0,0.38)] sm:rounded-[30px]">
       <div className="relative">
         <ListingImage
           href={href}
@@ -89,8 +89,8 @@ export default function ListingCard({
             onClick={() => onToggleSave(item.listing_id)}
             className={
               saved
-                ? "absolute right-4 top-4 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-red-500 shadow-[0_12px_28px_rgba(15,45,98,0.18)] transition hover:scale-105"
-                : "absolute right-4 top-4 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/92 text-cars-primary shadow-[0_12px_28px_rgba(15,45,98,0.18)] transition hover:scale-105 hover:text-red-500"
+                ? "absolute right-4 top-4 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full border border-red-400/25 bg-red-500/15 text-rose-200 shadow-[0_14px_30px_rgba(0,0,0,0.28)] transition hover:scale-105"
+                : "absolute right-4 top-4 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#0b111a]/88 text-slate-200 shadow-[0_14px_30px_rgba(0,0,0,0.28)] transition hover:scale-105 hover:text-rose-300"
             }
             aria-label={saved ? "Remove from saved cars" : "Save car"}
           >
@@ -99,37 +99,39 @@ export default function ListingCard({
         ) : null}
       </div>
 
-      <div className="flex flex-1 flex-col p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cars-accent">
+      <div className="flex flex-1 flex-col p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8fb4ff]">
               {eyebrow}
             </p>
-            <h2 className="mt-2 text-[1.75rem] font-apercu-bold leading-none text-cars-primary">
+            <h2 className="mt-2 text-2xl font-apercu-bold leading-tight text-slate-50 sm:text-[1.75rem]">
               {formatListingPrice(item.asking_price)}
             </h2>
           </div>
-          <span className="rounded-full bg-cars-off-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-cars-primary">
+          <span className="self-start rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-[#c5f6ff]">
             {item.status}
           </span>
         </div>
 
-        <Link href={href} className="mt-4 block transition hover:text-cars-accent">
-          <h3 className="text-xl font-apercu-bold leading-7 text-cars-primary">{title}</h3>
-          <p className="mt-1 text-sm font-medium text-cars-gray">
+        <Link href={href} className="mt-4 block min-w-0 transition hover:text-[#7de2ff]">
+          <h3 className="line-clamp-2 text-lg font-apercu-bold leading-6 text-slate-50 sm:text-xl sm:leading-7">
+            {title}
+          </h3>
+          <p className="mt-1 break-words text-sm font-medium text-slate-400">
             {item.model_year ? `${item.model_year} - ` : ""}
             {formatBodyType(item.body_type)}
           </p>
         </Link>
 
-        <div className="mt-5 flex flex-wrap gap-2">
+        <div className="mt-5 grid gap-2 sm:grid-cols-2">
           {specChips.map((chip) => (
             <span
               key={`${item.listing_id}-${chip.key}`}
-              className="inline-flex items-center gap-1.5 rounded-full bg-cars-off-white px-3 py-2 text-xs font-medium text-cars-primary"
+              className="inline-flex min-w-0 items-start gap-1.5 rounded-[18px] border border-white/8 bg-white/5 px-3 py-2.5 text-xs font-medium text-slate-200"
             >
-              <chip.icon className="h-3.5 w-3.5 text-cars-accent" />
-              {chip.label}
+              <chip.icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#8fb4ff]" />
+              <span className="min-w-0 break-words leading-5">{chip.label}</span>
             </span>
           ))}
         </div>
@@ -138,21 +140,23 @@ export default function ListingCard({
           {trustSignals.map((signal) => (
             <span
               key={`${item.listing_id}-${signal}`}
-              className="rounded-full border border-cars-primary/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-cars-gray"
+              className="max-w-full rounded-full border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400"
             >
-              {signal}
+              <span className="block max-w-full break-words leading-5">{signal}</span>
             </span>
           ))}
         </div>
 
         {item.description ? (
-          <p className="mt-4 line-clamp-2 text-sm leading-6 text-cars-gray">{item.description}</p>
+          <p className="mt-4 line-clamp-3 break-words text-sm leading-6 text-slate-300">
+            {item.description}
+          </p>
         ) : null}
 
         <div className="mt-auto flex flex-wrap items-center gap-2 pt-5">
           <Link
             href={href}
-            className="inline-flex flex-1 items-center justify-center rounded-full bg-cars-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-cars-accent"
+            className="editorial-button inline-flex h-11 w-full items-center justify-center rounded-full px-4 text-sm font-semibold text-slate-950 transition hover:brightness-105 sm:h-12"
           >
             Check availability
           </Link>

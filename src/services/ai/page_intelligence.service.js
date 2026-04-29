@@ -48,38 +48,90 @@ function buildNarrativeSection(key, title, narrative, action_paths = [], extra =
   };
 }
 
-function buildFitSection(fitAssessment, recommendationPaths = []) {
+function compactFitSignal(text, kind = "good") {
+  const normalized = String(text || "").trim().replace(/[.]+$/g, "");
+  if (!normalized) return null;
+
+  const rules =
+    kind === "good"
+      ? [
+          [/family-focused use case/i, "Family-friendly layout"],
+          [/everyday commuting easier|efficient powertrain/i, "Efficient daily driving"],
+          [/performance headroom|highway and out-of-town/i, "Confident highway pace"],
+          [/engaging fun-driving profile|engaging/i, "More engaging drive"],
+          [/seating requirement/i, "Good seating fit"],
+          [/long-term ownership/i, "Easier long-term ownership"],
+          [/brand you already feel good about/i, "Brand preference match"],
+          [/supercar and performance-first/i, "Fits performance brief"],
+          [/owner sentiment|review pool/i, "Positive owner feedback"],
+          [/market activity|volatile asking prices/i, "Steadier market support"],
+        ]
+      : [
+          [/7-seat flexibility/i, "Short on seven seats"],
+          [/cargo space/i, "Tight cargo room"],
+          [/bulky|tight parking/i, "Bulky for parking"],
+          [/ground clearance/i, "Limited ground clearance"],
+          [/awd|traction need/i, "AWD need unmet"],
+          [/not the most efficient|running cost mismatch/i, "Higher running costs"],
+          [/cost more to maintain|ownership complexity/i, "Higher upkeep likely"],
+          [/brand you explicitly want to avoid|brand/i, "Brand mismatch"],
+          [/does not include|missing must-have/i, "Missing must-have feature"],
+          [/large footprint/i, "Large urban footprint"],
+        ];
+
+  for (const [pattern, label] of rules) {
+    if (pattern.test(normalized)) return label;
+  }
+
+  if (kind === "good") {
+    if (/comfort|refinement/i.test(normalized)) return "Comfortable day to day";
+    if (/resale|market/i.test(normalized)) return "Stronger resale outlook";
+    if (/performance|sport|fun/i.test(normalized)) return "Stronger driving feel";
+    if (/seat/i.test(normalized)) return "Better passenger fit";
+  } else {
+    if (/comfort|refinement/i.test(normalized)) return "Comfort could feel average";
+    if (/resale|market/i.test(normalized)) return "Weaker market outlook";
+  }
+
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function compactFitSignals(items = [], kind = "good", limit = 3) {
+  const seen = new Set();
+  return items
+    .map((item) => compactFitSignal(item, kind))
+    .filter(Boolean)
+    .filter((item) => {
+      const key = String(item).toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, limit);
+}
+
+export function buildFitSection(fitAssessment, recommendationPaths = []) {
   if (!fitAssessment) return null;
+
+  const goodPoints = compactFitSignals(fitAssessment.reasons, "good", 3);
+  const watchOuts = compactFitSignals(fitAssessment.caveats, "bad", 2);
 
   return {
     key: "fit_for_you",
     title: "Fit for your needs",
-    assistant_message:
-      fitAssessment.reasons.length > 0
-        ? `${fitAssessment.name} looks like a ${fitAssessment.fit_label.toLowerCase()} for the profile currently on file because it ${fitAssessment.reasons.join(", ")}.`
-        : `${fitAssessment.name} looks like a ${fitAssessment.fit_label.toLowerCase()} based on the profile currently on file.`,
-    highlights: [
-      `Current fit score: ${fitAssessment.score}`,
-      fitAssessment.profile_summary ? `Profile used: ${fitAssessment.profile_summary}` : null,
-    ].filter(Boolean),
+    assistant_message: `${fitAssessment.name} looks like a ${fitAssessment.fit_label.toLowerCase()} for the profile currently on file.`,
+    highlights: goodPoints,
     insight_cards: [
       {
         title: "Fit score",
         value: fitAssessment.score,
         description: fitAssessment.fit_label,
       },
-      {
-        title: "Why it fits",
-        value: fitAssessment.reasons[0] || "Profile alignment",
-        description:
-          fitAssessment.reasons.slice(1).join(", ") ||
-          "The current buyer profile aligns reasonably well with this vehicle.",
-      },
     ],
     confidence: buildConfidence(0.72, [
       "Fit scoring is computed from the current saved buyer preference profile.",
     ]),
-    caveats: [],
+    caveats: watchOuts,
     sources: [],
     freshness_note: null,
     action_paths: recommendationPaths.slice(0, 2).map((path) =>

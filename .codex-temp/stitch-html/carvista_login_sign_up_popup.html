@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CARVISTA | Authentication</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-container": "#6517b3",
+                        "surface-container-lowest": "#0b0f0e",
+                        "on-secondary-fixed": "#2a0053",
+                        "tertiary": "#e4f0ed",
+                        "surface-dim": "#101413",
+                        "outline-variant": "#3b494c",
+                        "primary-fixed-dim": "#00daf2",
+                        "tertiary-container": "#c8d4d1",
+                        "on-primary": "#00363d",
+                        "error": "#ffb4ab",
+                        "on-error-container": "#ffdad6",
+                        "background": "#101413",
+                        "error-container": "#93000a",
+                        "surface-container-highest": "#323634",
+                        "primary-container": "#00e6ff",
+                        "on-surface-variant": "#bac9cc",
+                        "on-secondary-fixed-variant": "#6312b1",
+                        "surface-container": "#1c201f",
+                        "surface-bright": "#363a39",
+                        "inverse-primary": "#006874",
+                        "primary": "#c5f6ff",
+                        "on-surface": "#e0e3e1",
+                        "surface": "#101413",
+                        "on-tertiary-fixed-variant": "#3e4947",
+                        "surface-container-high": "#272b2a",
+                        "secondary-fixed-dim": "#dab9ff",
+                        "on-background": "#e0e3e1",
+                        "tertiary-fixed-dim": "#bdc9c6",
+                        "secondary-fixed": "#eedbff",
+                        "on-secondary": "#460084",
+                        "inverse-surface": "#e0e3e1",
+                        "inverse-on-surface": "#2d3130",
+                        "on-primary-fixed": "#001f24",
+                        "on-error": "#690005",
+                        "outline": "#849396",
+                        "on-tertiary": "#283231",
+                        "tertiary-fixed": "#d9e5e2",
+                        "secondary": "#dab9ff",
+                        "surface-variant": "#323634",
+                        "on-primary-fixed-variant": "#004f58",
+                        "primary-fixed": "#9af0ff",
+                        "surface-container-low": "#181c1b",
+                        "on-primary-container": "#00636f",
+                        "on-secondary-container": "#cfa7ff",
+                        "surface-tint": "#00daf2",
+                        "on-tertiary-container": "#515c5a",
+                        "on-tertiary-fixed": "#131e1c"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-effect {
+            background: rgba(16, 20, 19, 0.7);
+            backdrop-filter: blur(24px);
+        }
+        .neon-glow:hover {
+            box-shadow: 0 0 20px rgba(0, 230, 255, 0.4);
+        }
+        .editorial-gradient {
+            background: linear-gradient(to bottom, rgba(16, 20, 19, 0) 0%, rgba(16, 20, 19, 0.8) 100%);
+        }
+    </style>
+</head>
+<body class="bg-background font-body text-on-surface antialiased selection:bg-primary-container selection:text-on-primary-container overflow-hidden">
+<!-- Background Simulation -->
+<div class="fixed inset-0 z-0">
+<img alt="Carvista Showroom" class="w-full h-full object-cover blur-md opacity-40 scale-105" data-alt="Modern minimalist showroom with high-end sports cars parked on polished concrete under dramatic architectural lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB9yvLtsLMjEL0iSrj12Vwr5yl2sOeZHg3BKtbvilVQkgOQayRIZQmjcV3Ut8yLFbDvQbNwkThOjkd2r7rChf7d6fwJ4-6Xho_qTjWC6VSTAc-N2tome6kVX5dxB0JVgAKl2PIlJJ0sNJ1BHdPRGj0t74-pgm2BgvmfbhBnDHEzChQgkPZt8ENzOewRGJRbJ1LsbpEUlTGhC6pzni7gFA8m_rYpp60_FLpFycXzAIShc-aBwhL5lVGj11q2Qj61bGrpgaHWdsTb9tRL"/>
+<div class="absolute inset-0 bg-surface/60"></div>
+</div>
+<!-- Auth Modal Container -->
+<main class="relative z-10 flex min-h-screen items-center justify-center p-4 md:p-8">
+<div class="flex w-full max-w-5xl overflow-hidden rounded-xl shadow-[0_40px_100px_rgba(0,0,0,0.6)] animate-in fade-in zoom-in duration-500">
+<!-- Left Column: Cinematic Visual -->
+<section class="hidden md:flex relative w-2/5 overflow-hidden">
+<img alt="Supercar Cockpit" class="absolute inset-0 h-full w-full object-cover" data-alt="Interior cockpit of a high-performance supercar featuring carbon fiber detailing and neon cyan instrument lighting at night" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD1zJatHDLbYpsF0eyGl4dq01sMD8i_aGYMoX87M5YaAoMiF18_ZkWxCgh5SRRCTYPBiDdRUOBOuk4AVM2rsFOW3PVtAMxBGSuwmum5KsdjxCvjY6Vs9YqGc0REd0vHlQOa7fRxaVkRap3dROEbjVMA-DC8aR04wkAKKg0n_mIdTETDITTTgVn73qOVZlaOYBz2_9-pkVrwqH60U5o3fyKSnl7mWed8PQJdwUypzFvIVFVF49x1_Lmse7Uh_oR2u15CQR3BDpP8HH91"/>
+<div class="absolute inset-0 editorial-gradient"></div>
+<div class="relative z-10 flex flex-col justify-between p-10 h-full">
+<div class="flex items-center space-x-2">
+<span class="text-3xl font-headline font-bold tracking-tighter text-primary">CARVISTA</span>
+</div>
+<div class="space-y-4">
+<h1 class="text-4xl font-headline font-bold leading-tight tracking-tight text-white">
+                            Experience <br/>Automotive <br/>Excellence
+                        </h1>
+<p class="text-sm text-on-surface-variant font-light tracking-wide max-w-[200px]">
+                            Access our exclusive inventory of world-class vehicles and personalized financing.
+                        </p>
+</div>
+</div>
+</section>
+<!-- Right Column: Form -->
+<section class="w-full md:w-3/5 glass-effect p-8 md:p-12 lg:p-16 flex flex-col border-l border-outline-variant/10">
+<!-- Toggle Tabs -->
+<div class="flex items-center justify-center space-x-8 mb-10">
+<button class="font-headline text-lg font-semibold text-primary border-b-2 border-primary pb-2 transition-all">
+                        Login
+                    </button>
+<button class="font-headline text-lg font-medium text-on-surface-variant hover:text-on-surface transition-all pb-2">
+                        Sign Up
+                    </button>
+</div>
+<div class="flex flex-col space-y-6">
+<!-- Social Login -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<button class="flex items-center justify-center space-x-3 px-6 py-3 rounded-full bg-surface-container-high border border-outline-variant/20 hover:bg-surface-container-highest transition-all duration-300">
+<img alt="Google" class="w-5 h-5" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCSTYZvNlV8cFChPy3tWAjAV11meVeaFrXWmaWeg70N6mLAdlqIyeXlDgh_b3-3LDcg2OAbj9gi6t9J-34OLGW7N-QrhGJQZxU2JikzGYfzH0C7PvFdro1-CMrc9DDmpC8NwThRIQaHDqZ04pUMTuH4yg_pWkTMZNOWpjIXrzrLRjCkrCvq5QCst45TCMIiBjin_4dCyUZ0lUkMRThXQh1HSpXvdxsXF98iIWOJ11nTpIn8rLSYlTTJU3nTKU-3CXBE5x2WlRs6hz0B"/>
+<span class="text-sm font-medium">Continue with Google</span>
+</button>
+<button class="flex items-center justify-center space-x-3 px-6 py-3 rounded-full bg-surface-container-high border border-outline-variant/20 hover:bg-surface-container-highest transition-all duration-300">
+<img alt="Facebook" class="w-5 h-5" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCotoV481iB_3wQltxnnLqgLA413RrR6jaAZu2E3w__ZWjY0SnMP137x5zy_hFga3N1WFRu4oPXjYlMzrbGGykDNVojrc_K6kFsM4c-0-EG-qDhE2KfoeZxFYCkP7uhcNYqe7JYR5yLYnOyp4L0aAPilFfVTxkLcFQgrYKAKjx5YF14t4-jWZ2AXz5VjtsjNxm0f0kO2roA2b0iiNdZviu6OVc8sHX5dQtECGPZlN0U1ZYdXzRVrNwlU9XTtmhegvJuD_UdvdHoaloZ"/>
+<span class="text-sm font-medium">Continue with Facebook</span>
+</button>
+</div>
+<!-- Divider -->
+<div class="flex items-center space-x-4 py-2">
+<div class="h-[1px] flex-grow bg-outline-variant/30"></div>
+<span class="text-[10px] uppercase tracking-widest text-on-surface-variant font-medium">or continue with email</span>
+<div class="h-[1px] flex-grow bg-outline-variant/30"></div>
+</div>
+<!-- Input Fields -->
+<form class="space-y-4">
+<div class="space-y-1">
+<label class="block text-xs font-label uppercase tracking-widest text-on-surface-variant ml-1" for="email">Email Address</label>
+<input class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant/20 focus:border-primary focus:ring-0 px-4 py-3 text-on-surface placeholder:text-on-surface-variant/40 transition-all rounded-t-lg font-label" id="email" placeholder="name@domain.com" type="email"/>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between items-center px-1">
+<label class="block text-xs font-label uppercase tracking-widest text-on-surface-variant" for="password">Password</label>
+<a class="text-[10px] font-medium text-primary-fixed-dim hover:text-primary transition-colors" href="#">Forgot Password?</a>
+</div>
+<input class="w-full bg-surface-container-low border-0 border-b-2 border-outline-variant/20 focus:border-primary focus:ring-0 px-4 py-3 text-on-surface placeholder:text-on-surface-variant/40 transition-all rounded-t-lg font-label" id="password" placeholder="••••••••" type="password"/>
+</div>
+<!-- Submit Button -->
+<button class="w-full mt-6 py-4 rounded-full bg-gradient-to-r from-primary-container to-primary text-on-primary-container font-headline font-bold text-sm tracking-widest uppercase neon-glow transition-all active:scale-95" type="submit">
+                            Sign In
+                        </button>
+</form>
+<!-- Footer Links -->
+<p class="text-center text-sm text-on-surface-variant mt-4">
+                        Don't have an account? 
+                        <a class="text-primary-fixed-dim font-semibold hover:underline decoration-primary/30 underline-offset-4 ml-1" href="#">Sign up</a>
+</p>
+</div>
+<!-- Terms -->
+<p class="mt-auto pt-10 text-[10px] text-center text-on-surface-variant/50 leading-relaxed font-light">
+                    By continuing, you agree to Carvista's 
+                    <a class="underline" href="#">Terms of Service</a> and 
+                    <a class="underline" href="#">Privacy Policy</a>.
+                </p>
+</section>
+</div>
+</main>
+<!-- Close Button Floating -->
+<button class="fixed top-8 right-8 z-20 w-12 h-12 flex items-center justify-center rounded-full bg-surface-container-high/50 hover:bg-surface-container-highest transition-all border border-outline-variant/10">
+<span class="material-symbols-outlined text-on-surface">close</span>
+</button>
+</body></html>

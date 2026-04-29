@@ -32,9 +32,11 @@ export default function PriceLocationForm({
   errors,
 }: Props) {
   return (
-    <section className="section-shell p-6">
+    <section className="section-shell p-4 sm:p-5 md:p-6">
       <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">Step 4</p>
-      <h2 className="mt-2 text-3xl font-apercu-bold text-cars-primary">Price and selling details</h2>
+      <h2 className="mt-2 text-2xl font-apercu-bold text-cars-primary sm:text-3xl">
+        Price and selling details
+      </h2>
       <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
         This is the part buyers scan first, so keep the price and location clear and trustworthy.
       </p>
@@ -52,8 +54,8 @@ export default function PriceLocationForm({
           {errors.askingPrice ? <p className="mt-2 text-xs font-medium text-red-600">{errors.askingPrice}</p> : null}
         </div>
 
-        <div className="flex items-end">
-          <label className="inline-flex h-12 items-center gap-3 rounded-[20px] border border-cars-gray-light px-4 text-sm font-medium text-cars-primary">
+        <div className="flex">
+          <label className="inline-flex min-h-12 w-full items-center gap-3 rounded-[20px] border border-cars-gray-light px-4 py-3 text-sm font-medium text-cars-primary">
             <input
               type="checkbox"
               checked={negotiable}

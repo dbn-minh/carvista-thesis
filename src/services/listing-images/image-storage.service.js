@@ -11,6 +11,10 @@ export class ImageStorageService {
     throw new Error("deleteListingImage must be implemented by a storage provider.");
   }
 
+  async cleanupListingImages(_payload) {
+    throw new Error("cleanupListingImages must be implemented by a storage provider.");
+  }
+
   async reorderListingImages(_payload) {
     throw new Error("reorderListingImages must be implemented by a storage provider.");
   }

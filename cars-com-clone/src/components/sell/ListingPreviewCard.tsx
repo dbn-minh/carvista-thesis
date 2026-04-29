@@ -18,7 +18,7 @@ export default function ListingPreviewCard({ form, selectedVariant }: Props) {
 
   return (
     <article className="overflow-hidden rounded-[30px] border border-cars-gray-light/70 bg-white shadow-[0_18px_40px_rgba(15,45,98,0.08)] dark:border-cars-gray-light/35 dark:bg-slate-950/55">
-      <div className="relative h-56 overflow-hidden bg-[linear-gradient(135deg,rgba(233,241,255,0.9),rgba(255,255,255,1))] dark:bg-[linear-gradient(135deg,rgba(13,21,37,0.94),rgba(8,17,31,0.98))]">
+      <div className="relative aspect-[4/3] overflow-hidden bg-[linear-gradient(135deg,rgba(233,241,255,0.9),rgba(255,255,255,1))] dark:bg-[linear-gradient(135deg,rgba(13,21,37,0.94),rgba(8,17,31,0.98))] sm:aspect-[16/10]">
         {coverPhoto && safeCoverSrc ? (
           <img src={safeCoverSrc} alt={coverPhoto.name} className="h-full w-full object-cover" />
         ) : (
@@ -28,7 +28,7 @@ export default function ListingPreviewCard({ form, selectedVariant }: Props) {
         )}
       </div>
 
-      <div className="space-y-4 p-5">
+      <div className="space-y-4 p-4 sm:p-5">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
             Listing preview
@@ -39,7 +39,7 @@ export default function ListingPreviewCard({ form, selectedVariant }: Props) {
         </div>
 
         <div>
-          <p className="text-lg font-apercu-bold text-cars-primary">
+          <p className="break-words text-lg font-apercu-bold text-cars-primary">
             {buildListingPreviewTitle(form, selectedVariant)}
           </p>
           <p className="mt-2 text-sm leading-6 text-cars-gray">
