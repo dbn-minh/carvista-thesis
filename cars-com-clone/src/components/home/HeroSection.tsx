@@ -130,16 +130,6 @@ export default function HeroSection() {
             <span>Pricing intelligence</span>
             <span className="text-cars-gray dark:text-[#9fb2d9]">Catalog + live listings</span>
           </div>
-          <div className="absolute bottom-4 left-4 z-20 max-w-[250px] rounded-[26px] border border-cars-primary/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.68),rgba(255,255,255,0.28))] p-4 text-foreground shadow-[0_22px_50px_rgba(15,45,98,0.1)] backdrop-blur-md dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(11,16,23,0.78),rgba(11,16,23,0.48))] dark:text-white dark:shadow-[0_22px_50px_rgba(0,0,0,0.35)] sm:bottom-8 sm:left-6 sm:p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cars-primary dark:text-[#8fb4ff]">
-              Why people use CarVista
-            </p>
-            <ul className="mt-3 space-y-3 text-sm leading-6 text-cars-gray dark:text-slate-200">
-              <li>Compare trims side by side with AI guidance.</li>
-              <li>Track price history before you contact a seller.</li>
-              <li>Estimate ownership cost before you commit.</li>
-            </ul>
-          </div>
           <div className="absolute inset-x-4 bottom-6 top-14 sm:inset-x-8 sm:bottom-8 sm:top-16">
             <Image
               src="https://www.cars.com/images/sell/sale-dealer-woman-brand-colors.png"
@@ -150,15 +140,6 @@ export default function HeroSection() {
             />
           </div>
           <div className="absolute inset-0 z-10 rounded-[32px] bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0)_28%,rgba(247,250,255,0.22)_100%)] dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0)_26%,rgba(8,11,18,0.22)_100%)] sm:rounded-[40px]" />
-          <div className="absolute right-4 top-20 z-20 hidden rounded-[24px] border border-cars-primary/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.68),rgba(255,255,255,0.3))] p-4 text-foreground shadow-[0_20px_44px_rgba(15,45,98,0.1)] backdrop-blur-md dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(17,24,40,0.76),rgba(17,24,40,0.44))] dark:text-white dark:shadow-[0_20px_44px_rgba(0,0,0,0.34)] sm:block lg:right-6 lg:top-24 lg:max-w-[220px]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cars-primary dark:text-[#7de2ff]">
-              Market snapshot
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-foreground dark:text-slate-50">12.4M</p>
-            <p className="mt-1 text-sm text-cars-gray dark:text-slate-300">
-              Median list price across current premium stock.
-            </p>
-          </div>
         </div>
       </div>
     </section>

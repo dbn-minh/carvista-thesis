@@ -6,11 +6,12 @@ type Props = {
 };
 
 const toneClasses: Record<NonNullable<Props["tone"]>, string> = {
-  info: "border-white/10 bg-[rgba(255,255,255,0.06)] text-slate-200",
+  info:
+    "border-slate-200/80 bg-white/88 text-slate-700 dark:border-white/10 dark:bg-[rgba(255,255,255,0.06)] dark:text-slate-200",
   success:
-    "border-emerald-400/20 bg-emerald-500/10 text-emerald-100",
+    "border-sky-300/80 bg-sky-500/95 text-white dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100",
   error:
-    "border-rose-400/20 bg-rose-500/10 text-rose-100",
+    "border-rose-300/80 bg-rose-500/92 text-white dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-100",
 };
 
 export default function StatusBanner({ children, tone = "info" }: Props) {

@@ -59,7 +59,8 @@ function getFitScoreTone(sectionKey: string, card: { title: string; value?: stri
 
   if (numericScore >= 80 || label.includes("excellent")) {
     return {
-      shell: "border border-emerald-200 bg-[linear-gradient(180deg,#f5fff8_0%,#edf9f1_100%)] dark:border-emerald-400/20 dark:bg-emerald-500/10",
+      shell:
+        "border border-emerald-200 bg-[linear-gradient(180deg,#f5fff8_0%,#edf9f1_100%)] dark:border-emerald-400/20 dark:bg-none dark:bg-emerald-500/10",
       value: "text-[#216b45] dark:text-emerald-100",
       description: "text-[#477458] dark:text-emerald-100/80",
       label: "Excellent fit",
@@ -71,7 +72,8 @@ function getFitScoreTone(sectionKey: string, card: { title: string; value?: stri
 
   if (numericScore >= 60 || label.includes("good")) {
     return {
-      shell: "border border-amber-200 bg-[linear-gradient(180deg,#fffaf0_0%,#fff4dc_100%)] dark:border-amber-400/20 dark:bg-amber-500/10",
+      shell:
+        "border border-amber-200 bg-[linear-gradient(180deg,#fffaf0_0%,#fff4dc_100%)] dark:border-amber-400/20 dark:bg-none dark:bg-amber-500/10",
       value: "text-[#7f5f00] dark:text-amber-100",
       description: "text-[#8f7642] dark:text-amber-100/80",
       label: "Good fit",
@@ -83,7 +85,8 @@ function getFitScoreTone(sectionKey: string, card: { title: string; value?: stri
 
   if (numericScore >= 40 || label.includes("fair") || label.includes("mixed")) {
     return {
-      shell: "border border-orange-200 bg-[linear-gradient(180deg,#fff5eb_0%,#ffedde_100%)] dark:border-orange-400/20 dark:bg-orange-500/10",
+      shell:
+        "border border-orange-200 bg-[linear-gradient(180deg,#fff5eb_0%,#ffedde_100%)] dark:border-orange-400/20 dark:bg-none dark:bg-orange-500/10",
       value: "text-[#9a4f1a] dark:text-orange-100",
       description: "text-[#9c6a48] dark:text-orange-100/80",
       label: "Average fit",
@@ -94,7 +97,8 @@ function getFitScoreTone(sectionKey: string, card: { title: string; value?: stri
   }
 
   return {
-    shell: "border border-rose-200 bg-[linear-gradient(180deg,#fff4f4_0%,#ffeaea_100%)] dark:border-rose-400/20 dark:bg-rose-500/10",
+    shell:
+      "border border-rose-200 bg-[linear-gradient(180deg,#fff4f4_0%,#ffeaea_100%)] dark:border-rose-400/20 dark:bg-none dark:bg-rose-500/10",
     value: "text-[#a13d3d] dark:text-rose-100",
     description: "text-[#8b5a5a] dark:text-rose-100/80",
     label: "Weak fit",
@@ -355,7 +359,7 @@ export default function PageIntelligencePanel({
                         {section.title}
                       </p>
                       {section.confidence?.label ? (
-                        <span className="rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-semibold text-cars-primary">
+                        <span className="rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-semibold text-cars-primary dark:bg-white/10 dark:text-white/80">
                           {section.confidence.label}
                         </span>
                       ) : null}
@@ -395,7 +399,11 @@ export default function PageIntelligencePanel({
                               <topCardTone.Icon className={`h-6 w-6 ${topCardTone.iconColor}`} />
                             </span>
                           ) : null}
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cars-accent">
+                          <p
+                            className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${
+                              topCardTone ? topCardTone.description : "text-cars-accent"
+                            }`}
+                          >
                             {topCard.title}
                           </p>
                           {topCard.value != null ? (
@@ -454,7 +462,7 @@ export default function PageIntelligencePanel({
                         {section.title}
                       </p>
                       {!compactLayout && section.confidence?.label ? (
-                        <div className="mt-3 inline-flex rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-semibold text-cars-primary">
+                        <div className="mt-3 inline-flex rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-semibold text-cars-primary dark:bg-white/10 dark:text-white/80">
                           {section.confidence.label}
                         </div>
                       ) : null}
@@ -498,7 +506,11 @@ export default function PageIntelligencePanel({
                                 : "bg-cars-off-white dark:bg-slate-900/70"
                             }`}
                           >
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cars-accent">
+                            <p
+                              className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${
+                                cardTone ? cardTone.description : "text-cars-accent"
+                              }`}
+                            >
                               {card.title}
                             </p>
                             {card.value != null ? (
