@@ -154,7 +154,7 @@
   }
 
   .editorial-button {
-    background: linear-gradient(135deg, rgba(111,145,221,1), rgba(146,175,238,0.95), rgba(197,246,255,0.85));
+    background: linear-gradient(135deg, rgba(55, 93, 191, 1), rgba(85, 124, 218, 0.98), rgba(118, 157, 235, 0.95));
     box-shadow: 0 18px 40px rgba(111, 145, 221, 0.22);
   }
 
@@ -307,6 +307,13 @@
   html:not(.dark) .text-slate-50,
   html:not(.dark) .text-slate-100 {
     color: rgb(var(--theme-strong-rgb) / 1) !important;
+  }
+
+  html:not(.dark) .editorial-button,
+  html:not(.dark) :is(button, a, label, [role="button"], input[type="button"], input[type="submit"])[class*="bg-cars-primary"],
+  html:not(.dark) :is(button, a, label, [role="button"], input[type="button"], input[type="submit"])[class*="bg-cars-primary-light"],
+  html:not(.dark) :is(button, a, label, [role="button"], input[type="button"], input[type="submit"])[class*="bg-cars-accent"] {
+    color: rgb(255 255 255 / 1) !important;
   }
 
   html:not(.dark) .text-white\/92 {

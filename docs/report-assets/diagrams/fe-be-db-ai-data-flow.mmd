@@ -1,0 +1,39 @@
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant FE as Frontend UI<br/>Next.js page
+  participant API as API client<br/>apiFetch / carvista-api.ts
+  participant MW as Express middleware<br/>auth + validation
+  participant RT as Route handler
+  participant SVC as Domain or AI service
+  participant DB as MySQL via Sequelize
+  participant GOV as Official data APIs<br/>FuelEconomy / NHTSA
+  participant LLM as Ollama service
+
+  U->>FE: Trigger action<br/>login, save car, request viewing,<br/>compare vehicles, chat with advisor
+  FE->>API: Build request payload + JWT
+  API->>MW: HTTP request to backend
+  MW->>RT: Pass authenticated / validated request
+
+  alt Standard CRUD flow
+    RT->>SVC: Call auth / listing / watchlist / request service
+    SVC->>DB: Read or write business data
+    DB-->>SVC: Rows / mutation result
+    SVC-->>RT: Normalized response DTO
+  else AI-assisted flow
+    RT->>SVC: Call compare / predict / TCO / chat service
+    SVC->>DB: Load listings, variants, reviews,<br/>persisted market snapshots
+    DB-->>SVC: Structured vehicle + market data
+    par Optional official enrichment
+      SVC->>GOV: Fetch fuel economy / recall signals
+      GOV-->>SVC: Official evidence + source links
+    and Optional LLM enhancement
+      SVC->>LLM: Generate or refine narrative
+      LLM-->>SVC: Natural-language explanation
+    end
+    SVC-->>RT: AI result + evidence + confidence
+  end
+
+  RT-->>API: JSON response
+  API-->>FE: Parsed response object
+  FE-->>U: Render cards, tables, banners,<br/>charts, recommendations

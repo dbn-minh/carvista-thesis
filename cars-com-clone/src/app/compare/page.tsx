@@ -1363,16 +1363,16 @@ function ComparePageContent() {
 
         {result ? (
           <>
-            <section className="mt-6 section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(15,45,98,0.98),rgba(27,76,160,0.92),rgba(95,150,255,0.82))] p-5 text-white sm:p-6 md:p-8">
+            <section className="mt-6 section-shell overflow-hidden border-white/10 bg-[linear-gradient(135deg,rgba(244,248,255,0.98),rgba(229,238,255,0.95),rgba(194,214,255,0.9))] p-5 text-cars-primary shadow-[0_22px_56px_rgba(15,45,98,0.12)] dark:bg-[linear-gradient(135deg,rgba(15,45,98,0.98),rgba(27,76,160,0.92),rgba(95,150,255,0.82))] dark:text-white sm:p-6 md:p-8">
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.22em] text-white/70">
+                  <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent dark:text-white/70">
                     Quick verdict
                   </p>
-                  <h2 className="mt-2 text-2xl font-apercu-bold sm:text-3xl">
+                  <h2 className="mt-2 text-2xl font-apercu-bold text-cars-primary dark:text-white sm:text-3xl">
                     {recommendedItem ? `${buildCompareItemLabel(recommendedItem)} comes out ahead overall.` : "Comparison ready"}
                   </h2>
-                  <p className="mt-4 text-sm leading-7 text-white/85">
+                  <p className="mt-4 text-sm leading-7 text-cars-gray dark:text-white/85">
                     {result.assistant_message}
                   </p>
                   {result.highlights?.length ? (
@@ -1380,7 +1380,7 @@ function ComparePageContent() {
                       {result.highlights.slice(0, 3).map((highlight) => (
                         <span
                           key={highlight}
-                          className="rounded-full bg-white/12 px-3 py-2 text-xs font-semibold text-white"
+                          className="rounded-full border border-cars-primary/10 bg-white/80 px-3 py-2 text-xs font-semibold text-cars-primary dark:border-white/10 dark:bg-white/12 dark:text-white"
                         >
                           {highlight}
                         </span>
@@ -1390,18 +1390,18 @@ function ComparePageContent() {
                 </div>
 
                 {recommendedItem && winnerHighlights.length ? (
-                  <aside className="rounded-[24px] border border-white/12 bg-white/10 px-5 py-5 backdrop-blur-sm">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
+                  <aside className="rounded-[24px] border border-cars-primary/10 bg-white/80 px-5 py-5 text-cars-primary shadow-[0_18px_40px_rgba(15,45,98,0.1)] backdrop-blur-sm dark:border-white/12 dark:bg-white/10 dark:text-white">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cars-accent dark:text-white/70">
                       Winner highlights
                     </p>
-                    <h3 className="mt-2 text-lg font-apercu-bold text-white">
+                    <h3 className="mt-2 text-lg font-apercu-bold text-cars-primary dark:text-white">
                       {buildCompareItemLabel(recommendedItem)}
                     </h3>
                     <ul className="mt-4 space-y-3">
                       {winnerHighlights.map((highlight) => (
                         <li key={highlight.key} className="flex items-center gap-3">
                           <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-300" />
-                          <p className="text-sm font-semibold text-white">{highlight.title}</p>
+                          <p className="text-sm font-semibold text-cars-primary dark:text-white">{highlight.title}</p>
                         </li>
                       ))}
                     </ul>
@@ -1549,14 +1549,14 @@ function ComparePageContent() {
                         {selection?.listingId ? (
                           <Link
                             href={`/listings/${selection.listingId}`}
-                            className="inline-flex min-h-10 w-full items-center justify-center rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white sm:min-w-[132px] sm:w-auto"
+                            className="editorial-button inline-flex min-h-10 w-full items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-950 transition hover:brightness-105 dark:text-slate-950 sm:min-w-[132px] sm:w-auto"
                           >
                             View listing
                           </Link>
                         ) : selection?.variantId ? (
                           <Link
                             href={`/catalog/${selection.variantId}`}
-                            className="inline-flex min-h-10 w-full items-center justify-center rounded-full bg-cars-primary px-4 py-2 text-sm font-semibold text-white sm:min-w-[132px] sm:w-auto"
+                            className="editorial-button inline-flex min-h-10 w-full items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-950 transition hover:brightness-105 dark:text-slate-950 sm:min-w-[132px] sm:w-auto"
                           >
                             View vehicle
                           </Link>

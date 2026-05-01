@@ -841,7 +841,7 @@ export default function ListingDetailPage() {
                   placeholder="Tell the seller when you would like to view the car."
                 />
                 <button
-                  className="inline-flex w-full items-center justify-center rounded-full bg-cars-accent px-5 py-2.5 text-sm font-semibold text-primary-foreground sm:w-auto"
+                  className="editorial-button inline-flex w-full items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:brightness-105 dark:text-slate-950 sm:w-auto"
                   type="submit"
                 >
                   Send request

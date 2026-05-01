@@ -133,7 +133,7 @@ export default function AuthPanel({ mode, next, onModeChange, onSuccess }: Props
   const noSocialProvidersAvailable =
     providerStatus === "ready" && !providerInfo.social.google && !providerInfo.social.facebook;
   const fieldClassName =
-    "h-12 rounded-[18px] border-white/10 bg-white/5 px-4 text-primary-foreground placeholder:text-primary-foreground/34 focus-visible:border-cars-accent focus-visible:ring-cars-accent/35 sm:h-14";
+    "h-12 rounded-[18px] border border-slate-200/80 bg-white/88 px-4 text-slate-800 placeholder:text-slate-400 focus-visible:border-cars-accent focus-visible:ring-cars-accent/35 dark:border-white/10 dark:bg-white/5 dark:text-primary-foreground dark:placeholder:text-primary-foreground/34 sm:h-14";
   const isRegister = mode === "register";
 
   async function finishAuth() {
@@ -210,28 +210,28 @@ export default function AuthPanel({ mode, next, onModeChange, onSuccess }: Props
   }
 
   return (
-    <section className="overflow-hidden rounded-[32px] border border-white/8 bg-[#111616] shadow-[0_32px_120px_rgba(0,0,0,0.45)] sm:rounded-[36px]">
-      <div className="bg-[linear-gradient(135deg,rgba(23,29,30,1),rgba(41,56,92,0.96),rgba(111,145,221,0.78))] px-5 py-6 text-primary-foreground sm:px-7 sm:py-7">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cars-accent">
+    <section className="overflow-hidden rounded-[32px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.96))] shadow-[0_32px_120px_rgba(15,45,98,0.18)] dark:border-white/8 dark:bg-[#111616] dark:shadow-[0_32px_120px_rgba(0,0,0,0.45)] sm:rounded-[36px]">
+      <div className="bg-[linear-gradient(135deg,rgba(230,239,255,1),rgba(214,229,255,0.98),rgba(182,210,255,0.92))] px-5 py-6 text-slate-900 dark:bg-[linear-gradient(135deg,rgba(23,29,30,1),rgba(41,56,92,0.96),rgba(111,145,221,0.78))] dark:text-primary-foreground sm:px-7 sm:py-7">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cars-primary dark:text-cars-accent">
           {heading.eyebrow}
         </p>
-        <h2 className="mt-2 text-[2rem] font-apercu-bold leading-tight text-primary-foreground sm:text-3xl">
+        <h2 className="mt-2 text-[2rem] font-apercu-bold leading-tight text-slate-900 dark:text-primary-foreground sm:text-3xl">
           {heading.title}
         </h2>
-        <p className="mt-3 max-w-xl text-sm leading-6 text-primary-foreground/74">
+        <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600 dark:text-primary-foreground/74">
           {heading.description}
         </p>
       </div>
 
-      <div className="space-y-5 bg-[#111616] px-4 py-5 sm:space-y-6 sm:px-7 sm:py-7">
-        <div className="flex rounded-full border border-white/8 bg-white/5 p-1 lg:max-w-[380px]">
+      <div className="space-y-5 bg-transparent px-4 py-5 dark:bg-[#111616] sm:space-y-6 sm:px-7 sm:py-7">
+        <div className="flex rounded-full border border-slate-200/80 bg-white/72 p-1 shadow-[0_10px_30px_rgba(15,45,98,0.08)] dark:border-white/8 dark:bg-white/5 dark:shadow-none lg:max-w-[380px]">
           <button
             type="button"
             onClick={() => handleModeSwitch("login")}
             className={
               mode === "login"
-                ? "editorial-button flex min-h-11 flex-1 items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-950 shadow-[0_10px_24px_rgba(15,45,98,0.18)] dark:text-slate-950"
-                : "flex min-h-11 flex-1 items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-white/62"
+                ? "editorial-button flex min-h-11 flex-1 items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,45,98,0.18)] dark:text-slate-950"
+                : "flex min-h-11 flex-1 items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-500 transition-colors hover:text-slate-700 dark:text-white/62 dark:hover:text-white/82"
             }
           >
             Login
@@ -241,8 +241,8 @@ export default function AuthPanel({ mode, next, onModeChange, onSuccess }: Props
             onClick={() => handleModeSwitch("register")}
             className={
               mode === "register"
-                ? "editorial-button flex min-h-11 flex-1 items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-950 shadow-[0_10px_24px_rgba(15,45,98,0.18)] dark:text-slate-950"
-                : "flex min-h-11 flex-1 items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-white/62"
+                ? "editorial-button flex min-h-11 flex-1 items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,45,98,0.18)] dark:text-slate-950"
+                : "flex min-h-11 flex-1 items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-500 transition-colors hover:text-slate-700 dark:text-white/62 dark:hover:text-white/82"
             }
           >
             Register
@@ -290,7 +290,7 @@ export default function AuthPanel({ mode, next, onModeChange, onSuccess }: Props
                     Password
                   </label>
                   {!isRegister ? (
-                    <span className="text-xs font-medium text-primary-foreground/34">
+                    <span className="text-xs font-medium text-slate-400 dark:text-primary-foreground/34">
                       Minimum 6 characters
                     </span>
                   ) : null}
@@ -325,7 +325,7 @@ export default function AuthPanel({ mode, next, onModeChange, onSuccess }: Props
 
               <div className={isRegister ? "sm:col-span-2" : undefined}>
                 <Button
-                  className="editorial-button h-11 w-full rounded-full text-sm font-semibold text-slate-950 hover:brightness-105 sm:h-12"
+                  className="editorial-button h-11 w-full rounded-full text-sm font-semibold text-white hover:brightness-105 dark:text-slate-950 sm:h-12"
                   disabled={loading}
                   type="submit"
                 >
@@ -341,55 +341,55 @@ export default function AuthPanel({ mode, next, onModeChange, onSuccess }: Props
             <StatusBanner tone={tone}>{message}</StatusBanner>
           </div>
 
-          <aside className="space-y-4 rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(24,30,38,0.96),rgba(16,20,19,0.96))] px-4 py-4 text-primary-foreground sm:px-5 sm:py-5">
+          <aside className="space-y-4 rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(236,244,255,0.98),rgba(223,235,255,0.96))] px-4 py-4 text-slate-800 shadow-[0_18px_48px_rgba(15,45,98,0.08)] dark:border-white/8 dark:bg-[linear-gradient(180deg,rgba(24,30,38,0.96),rgba(16,20,19,0.96))] dark:text-primary-foreground dark:shadow-none sm:px-5 sm:py-5">
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-foreground/50">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-primary-foreground/50">
                 {socialLabel}
               </p>
-              <p className="text-sm leading-6 text-primary-foreground/72">{socialHelp}</p>
+              <p className="text-sm leading-6 text-slate-600 dark:text-primary-foreground/72">{socialHelp}</p>
             </div>
 
             <div className="grid gap-3">
               <button
                 className={`flex min-h-12 w-full items-center gap-3 rounded-full border px-4 text-left transition ${
                   canUseGoogle
-                    ? "border-white/18 bg-white/[0.02] text-primary-foreground shadow-[0_14px_34px_rgba(0,0,0,0.24)] hover:border-cars-accent/55 hover:bg-white/[0.08]"
-                    : "cursor-not-allowed border-white/10 bg-white/5 text-primary-foreground/35"
+                    ? "border-slate-200/80 bg-white/78 text-slate-800 shadow-[0_14px_34px_rgba(15,45,98,0.08)] hover:border-cars-primary/35 hover:bg-white dark:border-white/18 dark:bg-white/[0.02] dark:text-primary-foreground dark:shadow-[0_14px_34px_rgba(0,0,0,0.24)] dark:hover:border-cars-accent/55 dark:hover:bg-white/[0.08]"
+                    : "cursor-not-allowed border-slate-200/80 bg-white/55 text-slate-400 dark:border-white/10 dark:bg-white/5 dark:text-primary-foreground/35"
                 }`}
                 disabled={!canUseGoogle}
                 onClick={() => handleSocialLogin("google")}
                 type="button"
               >
                 <GoogleLogo />
-                <span className="whitespace-normal font-semibold leading-5 text-primary-foreground">
+                <span className="whitespace-normal font-semibold leading-5 text-slate-800 dark:text-primary-foreground">
                   {googleButtonLabel}
                 </span>
               </button>
               <button
                 className={`flex min-h-12 w-full items-center gap-3 rounded-full border px-4 text-left transition ${
                   canUseFacebook
-                    ? "border-white/18 bg-white/[0.02] text-primary-foreground shadow-[0_14px_34px_rgba(0,0,0,0.24)] hover:border-cars-accent/55 hover:bg-white/[0.08]"
-                    : "cursor-not-allowed border-white/10 bg-white/5 text-primary-foreground/35"
+                    ? "border-slate-200/80 bg-white/78 text-slate-800 shadow-[0_14px_34px_rgba(15,45,98,0.08)] hover:border-cars-primary/35 hover:bg-white dark:border-white/18 dark:bg-white/[0.02] dark:text-primary-foreground dark:shadow-[0_14px_34px_rgba(0,0,0,0.24)] dark:hover:border-cars-accent/55 dark:hover:bg-white/[0.08]"
+                    : "cursor-not-allowed border-slate-200/80 bg-white/55 text-slate-400 dark:border-white/10 dark:bg-white/5 dark:text-primary-foreground/35"
                 }`}
                 disabled={!canUseFacebook}
                 onClick={() => handleSocialLogin("facebook")}
                 type="button"
               >
                 <FacebookLogo />
-                <span className="whitespace-normal font-semibold leading-5 text-primary-foreground">
+                <span className="whitespace-normal font-semibold leading-5 text-slate-800 dark:text-primary-foreground">
                   {facebookButtonLabel}
                 </span>
               </button>
             </div>
 
             {providerStatus === "error" ? (
-              <p className="text-xs leading-5 text-primary-foreground/54">
+              <p className="text-xs leading-5 text-slate-500 dark:text-primary-foreground/54">
                 We could not confirm provider availability just now, but you can still try a
                 social sign-in.
               </p>
             ) : null}
             {noSocialProvidersAvailable ? (
-              <p className="text-xs leading-5 text-primary-foreground/54">
+              <p className="text-xs leading-5 text-slate-500 dark:text-primary-foreground/54">
                 Social login buttons will appear here once the provider keys are configured.
               </p>
             ) : null}
