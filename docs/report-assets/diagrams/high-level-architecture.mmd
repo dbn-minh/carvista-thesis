@@ -1,0 +1,68 @@
+flowchart TB
+  classDef frontend fill:#EAF2FF,stroke:#4E79C9,stroke-width:2px,color:#10223A;
+  classDef backend fill:#E8F8F5,stroke:#2E8B78,stroke-width:2px,color:#0F2C27;
+  classDef ai fill:#F3EEFF,stroke:#8A63D2,stroke-width:2px,color:#2D1E59;
+  classDef data fill:#FFF7E8,stroke:#D49A2B,stroke-width:2px,color:#4B3411;
+  classDef external fill:#FFF1F3,stroke:#D66A85,stroke-width:2px,color:#5B2030;
+  classDef user fill:#FFFFFF,stroke:#6B7280,stroke-width:1.5px,color:#111827;
+
+  user["Users<br/>Buyers, sellers, admins"]
+
+  subgraph FE["Frontend Layer"]
+    direction LR
+    pages["Next.js App Router pages<br/>home, listings, compare, garage, profile"]
+    ui["React UI components<br/>forms, cards, dialogs, themes"]
+    api["API client layer<br/>apiFetch + carvista-api.ts"]
+  end
+
+  subgraph BE["Backend API Layer"]
+    direction LR
+    app["Express app<br/>createApp(), CORS, JSON parser,<br/>logging, Swagger"]
+    mw["Middleware<br/>requireAuth, requireRole,<br/>error handling"]
+    routes["Route modules<br/>auth, catalog, listings, watchlist,<br/>requests, reviews, notifications, ai, admin"]
+    domain["Domain services<br/>auth, listings, watchlist,<br/>viewing requests, notifications"]
+  end
+
+  subgraph CORE["AI and Data Core"]
+    direction LR
+    aiRoutes["AI endpoints<br/>/ai/chat, /ai/compare,<br/>/ai/predict-price, /ai/tco"]
+    orchestration["AI orchestration<br/>intent classifier, chat orchestrator,<br/>recommendation, compare, predict,<br/>page intelligence"]
+    retrieval["Knowledge + retrieval<br/>source retrieval, market data,<br/>presentation, contracts"]
+    llm["LLM provider<br/>Ollama service"]
+    orm["Sequelize + models<br/>req.ctx.models / req.ctx.tables"]
+    mysql["MySQL / MariaDB"]
+    snapshots["Persisted intelligence data<br/>listings, price history, reviews,<br/>fuel economy, recall snapshots"]
+  end
+
+  subgraph EXT["External Integrations"]
+    direction LR
+    docs["Swagger / OpenAPI"]
+    oauth["Google + Facebook OAuth"]
+    notify["Resend email + Twilio SMS"]
+    media["Cloudinary image storage"]
+    official["Official vehicle sources<br/>FuelEconomy.gov + NHTSA"]
+  end
+
+  user --> pages
+  pages --> ui --> api --> app
+  app --> mw --> routes
+  routes --> domain
+  routes --> aiRoutes
+  aiRoutes --> orchestration --> retrieval
+  orchestration --> llm
+  domain --> orm
+  retrieval --> orm
+  orm --> mysql
+  snapshots --- mysql
+  retrieval --> official
+  domain --> notify
+  domain --> media
+  domain --> oauth
+  app --> docs
+
+  class user user;
+  class pages,ui,api frontend;
+  class app,mw,routes,domain backend;
+  class aiRoutes,orchestration,retrieval,llm ai;
+  class orm,mysql,snapshots data;
+  class docs,oauth,notify,media,official external;
