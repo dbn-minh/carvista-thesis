@@ -21,10 +21,10 @@ const featureLinks = [
 ] as const;
 
 const thesisLinks = [
-  "Global catalog and detailed specs",
-  "Marketplace listing and seller contact flows",
-  "Watchlist, notifications, and user-generated reviews",
-  "AI compare, price trend, and TCO experiments",
+  "Browse the catalog with detailed vehicle specs",
+  "Explore live listings and connect with sellers",
+  "Save favorites, track updates, and manage your shortlist",
+  "Compare vehicles with AI-assisted pricing and ownership insights",
 ];
 
 export default function Footer() {
@@ -54,13 +54,12 @@ export default function Footer() {
                 CarVista
               </p>
               <h2 className="max-w-xl text-2xl font-apercu-bold leading-tight text-foreground dark:text-white sm:text-3xl">
-                A thesis-ready car platform inspired by cars.com, expanded with AI-first
-                workflows.
+                A modern car marketplace inspired by cars.com, enhanced with smarter
+                research and comparison tools.
               </h2>
               <p className="mt-4 max-w-xl text-sm leading-6 text-cars-gray dark:text-white/72 sm:text-[15px]">
-                The current product combines catalog exploration, marketplace listings,
-                seller communication, reviews, saved logs, and AI-assisted insights in one
-                consistent experience.
+                Explore the catalog, browse live listings, compare trims, follow pricing
+                trends, and use AI-assisted insights to make decisions with more clarity.
               </p>
             </div>
 
@@ -126,7 +125,7 @@ export default function Footer() {
 
         <div className="mt-6 grid gap-6 lg:mt-8 lg:grid-cols-[1.2fr_1fr] lg:gap-8">
           <div className="section-shell p-5 sm:p-6">
-            <h3 className="text-lg font-apercu-bold text-foreground dark:text-white">Current project scope</h3>
+            <h3 className="text-lg font-apercu-bold text-foreground dark:text-white">What you can do</h3>
             <ul className="mt-4 grid gap-3 md:grid-cols-2">
               {thesisLinks.map((item) => (
                 <li
@@ -163,10 +162,6 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-6 flex flex-col gap-3 border-t border-white/6 pt-5 text-sm leading-6 text-cars-gray dark:text-slate-400 md:mt-8 md:flex-row md:items-center md:justify-between md:gap-6">
-          <p>CarVista thesis prototype. Inspired by cars.com, extended with AI-powered workflows.</p>
-          <p>Built with Next.js, Node.js, MySQL, Sequelize, and custom AI services.</p>
-        </div>
       </div>
     </footer>
   );

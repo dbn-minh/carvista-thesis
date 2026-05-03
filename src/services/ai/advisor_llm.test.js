@@ -10,6 +10,8 @@ import {
   formatAdvisorRecommendationWithModel,
   parseModelJson,
 } from "./advisor_llm.service.js";
+import { createLlmService, normalizeLlmProvider } from "./llm.service.js";
+import { OpenAiCompatibleService } from "./openai_compatible.service.js";
 import { OllamaService } from "./ollama.service.js";
 
 test("advisor LLM extraction maps fuzzy customer input into profile fields", async () => {
@@ -515,4 +517,66 @@ test("ollama health check reports graceful failure", async () => {
   } finally {
     global.fetch = originalFetch;
   }
+});
+
+test("openai-compatible service maps chat completions into generated text", async () => {
+  const originalFetch = global.fetch;
+  let seenUrl = "";
+  let seenHeaders = null;
+  let seenBody = null;
+
+  global.fetch = async (url, init = {}) => {
+    seenUrl = String(url);
+    seenHeaders = init.headers;
+    seenBody = JSON.parse(String(init.body || "{}"));
+    return {
+      ok: true,
+      json: async () => ({
+        id: "chatcmpl-test",
+        choices: [{ message: { content: '{"ok":true}' } }],
+      }),
+    };
+  };
+
+  try {
+    const service = new OpenAiCompatibleService({
+      baseUrl: "https://mkp-api.fptcloud.com",
+      apiKey: "test-key",
+      model: "fpt/Qwen/Qwen3-32B",
+      timeoutMs: 1000,
+      retryCount: 0,
+    });
+    const result = await service.generate({
+      prompt: "Return JSON",
+      system: "JSON only",
+      format: "json",
+      options: { temperature: 0, num_predict: 42 },
+    });
+
+    assert.equal(result.text, '{"ok":true}');
+    assert.equal(seenUrl, "https://mkp-api.fptcloud.com/chat/completions");
+    assert.equal(seenHeaders.Authorization, "Bearer test-key");
+    assert.equal(seenBody.model, "fpt/Qwen/Qwen3-32B");
+    assert.equal(seenBody.max_tokens, 42);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("llm service factory resolves local and FPT providers cleanly", () => {
+  const localService = createLlmService({
+    provider: "ollama",
+    baseUrl: "http://localhost:11434",
+    model: "qwen3:1.7b",
+  });
+  const remoteService = createLlmService({
+    provider: "fpt",
+    baseUrl: "https://mkp-api.fptcloud.com",
+    apiKey: "test-key",
+    model: "fpt/Qwen/Qwen3-32B",
+  });
+
+  assert.equal(normalizeLlmProvider("fpt"), "openai_compatible");
+  assert.ok(localService instanceof OllamaService);
+  assert.ok(remoteService instanceof OpenAiCompatibleService);
 });
