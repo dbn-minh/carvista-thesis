@@ -7,6 +7,7 @@ import { classifyIntent } from "./intent_classifier.service.js";
 import { classifyConversationRoute } from "./conversation_orchestrator.service.js";
 import { classifyConversationTurn } from "./conversation_state.service.js";
 import { compareVariants } from "./compare_variants.service.js";
+import { generateComparisonInsight } from "./ai_insight.service.js";
 import {
   fetchOfficialVehicleSignals,
   loadListingMarketSignals,
@@ -15,6 +16,7 @@ import {
 } from "./source_retrieval.service.js";
 import { recommendCars } from "./recommendation.service.js";
 import { calculateTco } from "./tco.service.js";
+import { predictPrice } from "./predict_price.service.js";
 
 process.env.NODE_ENV = "test";
 
@@ -448,6 +450,9 @@ test("compare engine returns source-aware verdict with buyer-profile fit", async
 
      assert.equal(result.title, "AI comparison verdict");
      assert.equal(result.recommended_variant_id, 1);
+     assert.equal(result.meta.aiUsed, false);
+     assert.equal(result.meta.fallbackUsed, true);
+     assert.equal(typeof result.aiInsight.summary, "string");
      assert.ok(result.confidence.score > 0.5);
      assert.ok(result.sources.length >= 2);
      assert.ok(result.items[0].scores.use_case_fit_score >= 0);
@@ -461,6 +466,49 @@ test("compare engine returns source-aware verdict with buyer-profile fit", async
     } finally {
      global.fetch = originalFetch;
    }
+});
+
+test("AI insight service falls back when the LLM provider fails", async () => {
+  const insight = await generateComparisonInsight(
+    {
+      structuredResult: {
+        recommended_variant_id: 1,
+        recommendation_reason: "Winner selected by backend score.",
+        items: [
+          {
+            variant_id: 1,
+            year: 2024,
+            make: "Toyota",
+            model: "Crossline",
+            trim: "Urban Hybrid",
+            pros: ["Efficient daily use."],
+            cons: [],
+            scores: { final_score: 88 },
+          },
+        ],
+        caveats: ["Market coverage is partial."],
+      },
+      presentation: {
+        title: "AI comparison verdict",
+        assistant_message: "Toyota Crossline is the backend-selected winner.",
+        highlights: ["Toyota Crossline: efficient daily use"],
+      },
+    },
+    {
+      ollama: {
+        provider: "fpt",
+        model: "Qwen3-32B",
+        apiKey: "test-key",
+        async generate() {
+          throw new Error("provider timeout");
+        },
+      },
+    }
+  );
+
+  assert.equal(insight.meta.aiUsed, false);
+  assert.equal(insight.meta.fallbackUsed, true);
+  assert.match(insight.aiInsight.summary, /backend-selected winner/i);
 });
 
 test("chat orchestrator returns clarification envelope for incomplete TCO requests", async () => {
@@ -1863,6 +1911,85 @@ test("chat orchestrator formats recommendation shortlists with reasons caveats a
   assert.doesNotMatch(result.final_answer, /Why it fits:|Watch-out:|Best for:|Next step:/);
 });
 
+test("chat orchestrator uses backend structured result before the final advisor LLM response", async () => {
+  let seenPrompt = "";
+  const buyerProfile = {
+    primary_use_cases: ["family"],
+    budget_max: 1000000000,
+    preferred_body_type: "suv",
+  };
+  const ctx = {
+    services: {
+      ollama: {
+        provider: "fpt",
+        model: "Qwen3-32B",
+        apiKey: "test-key",
+        async generate(request) {
+          seenPrompt = request.prompt;
+          return {
+            text: JSON.stringify({
+              answer: "I would start with the Toyota Corolla Cross because it is the backend-ranked family SUV fit.",
+              reasons: ["Backend ranking placed Corolla Cross first for the saved family profile."],
+              caveats: [],
+              advice: "Open the vehicle detail page before checking listings.",
+            }),
+          };
+        },
+      },
+    },
+    sequelize: {
+      async query(sql) {
+        if (sql.includes("FROM car_variants cv")) {
+          return [[
+            {
+              variant_id: 7,
+              model_year: 2024,
+              trim_name: "Hybrid Premium",
+              body_type: "suv",
+              fuel_type: "hybrid",
+              engine: "2.0L",
+              transmission: "AT",
+              drivetrain: "FWD",
+              seats: 5,
+              msrp_base: 980000000,
+              model_name: "Corolla Cross",
+              make_name: "Toyota",
+              latest_price: 955000000,
+            },
+          ]];
+        }
+        if (sql.includes("FROM car_reviews") || sql.includes("FROM vehicle_market_signals")) {
+          return [[]];
+        }
+        throw new Error(`Unexpected SQL in advisor insight test: ${sql}`);
+      },
+    },
+    models: {
+      Listings: { async findAll() { return []; } },
+      VariantSpecs: { async findAll() { return []; } },
+      VariantSpecKv: { async findAll() { return []; } },
+      VariantImages: { async findAll() { return []; } },
+    },
+  };
+
+  const result = await orchestrateChatRequest(ctx, {
+    message: "Recommend a family SUV under 1 billion",
+    context: {
+      market_id: 1,
+      advisor_profile: buyerProfile,
+      budget: buyerProfile.budget_max,
+    },
+    advisor_profile: buyerProfile,
+  });
+
+  assert.equal(result.intent, "recommend_car");
+  assert.match(result.final_answer, /backend-ranked family SUV/i);
+  assert.match(seenPrompt, /structured_backend_result_json/);
+  assert.match(seenPrompt, /Corolla Cross/);
+  assert.equal(result.meta.aiUsed, true);
+  assert.equal(result.structured_result.aiInsight.reasons[0], "Backend ranking placed Corolla Cross first for the saved family profile.");
+});
+
 test("chat advisor binds short clarification replies to the pending compare flow", async () => {
   const originalFetch = global.fetch;
   global.fetch = mockFetchFactory();
@@ -2412,6 +2539,155 @@ test("chat advisor resets stale compare context when the user asks a new general
   assert.equal(sessions[0].context_json.active_topic.intent, "vehicle_general_qa");
   assert.deepEqual(sessions[0].context_json.compare_variant_ids, []);
   assert.equal(sessions[0].context_json.focus_variant_id, null);
+});
+
+test("price outlook response includes aiInsight while numeric forecast stays backend-calculated if Qwen fails", async () => {
+  const originalFetch = global.fetch;
+  global.fetch = mockFetchFactory();
+
+  const variantRow = {
+    variant_id: 901,
+    model_id: 9010,
+    model_year: 2022,
+    trim_name: "Market Test",
+    body_type: "suv",
+    fuel_type: "gasoline",
+    engine: "2.0L",
+    transmission: "AT",
+    drivetrain: "FWD",
+    seats: 5,
+    doors: 5,
+    msrp_base: 1000000000,
+    model_name: "Insight",
+    make_name: "CarVista",
+    latest_price: 880000000,
+  };
+  const historyRows = Array.from({ length: 8 }, (_, index) => ({
+    toJSON: () => ({
+      price_id: index + 1,
+      variant_id: 901,
+      market_id: 1,
+      price_type: "avg_market",
+      price: String(960000000 - index * 10000000),
+      captured_at: new Date(Date.UTC(2025, index, 1)).toISOString(),
+      source: "local_seed_history_v1",
+    }),
+  }));
+
+  const ctx = {
+    services: {
+      ollama: {
+        provider: "fpt",
+        model: "Qwen3-32B",
+        apiKey: "test-key",
+        async generate() {
+          throw new Error("Qwen unavailable");
+        },
+      },
+    },
+    sequelize: {
+      async query(sql) {
+        if (sql.includes("WHERE cv.variant_id = :variant_id")) {
+          return [[variantRow]];
+        }
+        if (sql.includes("WHERE cv.model_id = :model_id")) {
+          return [[
+            {
+              variant_id: 902,
+              model_id: 9010,
+              model_year: 2021,
+              trim_name: "Comparable",
+              body_type: "suv",
+              fuel_type: "gasoline",
+              msrp_base: 980000000,
+              latest_price: 870000000,
+              model_name: "Insight",
+              make_name: "CarVista",
+            },
+          ]];
+        }
+        return [[]];
+      },
+    },
+    models: {
+      Markets: {
+        async findByPk() {
+          return { market_id: 1, name: "Vietnam", country_code: "VN", currency_code: "VND" };
+        },
+      },
+      VariantSpecs: { async findOne() { return null; } },
+      VariantSpecKv: { async findAll() { return []; } },
+      CarReviews: { async findAll() { return []; } },
+      VariantPriceHistory: { async findAll() { return historyRows; } },
+      Listings: { async findAll() { return []; } },
+    },
+  };
+
+  try {
+    const result = await predictPrice(ctx, {
+      variant_id: 901,
+      market_id: 1,
+      horizon_months: 6,
+    });
+
+    assert.equal(typeof result.predicted_price, "number");
+    assert.equal(result.meta.aiUsed, false);
+    assert.equal(result.meta.fallbackUsed, true);
+    assert.match(result.aiInsight.summary, /AI explanation was unavailable|best current estimate/i);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("TCO response includes aiInsight while totals stay backend-calculated if Qwen fails", async () => {
+  const ctx = {
+    services: {
+      ollama: {
+        provider: "fpt",
+        model: "Qwen3-32B",
+        apiKey: "test-key",
+        async generate() {
+          throw new Error("Qwen unavailable");
+        },
+      },
+    },
+    models: {
+      Markets: {
+        async findByPk() {
+          return { market_id: 1, name: "Vietnam", currency_code: "VND" };
+        },
+      },
+      TcoProfiles: {
+        async findOne() {
+          return { profile_id: 1, name: "Vietnam demo profile", market_id: 1 };
+        },
+      },
+      TcoRules: {
+        async findAll() {
+          return [
+            { cost_type: "registration_tax", rule_kind: "rate", rate: 0.1, fixed_amount: null, formula_json: null, applies_to: "vehicle" },
+            { cost_type: "vat", rule_kind: "rate", rate: 0.1, fixed_amount: null, formula_json: null, applies_to: "vehicle" },
+            { cost_type: "insurance", rule_kind: "fixed", rate: null, fixed_amount: 12000000, formula_json: null, applies_to: "vehicle" },
+            { cost_type: "maintenance", rule_kind: "formula", rate: null, fixed_amount: null, formula_json: { formula: "per_km", rate: 900 }, applies_to: "vehicle" },
+            { cost_type: "depreciation", rule_kind: "formula", rate: null, fixed_amount: null, formula_json: { formula: "straight_line", rate: 0.1 }, applies_to: "vehicle" },
+          ];
+        },
+      },
+    },
+  };
+
+  const result = await calculateTco(ctx, {
+    market_id: 1,
+    base_price: 1000000000,
+    ownership_years: 3,
+    km_per_year: 12000,
+  });
+
+  assert.equal(typeof result.total_cost, "number");
+  assert.equal(result.costs.vat, 100000000);
+  assert.equal(result.meta.aiUsed, false);
+  assert.equal(result.meta.fallbackUsed, true);
+  assert.match(result.aiInsight.summary, /drive-away|ownership|AI explanation was unavailable/i);
 });
 
 test("tco service returns a partial safe result when market tax config is missing", async () => {

@@ -62,16 +62,6 @@ export default function ListingReviewPanel({
           ))}
         </div>
       </div>
-
-      <div className="rounded-[28px] border border-cars-gray-light/70 bg-white p-4 shadow-[0_12px_28px_rgba(15,45,98,0.05)] dark:border-cars-gray-light/35 dark:bg-slate-950/55 sm:p-5">
-        <h3 className="text-lg font-apercu-bold text-cars-primary">What will be published</h3>
-        <p className="mt-3 text-sm leading-6 text-cars-gray">
-          The current backend still stores the extra seller notes inside the listing description so the publish flow stays compatible while the richer data model catches up.
-        </p>
-        <div className="mt-4 rounded-[20px] bg-cars-off-white p-4 text-sm leading-6 text-cars-gray dark:bg-slate-900/65">
-          {composedDescription || "No description content yet."}
-        </div>
-      </div>
     </aside>
   );
 }

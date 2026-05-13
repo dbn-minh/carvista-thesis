@@ -14,6 +14,7 @@ import SellProgress from "@/components/sell/SellProgress";
 import VehicleSelector from "@/components/sell/VehicleSelector";
 import {
   createObjectPreviewUrl,
+  getRemainingImageSlots,
   optimizeListingImageFile,
   revokeObjectPreviewUrl,
   validatePreparedListingImages,
@@ -260,7 +261,19 @@ export default function SellPage() {
     const list = Array.from(files);
     if (list.length === 0) return;
 
-    const validationErrors = validateSelectedImageFiles(list, form.photos.length);
+    const remainingSlots = getRemainingImageSlots(form.photos.length);
+    if (remainingSlots <= 0) {
+      const selectionErrors = validateSelectedImageFiles(list, form.photos.length);
+      setTone("error");
+      setMessage(selectionErrors[0]?.message || "This listing already has the maximum number of photos.");
+      setFieldErrors((current) => ({ ...current, photos: selectionErrors[0]?.message || "Remove one photo before adding more." }));
+      return;
+    }
+
+    const acceptedFiles = list.slice(0, remainingSlots);
+    const skippedCount = list.length - acceptedFiles.length;
+
+    const validationErrors = validateSelectedImageFiles(acceptedFiles, form.photos.length);
     if (validationErrors.length > 0) {
       setTone("error");
       setMessage(validationErrors[0].message);
@@ -268,7 +281,7 @@ export default function SellPage() {
       return;
     }
 
-    const drafts: PhotoDraft[] = list.map((file, index) => ({
+    const drafts: PhotoDraft[] = acceptedFiles.map((file, index) => ({
       id: buildId(`photo-${index}`),
       name: file.name,
       size: file.size,
@@ -286,8 +299,8 @@ export default function SellPage() {
       photos: [...current.photos, ...drafts],
     }));
 
-    for (let index = 0; index < list.length; index += 1) {
-      const originalFile = list[index];
+    for (let index = 0; index < acceptedFiles.length; index += 1) {
+      const originalFile = acceptedFiles[index];
       const draft = drafts[index];
 
       try {
@@ -354,6 +367,12 @@ export default function SellPage() {
     }
 
     setFieldErrors((current) => ({ ...current, photos: undefined }));
+    if (skippedCount > 0) {
+      setTone("info");
+      setMessage(
+        `Added ${acceptedFiles.length} photo${acceptedFiles.length === 1 ? "" : "s"}. ${skippedCount} image${skippedCount === 1 ? "" : "s"} skipped because each listing can have up to 10 photos.`
+      );
+    }
   }
 
   function setCoverPhoto(photoId: string) {

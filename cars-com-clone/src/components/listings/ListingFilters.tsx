@@ -180,15 +180,6 @@ export default function ListingFilters({
             </p>
           </div>
 
-          <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(135deg,rgba(111,145,221,0.22),rgba(125,226,255,0.08))] px-4 py-4 text-white shadow-[0_18px_40px_rgba(0,0,0,0.22)] sm:px-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#c5f6ff]">
-              Buyer flow
-            </p>
-            <p className="mt-2 text-sm leading-6 text-slate-200">
-              Check availability first. Review the vehicle and the seller before you request a
-              viewing.
-            </p>
-          </div>
         </div>
 
         <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_240px]">

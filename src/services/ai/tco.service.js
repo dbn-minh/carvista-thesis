@@ -1,4 +1,5 @@
 import { clamp, currencySymbolMap, roundMoney, toRateFraction, pickLatestByKey } from "./_helpers.js";
+import { generateTcoInsight } from "./ai_insight.service.js";
 import { buildConfidence, buildEvidence } from "./contracts.js";
 import { buildTcoPresentation } from "./presentation.service.js";
 import {
@@ -40,6 +41,20 @@ function estimateEnergyCostPerYear({ officialSignals, kmPerYear, currency }) {
   return {
     annual_cost: annualFuelCost * (kmPerYear / EPA_BASELINE_KM),
     assumption: "Energy cost uses the official FuelEconomy.gov annual fuel-cost estimate scaled to the selected yearly distance.",
+  };
+}
+
+async function attachTcoInsight(ctx, result, presentation = null) {
+  const insight = await generateTcoInsight(
+    { structuredResult: result, presentation },
+    { ollama: ctx.services?.ollama ?? ctx.ai?.ollama }
+  );
+
+  return {
+    ...result,
+    ...insight.presentation,
+    aiInsight: insight.aiInsight,
+    meta: insight.meta,
   };
 }
 
@@ -85,7 +100,7 @@ export async function calculateTco(ctx, input) {
     Number(variantContext?.variant?.latest_price ?? variantContext?.variant?.msrp_base ?? Number.NaN);
 
   if (!profileBundle.profile) {
-    return {
+    const partialResult = {
       status: "partial",
       code: "PROFILE_NOT_FOUND",
       message: `No TCO profile is configured for market ${resolvedMarketId}.`,
@@ -118,6 +133,7 @@ export async function calculateTco(ctx, input) {
         "Registration tax, VAT, excise, import duty, insurance, and depreciation could not be computed because the market rule set is incomplete.",
       ],
     };
+    return attachTcoInsight(ctx, partialResult);
   }
 
   if (!Number.isFinite(base_price) || base_price <= 0) {
@@ -320,8 +336,5 @@ export async function calculateTco(ctx, input) {
     ],
   };
 
-  return {
-    ...result,
-    ...buildTcoPresentation(result),
-  };
+  return attachTcoInsight(ctx, result, buildTcoPresentation(result));
 }

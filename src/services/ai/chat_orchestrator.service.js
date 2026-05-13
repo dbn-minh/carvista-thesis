@@ -1,5 +1,6 @@
 import { formatFinalAnswer } from "./ai_formatter.service.js";
-import { enhanceAdvisorRecommendationWithModel, formatConversationPolicyWithModel } from "./advisor_llm.service.js";
+import { generateAdvisorFinalResponse } from "./ai_insight.service.js";
+import { formatConversationPolicyWithModel } from "./advisor_llm.service.js";
 import { compareVariants } from "./compare_variants.service.js";
 import { handleConversationPolicy } from "./conversation_policy.service.js";
 import {
@@ -387,16 +388,28 @@ export async function orchestrateChatRequest(
     structured_result: structuredResult,
     turn_context,
   });
-  if (intentResult.intent === "recommend_car" && structuredResult) {
-    const enhanced = await enhanceAdvisorRecommendationWithModel(structuredResult, turn_context, {
+  let advisorInsightMeta = null;
+  if (structuredResult) {
+    const advisorResponse = await generateAdvisorFinalResponse({
+      intent: intentResult.intent,
+      userMessage: message,
+      structuredResult,
+      rawPayload,
+      fallbackAnswer: formatted.final_answer,
+      turnContext: turn_context,
+    }, {
       ollama: ctx.services?.ollama ?? ctx.ai?.ollama,
     });
-    formatted.final_answer = enhanced.final_answer;
-    structuredResult = enhanced.structured_result;
+    formatted.final_answer = advisorResponse.final_answer;
+    advisorInsightMeta = advisorResponse.meta;
+    structuredResult = {
+      ...structuredResult,
+      aiInsight: advisorResponse.aiInsight,
+    };
   }
   const shared = extractSharedEnvelopeFields(rawPayload, structuredResult);
   servicesUsed.push("AiFormatter");
-  if (intentResult.intent === "recommend_car") servicesUsed.push("OllamaAdvisorFormatter");
+  if (structuredResult) servicesUsed.push(advisorInsightMeta?.aiUsed ? "Qwen3AdvisorInsight" : "AiInsightFallback");
   logAiEvent("info", "structured_result_ready", {
     flow_id,
     intent: intentResult.intent,
@@ -424,6 +437,10 @@ export async function orchestrateChatRequest(
       fallback_used:
         rawPayload?.prediction_mode === "limited_history_fallback" ||
         shared.sources.some((source) => source.type !== "internal_db"),
+      aiProvider: advisorInsightMeta?.aiProvider ?? null,
+      aiModel: advisorInsightMeta?.aiModel ?? null,
+      aiUsed: Boolean(advisorInsightMeta?.aiUsed),
+      aiFallbackUsed: Boolean(advisorInsightMeta?.fallbackUsed),
       latency_ms: Date.now() - startedAt,
       route_service: route.service,
       missing_fields: intentResult.missing_fields,

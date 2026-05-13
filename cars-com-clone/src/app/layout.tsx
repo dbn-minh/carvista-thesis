@@ -27,6 +27,13 @@ export const metadata: Metadata = {
   title: "CarVista | AI-Powered Intelligent Car Platform",
   description:
     "Explore real car data, compare models intelligently, track listings, and use AI-powered insights for price trends, total cost of ownership, and expert-style guidance.",
+  icons: {
+    icon: [
+      { url: "/logos/Icon-only.ico", sizes: "32x32", type: "image/x-icon" },
+      { url: "/logos/carvista-logo-icon.png", type: "image/png" },
+    ],
+    apple: [{ url: "/logos/Square%20app%20icon.png", sizes: "1254x1254", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({

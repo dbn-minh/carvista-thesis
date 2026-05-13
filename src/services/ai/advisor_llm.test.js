@@ -482,6 +482,7 @@ test("ollama service retries transient local errors and returns generated text",
 
   try {
     const service = new OllamaService({
+      provider: "ollama",
       baseUrl: "http://localhost:11434",
       model: "qwen3:1.7b",
       timeoutMs: 1000,
@@ -504,6 +505,7 @@ test("ollama health check reports graceful failure", async () => {
 
   try {
     const service = new OllamaService({
+      provider: "ollama",
       baseUrl: "http://localhost:11434",
       model: "qwen3:1.7b",
       timeoutMs: 1000,
@@ -512,6 +514,96 @@ test("ollama health check reports graceful failure", async () => {
     const result = await service.health();
     assert.equal(result.ok, false);
     assert.match(result.error, /Ollama offline/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("ollama service can map generate calls to FPT AI Factory chat completions", async () => {
+  const originalFetch = global.fetch;
+  let seenUrl = "";
+  let seenOptions = null;
+  global.fetch = async (url, options) => {
+    seenUrl = String(url);
+    seenOptions = options;
+    return {
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: '{"answer":"ready"}',
+            },
+          },
+        ],
+      }),
+    };
+  };
+
+  try {
+    const service = new OllamaService({
+      provider: "fpt",
+      baseUrl: "https://api.gptcloud.com/aiam/v1",
+      apiKey: "secret-key",
+      model: "fpt-session-model-id",
+      timeoutMs: 1000,
+      retryCount: 0,
+    });
+    const result = await service.generate({
+      system: "Return strict JSON only.",
+      prompt: "say ready",
+      format: "json",
+      options: { temperature: 0.2, num_predict: 80 },
+    });
+
+    assert.equal(result.text, '{"answer":"ready"}');
+    assert.equal(seenUrl, "https://api.gptcloud.com/aiam/v1/chat/completions");
+    assert.match(seenOptions.headers.Authorization, /^Bearer secret-key$/);
+
+    const payload = JSON.parse(seenOptions.body);
+    assert.equal(payload.model, "fpt-session-model-id");
+    assert.equal(payload.messages[0].role, "system");
+    assert.equal(payload.messages[0].content, "Return strict JSON only.");
+    assert.equal(payload.messages[1].role, "user");
+    assert.equal(payload.messages[1].content, "say ready");
+    assert.equal(payload.max_tokens, 80);
+    assert.equal(payload.temperature, 0.2);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("ollama service accepts a full FPT chat completions endpoint without duplicating the path", async () => {
+  const originalFetch = global.fetch;
+  let seenUrl = "";
+  global.fetch = async (url) => {
+    seenUrl = String(url);
+    return {
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: '{"ok":true}',
+            },
+          },
+        ],
+      }),
+    };
+  };
+
+  try {
+    const service = new OllamaService({
+      provider: "fpt",
+      baseUrl: "https://api.gptcloud.com/aiam/v1/chat/completions",
+      apiKey: "secret-key",
+      model: "fpt-session-model-id",
+      timeoutMs: 1000,
+      retryCount: 0,
+    });
+    const result = await service.generate({ prompt: "ping", format: "json" });
+    assert.equal(result.text, '{"ok":true}');
+    assert.equal(seenUrl, "https://api.gptcloud.com/aiam/v1/chat/completions");
   } finally {
     global.fetch = originalFetch;
   }

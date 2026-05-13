@@ -244,7 +244,7 @@ function CatalogPageContent() {
     }
 
     return {
-      title: `${availableListings.length} active listings ready to browse`,
+      title: `${availableListings.length} cars ready to browse`,
       description: `Showing ${filterOptions.makes.length} brands, ${filterOptions.bodyTypes.length} body styles, and ${filterOptions.fuelTypes.length} fuel types backed by live inventory.`,
     };
   }, [availableListings, filterOptions, inventoryError, loadingInventory]);
@@ -389,11 +389,6 @@ function CatalogPageContent() {
             Ask AI for help
           </button>
         </div>
-
-        <p className="mt-4 text-sm leading-6 text-slate-300">
-          Results open in Listings so you always see cars that are actually available on the
-          marketplace.
-        </p>
       </section>
 
       {!loadingInventory && shortcuts.length > 0 ? (

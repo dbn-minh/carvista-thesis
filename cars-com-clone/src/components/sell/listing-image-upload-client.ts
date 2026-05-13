@@ -14,6 +14,10 @@ export const LISTING_IMAGE_CLIENT_LIMITS = {
   maxTotalUploadBytes: MAX_TOTAL_UPLOAD_BYTES,
 };
 
+export function getRemainingImageSlots(existingCount: number) {
+  return Math.max(0, MAX_FILE_COUNT - Math.max(0, existingCount));
+}
+
 export type ListingImageUploadClientError = {
   code:
     | "too_many_files"
@@ -29,11 +33,15 @@ export function validateSelectedImageFiles(
   existingCount: number
 ): ListingImageUploadClientError[] {
   const errors: ListingImageUploadClientError[] = [];
+  const remainingSlots = getRemainingImageSlots(existingCount);
 
   if (existingCount + files.length > MAX_FILE_COUNT) {
     errors.push({
       code: "too_many_files",
-      message: `You can upload up to ${MAX_FILE_COUNT} images per listing.`,
+      message:
+        remainingSlots <= 0
+          ? `This listing already has ${MAX_FILE_COUNT} photos. Remove one before adding more.`
+          : `You already have ${existingCount} photo${existingCount === 1 ? "" : "s"} staged. You can add ${remainingSlots} more.`,
     });
   }
 

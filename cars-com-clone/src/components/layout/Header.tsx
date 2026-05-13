@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Heart, Inbox, Menu, UserRound, type LucideIcon } from "lucide-react";
@@ -121,25 +122,20 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-white/6 bg-[#0f1414]/88 backdrop-blur-2xl">
       <div className="border-b border-white/6 bg-[linear-gradient(90deg,rgba(111,145,221,0.16),rgba(197,246,255,0.08),rgba(218,185,255,0.08))] text-white">
-        <div className="container-cars flex flex-col gap-2 py-2 text-[11px] sm:flex-row sm:items-center sm:justify-between sm:text-xs md:text-sm">
-          <p className="max-w-3xl font-medium leading-5 text-white/72">
-            CarVista blends marketplace flows with AI compare, forecasting, and TCO insights.
-          </p>
-          <button
-            type="button"
-            onClick={() => openAssistant()}
-            className="inline-flex w-full items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white/88 transition-colors hover:bg-white/10 hover:text-white sm:w-auto sm:px-4 sm:py-2"
-          >
-            Explore AI tools
-          </button>
-        </div>
       </div>
 
       <div className="container-cars flex items-center justify-between gap-3 py-3 lg:grid lg:grid-cols-[auto_1fr_auto] lg:items-center lg:gap-6 lg:py-4">
         <div className="min-w-0 flex items-center gap-4">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,rgba(111,145,221,1),rgba(197,246,255,0.88))] text-lg font-apercu-bold text-slate-950 shadow-[0_18px_42px_rgba(197,246,255,0.2)]">
-              CV
+          <Link href="/" className="flex min-w-0 items-center gap-3" aria-label="CarVista home">
+            <div className="flex h-12 w-[82px] shrink-0 items-center justify-center overflow-hidden rounded-[22px] border border-white/12 bg-white px-2 py-1 shadow-[0_18px_42px_rgba(197,246,255,0.2)]">
+              <Image
+                src="/logos/carvista-logo-icon.png"
+                alt=""
+                width={931}
+                height={482}
+                priority
+                className="h-full w-full object-contain"
+              />
             </div>
             <div className="min-w-0">
               <p className="truncate text-lg font-apercu-bold text-white sm:text-xl">CarVista</p>

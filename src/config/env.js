@@ -168,10 +168,19 @@ export const env = {
     },
   },
   ai: {
+    provider:
+      process.env.AI_PROVIDER ||
+      (process.env.FPT_AI_API_KEY ? "fpt" : "ollama"),
     ollama: {
       baseUrl: trimSlash(process.env.OLLAMA_BASE_URL || "http://localhost:11434"),
       model: process.env.OLLAMA_MODEL || "qwen3:1.7b",
       timeoutMs: toInt(process.env.OLLAMA_TIMEOUT_MS, 30000),
+    },
+    fpt: {
+      baseUrl: trimSlash(process.env.FPT_AI_BASE_URL || "https://api.gptcloud.com/aiam/v1"),
+      apiKey: process.env.FPT_AI_API_KEY || "",
+      model: process.env.FPT_AI_MODEL || "",
+      timeoutMs: toInt(process.env.FPT_AI_TIMEOUT_MS, 30000),
     },
   },
   priceDropThreshold: toFloat(process.env.PRICE_DROP_THRESHOLD, 0.03),

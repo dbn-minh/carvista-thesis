@@ -38,10 +38,10 @@ export default function NewsSection() {
           <div className="space-y-5">
             <Link
               href={`/tips/${featuredArticle.slug}`}
-              className="group overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,36,0.98),rgba(10,14,20,0.98))] transition-all hover:-translate-y-1 hover:border-[#8fb4ff]/30 hover:shadow-[0_22px_54px_rgba(0,0,0,0.32)]"
+              className="group block overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,24,36,0.98),rgba(10,14,20,0.98))] transition-all hover:-translate-y-1 hover:border-[#8fb4ff]/30 hover:shadow-[0_22px_54px_rgba(0,0,0,0.32)]"
             >
               <div className="grid gap-0 lg:grid-cols-[1.05fr_0.95fr]">
-                <div className="relative h-60 overflow-hidden bg-[#0c1119] sm:h-72 lg:h-full lg:min-h-[360px]">
+                <div className="relative h-60 overflow-hidden rounded-t-[26px] bg-[#0c1119] sm:h-72 lg:h-full lg:min-h-[360px] lg:rounded-l-[26px] lg:rounded-tr-none">
                   <Image
                     src={featuredArticle.image}
                     alt={featuredArticle.title}

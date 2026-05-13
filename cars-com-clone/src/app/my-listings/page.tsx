@@ -18,6 +18,7 @@ import {
   getListingImages,
 } from "@/components/listings/listing-utils";
 import {
+  getRemainingImageSlots,
   LISTING_IMAGE_CLIENT_LIMITS,
   optimizeListingImageFile,
   validatePreparedListingImages,
@@ -267,7 +268,18 @@ export default function MyListingsPage() {
 
     if (!editingItem || files.length === 0) return;
 
-    const selectionErrors = validateSelectedImageFiles(files, editingImages.length);
+    const remainingSlots = getRemainingImageSlots(editingImages.length);
+    if (remainingSlots <= 0) {
+      const selectionErrors = validateSelectedImageFiles(files, editingImages.length);
+      setTone("error");
+      setMessage(selectionErrors[0]?.message || "This listing already has the maximum number of photos.");
+      return;
+    }
+
+    const acceptedFiles = files.slice(0, remainingSlots);
+    const skippedCount = files.length - acceptedFiles.length;
+
+    const selectionErrors = validateSelectedImageFiles(acceptedFiles, editingImages.length);
     if (selectionErrors.length > 0) {
       setTone("error");
       setMessage(selectionErrors[0].message);
@@ -277,7 +289,7 @@ export default function MyListingsPage() {
     setPhotoActionKey("upload");
 
     try {
-      const optimized = await Promise.all(files.map((file) => optimizeListingImageFile(file)));
+      const optimized = await Promise.all(acceptedFiles.map((file) => optimizeListingImageFile(file)));
       const preparedErrors = validatePreparedListingImages(optimized);
 
       if (preparedErrors.length > 0) {
@@ -289,8 +301,12 @@ export default function MyListingsPage() {
       await listingsApi.uploadImages(editingItem.listing_id, optimized);
       await loadImages(editingItem.listing_id);
       await refreshListingCards(editingItem.listing_id);
-      setTone("success");
-      setMessage("Listing photos uploaded.");
+      setTone(skippedCount > 0 ? "info" : "success");
+      setMessage(
+        skippedCount > 0
+          ? `Uploaded ${acceptedFiles.length} photo${acceptedFiles.length === 1 ? "" : "s"}. ${skippedCount} image${skippedCount === 1 ? "" : "s"} skipped because each listing can have up to 10 photos.`
+          : "Listing photos uploaded."
+      );
     } catch (error) {
       setTone("error");
       setMessage(error instanceof Error ? error.message : "Could not upload listing photos.");

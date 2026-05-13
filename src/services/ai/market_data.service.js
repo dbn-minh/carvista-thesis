@@ -1,3 +1,4 @@
+import { generatePriceOutlookInsight } from "./ai_insight.service.js";
 import { buildConfidence } from "./contracts.js";
 import { forecastResultSchema } from "./dtos.js";
 import { buildInternalSource, loadComparableMarketContext, loadVariantContext } from "./source_retrieval.service.js";
@@ -19,7 +20,7 @@ export async function analyzeMarketTrend(ctx, { variant_id, market_id = 1, horiz
   const trend = describeTrend(context.price_history);
   const scarcity = comparable.items.length >= 6 ? "mass-market or well-supplied" : comparable.items.length >= 2 ? "thin market" : "scarcity uncertain";
 
-  return forecastResultSchema.parse({
+  const result = forecastResultSchema.parse({
     intent: "market_trend_analysis",
     vehicle: context.variant.label,
     horizon_months,
@@ -48,4 +49,16 @@ export async function analyzeMarketTrend(ctx, { variant_id, market_id = 1, horiz
       ...comparable.sources,
     ],
   });
+
+  const insight = await generatePriceOutlookInsight(
+    { structuredResult: result },
+    { ollama: ctx.services?.ollama ?? ctx.ai?.ollama }
+  );
+
+  return {
+    ...result,
+    ...insight.presentation,
+    aiInsight: insight.aiInsight,
+    meta: insight.meta,
+  };
 }

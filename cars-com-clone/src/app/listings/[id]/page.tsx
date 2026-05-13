@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useParams } from "next/navigation";
 import {
   Building2,
+  ChevronLeft,
+  ChevronRight,
   CheckCheck,
   Clock3,
   Heart,
@@ -19,6 +21,7 @@ import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import PriceHistoryChart from "@/components/catalog/PriceHistoryChart";
 import StatusBanner from "@/components/common/StatusBanner";
 import Header from "@/components/layout/Header";
+import ListingDescriptionSections from "@/components/listings/ListingDescriptionSections";
 import {
   buildListingTitle,
   formatBodyType,
@@ -72,8 +75,11 @@ export default function ListingDetailPage() {
   const [tone, setTone] = useState<"success" | "error" | "info">("info");
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const thumbnailStripRef = useRef<HTMLDivElement | null>(null);
   const [priceHistoryRows, setPriceHistoryRows] = useState<Array<Record<string, unknown>>>([]);
   const [priceHistoryLoading, setPriceHistoryLoading] = useState(false);
+  const [canScrollThumbsLeft, setCanScrollThumbsLeft] = useState(false);
+  const [canScrollThumbsRight, setCanScrollThumbsRight] = useState(false);
 
   const [profile, setProfile] = useState<User | null>(null);
   const [activeRequest, setActiveRequest] = useState<ViewingRequest | null>(null);
@@ -227,6 +233,44 @@ export default function ListingDetailPage() {
         : [],
     [detail, sellerProfile]
   );
+
+  const updateThumbnailScrollState = useCallback(() => {
+    const strip = thumbnailStripRef.current;
+    if (!strip) {
+      setCanScrollThumbsLeft(false);
+      setCanScrollThumbsRight(false);
+      return;
+    }
+
+    setCanScrollThumbsLeft(strip.scrollLeft > 8);
+    setCanScrollThumbsRight(strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 8);
+  }, []);
+
+  useEffect(() => {
+    updateThumbnailScrollState();
+
+    function handleResize() {
+      updateThumbnailScrollState();
+    }
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [gallery.length, updateThumbnailScrollState]);
+
+  useEffect(() => {
+    updateThumbnailScrollState();
+  }, [selectedImage, updateThumbnailScrollState]);
+
+  function scrollThumbnailStrip(direction: "left" | "right") {
+    const strip = thumbnailStripRef.current;
+    if (!strip) return;
+
+    const scrollAmount = Math.max(strip.clientWidth * 0.78, 220);
+    strip.scrollBy({
+      left: direction === "left" ? -scrollAmount : scrollAmount,
+      behavior: "smooth",
+    });
+  }
 
   const sendRequest = useCallback(
     async (event: FormEvent) => {
@@ -463,8 +507,8 @@ export default function ListingDetailPage() {
         {loading ? <p className="text-sm text-slate-300">Loading listing detail...</p> : null}
 
         {detail?.listing ? (
-          <section className="mb-8 grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(300px,0.9fr)] xl:items-start">
-            <div className="section-shell p-4 sm:p-5 md:p-6">
+          <section className="mb-8 grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(300px,0.9fr)] lg:items-stretch">
+            <div className="section-shell flex h-full flex-col p-4 sm:p-5 md:p-6">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <h2 className="text-xl font-apercu-bold text-cars-primary sm:text-2xl">
@@ -494,32 +538,67 @@ export default function ListingDetailPage() {
               )}
 
               {gallery.length > 1 ? (
-                <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
-                  {gallery.map((image) => (
-                    <button
-                      key={image}
-                      type="button"
-                      onClick={() => setSelectedImage(image)}
-                      className={
-                        image === selectedImage
-                          ? "overflow-hidden rounded-[18px] ring-2 ring-cars-accent"
-                          : "overflow-hidden rounded-[18px] border border-cars-gray-light/70"
-                      }
-                    >
-                      <div className="aspect-[4/3]">
-                        <img
-                          src={image}
-                          alt={listingTitle}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                    </button>
-                  ))}
+                <div className="mt-4 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => scrollThumbnailStrip("left")}
+                    disabled={!canScrollThumbsLeft}
+                    aria-label="Scroll thumbnails left"
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cars-primary/12 bg-white/85 text-cars-primary shadow-sm transition-colors hover:bg-cars-off-white disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+
+                  <div
+                    ref={thumbnailStripRef}
+                    onScroll={updateThumbnailScrollState}
+                    className="flex-1 overflow-x-auto scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  >
+                    <div className="flex min-w-max gap-3 pb-1">
+                      {gallery.map((image, index) => (
+                        <button
+                          key={`${image}-${index}`}
+                          type="button"
+                          onClick={(event) => {
+                            setSelectedImage(image);
+                            event.currentTarget.scrollIntoView({
+                              behavior: "smooth",
+                              block: "nearest",
+                              inline: "center",
+                            });
+                          }}
+                          className={
+                            image === selectedImage
+                              ? "w-[104px] shrink-0 overflow-hidden rounded-[18px] ring-2 ring-cars-accent sm:w-[120px]"
+                              : "w-[104px] shrink-0 overflow-hidden rounded-[18px] border border-cars-gray-light/70 sm:w-[120px]"
+                          }
+                        >
+                          <div className="aspect-[4/3]">
+                            <img
+                              src={image}
+                              alt={`${listingTitle} thumbnail ${index + 1}`}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => scrollThumbnailStrip("right")}
+                    disabled={!canScrollThumbsRight}
+                    aria-label="Scroll thumbnails right"
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cars-primary/12 bg-white/85 text-cars-primary shadow-sm transition-colors hover:bg-cars-off-white disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
                 </div>
               ) : null}
             </div>
 
-            <div className="section-shell self-start p-4 sm:p-5 md:p-6">
+            <div className="section-shell flex h-full flex-col p-4 sm:p-5 md:p-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
@@ -550,11 +629,7 @@ export default function ListingDetailPage() {
                 ))}
               </div>
 
-              <p className="mt-5 text-sm leading-7 text-cars-gray">
-                {detail.listing.description || "Seller has not added a description yet."}
-              </p>
-
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <div className="mt-auto grid gap-3 pt-6 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={saveListing}
@@ -572,6 +647,10 @@ export default function ListingDetailPage() {
               </div>
             </div>
           </section>
+        ) : null}
+
+        {detail?.listing ? (
+          <ListingDescriptionSections description={detail.listing.description} />
         ) : null}
 
         {detail?.listing && sellerProfile ? (

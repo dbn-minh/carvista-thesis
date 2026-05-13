@@ -628,13 +628,13 @@ function CompareSearchPanel({
   onClear: () => void;
 }) {
   return (
-    <div className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(28,32,31,0.96),rgba(16,20,19,0.96))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.32)] sm:p-5">
+    <div className="flex h-full flex-col rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(28,32,31,0.96),rgba(16,20,19,0.96))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.32)] sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cars-accent">
             {title}
           </p>
-          <p className="mt-2 text-sm leading-6 text-white/60">
+          <p className="mt-2 min-h-[3rem] text-sm leading-6 text-white/60">
             Search the compare-ready catalog only. Select an exact supported variant before
             comparing.
           </p>
@@ -658,10 +658,14 @@ function CompareSearchPanel({
       />
 
       {selected ? (
-        <div className="mt-4 rounded-[22px] border border-white/8 bg-white/6 px-4 py-4">
-          <p className="break-words text-sm font-semibold text-white">{selected.label}</p>
+        <div className="mt-4 flex min-h-[6.5rem] flex-col rounded-[22px] border border-white/8 bg-white/6 px-4 py-4">
+          <p className="min-h-[2.75rem] break-words text-sm font-semibold leading-6 text-white">
+            {selected.label}
+          </p>
           {selected.resolutionNote ? (
-            <p className="mt-2 text-xs leading-5 text-white/58">{selected.resolutionNote}</p>
+            <p className="mt-2 overflow-hidden text-xs leading-5 text-white/58 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+              {selected.resolutionNote}
+            </p>
           ) : null}
         </div>
       ) : null}
@@ -1301,7 +1305,7 @@ function ComparePageContent() {
           <StatusBanner tone={tone}>{message}</StatusBanner>
         </div>
 
-        <section className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-start lg:gap-5">
+        <section className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-stretch lg:gap-5">
           <CompareSearchPanel
             title="Vehicle A"
             value={leftQuery}
@@ -1439,7 +1443,7 @@ function ComparePageContent() {
                     key={selection?.variantId ?? index}
                     className="flex h-full flex-col overflow-hidden rounded-[30px] border border-cars-gray-light/70 bg-white shadow-[0_20px_44px_rgba(15,45,98,0.08)]"
                   >
-                    <div className="relative aspect-[4/3] bg-cars-off-white sm:aspect-[16/10]">
+                    <div className="relative h-[240px] bg-cars-off-white sm:h-[300px] lg:h-[340px]">
                       {getSelectionImage(selection) ? (
                         <img
                           src={getSelectionImage(selection) || undefined}
@@ -1459,20 +1463,20 @@ function ComparePageContent() {
                     </div>
 
                     <div className="flex flex-1 flex-col p-4 sm:p-5">
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
                         <div className="min-w-0">
                           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
                             Vehicle {index === 0 ? "A" : "B"}
                           </p>
-                          <h3 className="mt-2 break-words text-2xl font-apercu-bold text-cars-primary">
+                          <h3 className="mt-2 min-h-[4rem] break-words text-2xl font-apercu-bold leading-tight text-cars-primary">
                             {selection?.label || (item ? buildCompareItemLabel(item) : "Vehicle")}
                           </h3>
                         </div>
-                        <div className="sm:text-right">
+                        <div className="sm:min-w-[180px] sm:text-right">
                           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
                             {selection?.listing ? "Asking price" : "Market price"}
                           </p>
-                          <p className="mt-2 break-words text-xl font-apercu-bold text-cars-primary">
+                          <p className="mt-2 min-h-[3.5rem] break-words text-xl font-apercu-bold leading-tight text-cars-primary">
                             {selection?.listing
                               ? formatListingPrice(selection.listing.listing.asking_price)
                               : formatListingPrice(item?.latest_price ?? item?.msrp_base)}
@@ -1480,12 +1484,12 @@ function ComparePageContent() {
                         </div>
                       </div>
 
-                      <div className="mt-5 grid gap-3 xl:grid-cols-2">
-                        <div className="rounded-[20px] bg-cars-off-white px-4 py-4">
+                      <div className="mt-5 grid items-stretch gap-3 xl:grid-cols-2">
+                        <div className="flex h-full flex-col rounded-[20px] bg-cars-off-white px-4 py-4">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cars-accent">
                             Key snapshot
                           </p>
-                          <ul className="mt-3 space-y-2 text-sm text-cars-primary">
+                          <ul className="mt-3 flex-1 space-y-2 text-sm text-cars-primary">
                             <li>{item?.year || "-"} · {formatBodyType(item?.body_type)}</li>
                             <li>{formatFuelType(item?.fuel_type)} · {formatTransmission(item?.transmission)}</li>
                             <li>{selection?.listing ? formatMileage(selection.listing.listing.mileage_km) : `${Number(item?.seats) || "-"} seats`}</li>
@@ -1500,7 +1504,7 @@ function ComparePageContent() {
                           </ul>
                         </div>
 
-                        <div className="rounded-[20px] bg-cars-off-white px-4 py-4">
+                        <div className="flex h-full flex-col rounded-[20px] bg-cars-off-white px-4 py-4">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cars-accent">
                             Best fit
                           </p>
@@ -1515,33 +1519,10 @@ function ComparePageContent() {
                             ))}
                           </div>
                           {buildListingMarketPosition(selection, item) ? (
-                            <p className="mt-3 text-sm leading-6 text-cars-gray">
+                            <p className="mt-auto pt-3 text-sm leading-6 text-cars-gray">
                               {buildListingMarketPosition(selection, item)}
                             </p>
                           ) : null}
-                        </div>
-                      </div>
-
-                      <div className="mt-5 grid flex-1 gap-4 sm:grid-cols-2">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
-                            Pros
-                          </p>
-                          <ul className="mt-3 space-y-2 text-sm leading-6 text-cars-primary">
-                            {(item?.pros ?? []).slice(0, 4).map((entry) => (
-                              <li key={entry}>- {entry}</li>
-                            ))}
-                          </ul>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
-                            Watch-outs
-                          </p>
-                          <ul className="mt-3 space-y-2 text-sm leading-6 text-cars-primary">
-                            {(item?.cons ?? []).slice(0, 4).map((entry) => (
-                              <li key={entry}>- {entry}</li>
-                            ))}
-                          </ul>
                         </div>
                       </div>
 

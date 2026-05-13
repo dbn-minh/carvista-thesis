@@ -1,4 +1,5 @@
 import { clamp, roundMoney } from "./_helpers.js";
+import { generatePriceOutlookInsight } from "./ai_insight.service.js";
 import { buildConfidence, buildEvidence } from "./contracts.js";
 import { buildPredictPresentation } from "./presentation.service.js";
 import {
@@ -263,8 +264,16 @@ export async function predictPrice(ctx, input) {
     },
   };
 
+  const presentation = buildPredictPresentation(result);
+  const insight = await generatePriceOutlookInsight(
+    { structuredResult: result, presentation },
+    { ollama: ctx.services?.ollama ?? ctx.ai?.ollama }
+  );
+
   return {
     ...result,
-    ...buildPredictPresentation(result),
+    ...insight.presentation,
+    aiInsight: insight.aiInsight,
+    meta: insight.meta,
   };
 }

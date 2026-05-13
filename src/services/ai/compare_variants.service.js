@@ -1,5 +1,5 @@
 import { clamp } from "./_helpers.js";
-import { enhanceComparePresentationWithModel } from "./advisor_llm.service.js";
+import { generateComparisonInsight } from "./ai_insight.service.js";
 import { buildConfidence, buildEvidence } from "./contracts.js";
 import { buildComparePresentation } from "./presentation.service.js";
 import { buildInternalSource, fetchOfficialVehicleSignals } from "./source_retrieval.service.js";
@@ -499,11 +499,16 @@ export async function compareVariants(ctx, input) {
   };
 
   const presentation = buildComparePresentation(result);
-  const enhancedPresentation = await enhanceComparePresentationWithModel(result, presentation);
+  const insight = await generateComparisonInsight(
+    { structuredResult: result, presentation },
+    { ollama: ctx.services?.ollama ?? ctx.ai?.ollama }
+  );
 
   return {
     ...result,
-    ...enhancedPresentation,
+    ...insight.presentation,
+    aiInsight: insight.aiInsight,
+    meta: insight.meta,
   };
 }
 
