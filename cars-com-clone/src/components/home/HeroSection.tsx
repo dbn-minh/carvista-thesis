@@ -35,10 +35,6 @@ export default function HeroSection() {
 
       <div className="container-cars relative z-10 grid gap-10 py-12 sm:py-14 lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:py-20">
         <div className="text-foreground dark:text-white">
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-cars-primary/12 bg-white/80 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-cars-primary backdrop-blur-xl dark:border-white/10 dark:bg-white/5 dark:text-[#b6c4ec]">
-            <span className="h-2 w-2 rounded-full bg-cars-primary-light dark:bg-[#7de2ff]" />
-            Editorial marketplace
-          </div>
           <p className="mb-4 text-sm font-semibold uppercase tracking-[0.24em] text-cars-gray dark:text-[#b7c4df]">
             Buy, sell, compare, and decide with context
           </p>
@@ -95,33 +91,6 @@ export default function HeroSection() {
               ))}
             </div>
           </form>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            <div className="glass-panel rounded-[22px] p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-cars-primary dark:text-[#8fb4ff]">
-                Live context
-              </p>
-              <p className="mt-2 text-sm leading-6 text-cars-gray dark:text-slate-200">
-                Compare the market, trim differences, and ownership cost in one flow.
-              </p>
-            </div>
-            <div className="glass-panel rounded-[22px] p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-cars-primary dark:text-[#7de2ff]">
-                Faster shortlist
-              </p>
-              <p className="mt-2 text-sm leading-6 text-cars-gray dark:text-slate-200">
-                Save candidates, review pricing history, and keep your shortlist organized.
-              </p>
-            </div>
-            <div className="glass-panel rounded-[22px] p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-cars-primary dark:text-[#c5f6ff]">
-                Seller ready
-              </p>
-              <p className="mt-2 text-sm leading-6 text-cars-gray dark:text-slate-200">
-                List your car with the same detail depth buyers use to evaluate it.
-              </p>
-            </div>
-          </div>
         </div>
 
         <div className="relative min-h-[360px] sm:min-h-[420px] lg:min-h-[560px]">

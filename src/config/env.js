@@ -78,6 +78,9 @@ const corsAllowedOrigins = [
   ...parseList(process.env.CORS_ALLOWED_ORIGINS),
 ].filter(Boolean);
 const corsAllowedOriginPatterns = parseList(process.env.CORS_ALLOWED_ORIGIN_PATTERNS);
+const aiProvider = String(process.env.AI_PROVIDER || "ollama")
+  .trim()
+  .toLowerCase();
 
 function resolveSocialRedirectUri(envKey, providerPath) {
   return trimSlash(process.env[envKey] || `${appPublicUrl}/api/auth/social/${providerPath}/callback`);
@@ -168,10 +171,18 @@ export const env = {
     },
   },
   ai: {
+    provider: aiProvider,
     ollama: {
       baseUrl: trimSlash(process.env.OLLAMA_BASE_URL || "http://localhost:11434"),
       model: process.env.OLLAMA_MODEL || "qwen3:1.7b",
       timeoutMs: toInt(process.env.OLLAMA_TIMEOUT_MS, 30000),
+    },
+    openaiCompatible: {
+      baseUrl: trimSlash(process.env.AI_BASE_URL || ""),
+      apiKey: process.env.AI_API_KEY || "",
+      model: process.env.AI_MODEL || "",
+      timeoutMs: toInt(process.env.AI_TIMEOUT_MS, 30000),
+      chatCompletionsPath: process.env.AI_CHAT_COMPLETIONS_PATH || "/chat/completions",
     },
   },
   priceDropThreshold: toFloat(process.env.PRICE_DROP_THRESHOLD, 0.03),

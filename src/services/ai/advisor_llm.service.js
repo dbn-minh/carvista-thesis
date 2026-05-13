@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { defaultOllamaService } from "./ollama.service.js";
+import { defaultLlmService } from "./llm.service.js";
 import { extractAdvisorProfilePatch, mergePreferenceProfiles } from "./advisor_profile.service.js";
 
 const EXTRACTION_SYSTEM_PROMPT = [
@@ -115,9 +115,13 @@ function compactCompareItemForPrompt(item) {
   };
 }
 
-function shouldUseOllama(ollama) {
-  if (!ollama?.generate) return false;
-  return !(ollama === defaultOllamaService && process.env.NODE_ENV === "test");
+function resolveLlmClient(llm, legacyOllama = null) {
+  return llm ?? legacyOllama ?? defaultLlmService;
+}
+
+function shouldUseLlm(llm) {
+  if (!llm?.generate) return false;
+  return !(llm === defaultLlmService && process.env.NODE_ENV === "test");
 }
 
 function stripThinking(text) {
@@ -499,14 +503,15 @@ function buildAdvisorQuestionPrompt({ profile, nextQuestion, latestMessage, fall
 
 export async function formatAdvisorNextQuestionWithModel(
   { profile = {}, nextQuestion = null, latestMessage = "", fallback = "" } = {},
-  { ollama = defaultOllamaService } = {}
+  { llm = null, ollama = null } = {}
 ) {
   const safeFallback = sanitizeSingleAdvisorQuestion(fallback, nextQuestion?.question || "What should I help you find?");
-  if (!nextQuestion?.question || !shouldUseOllama(ollama)) return safeFallback;
+  const modelClient = resolveLlmClient(llm, ollama);
+  if (!nextQuestion?.question || !shouldUseLlm(modelClient)) return safeFallback;
 
   try {
     const skill = await loadAdvisorSkillMarkdown();
-    const result = await ollama.generate({
+    const result = await modelClient.generate({
       system: `${ADVISOR_QUESTION_SYSTEM_PROMPT}\n\n${skill}`,
       prompt: buildAdvisorQuestionPrompt({ profile, nextQuestion, latestMessage, fallback: safeFallback }),
       format: "json",
@@ -523,13 +528,14 @@ export async function extractAdvisorProfilePatchWithModel(
   message,
   expectedQuestionKey = null,
   currentProfile = {},
-  { ollama = defaultOllamaService } = {}
+  { llm = null, ollama = null } = {}
 ) {
   const fallbackProfile = extractAdvisorProfilePatch(message, expectedQuestionKey, currentProfile);
-  if (!shouldUseOllama(ollama)) return fallbackProfile;
+  const modelClient = resolveLlmClient(llm, ollama);
+  if (!shouldUseLlm(modelClient)) return fallbackProfile;
 
   try {
-    const result = await ollama.generate({
+    const result = await modelClient.generate({
       system: EXTRACTION_SYSTEM_PROMPT,
       prompt: buildExtractionPrompt({ message, expectedQuestionKey, currentProfile }),
       format: "json",
@@ -660,13 +666,14 @@ export async function formatConversationPolicyWithModel(
   intent,
   message,
   policyResponse,
-  { ollama = defaultOllamaService } = {}
+  { llm = null, ollama = null } = {}
 ) {
   const fallback = policyResponse?.final_answer || "I can help with cars, pricing, comparisons, and ownership costs.";
-  if (!shouldUseOllama(ollama)) return fallback;
+  const modelClient = resolveLlmClient(llm, ollama);
+  if (!shouldUseLlm(modelClient)) return fallback;
 
   try {
-    const result = await ollama.generate({
+    const result = await modelClient.generate({
       system: POLICY_SYSTEM_PROMPT,
       prompt: [
         "/no_think",
@@ -689,16 +696,17 @@ export async function formatConversationPolicyWithModel(
 export async function enhanceAdvisorRecommendationWithModel(
   structuredResult,
   turnContext = {},
-  { ollama = defaultOllamaService } = {}
+  { llm = null, ollama = null } = {}
 ) {
   const fallback = {
     final_answer: fallbackRecommendationCopy(structuredResult, turnContext),
     structured_result: structuredResult,
   };
-  if (!shouldUseOllama(ollama)) return fallback;
+  const modelClient = resolveLlmClient(llm, ollama);
+  if (!shouldUseLlm(modelClient)) return fallback;
 
   try {
-    const result = await ollama.generate({
+    const result = await modelClient.generate({
       system: FORMAT_SYSTEM_PROMPT,
       prompt: buildRecommendationFormattingPrompt(structuredResult, turnContext),
       format: "json",
@@ -713,22 +721,23 @@ export async function enhanceAdvisorRecommendationWithModel(
 export async function formatAdvisorRecommendationWithModel(
   structuredResult,
   turnContext = {},
-  { ollama = defaultOllamaService } = {}
+  { llm = null, ollama = null } = {}
 ) {
-  const enhanced = await enhanceAdvisorRecommendationWithModel(structuredResult, turnContext, { ollama });
+  const enhanced = await enhanceAdvisorRecommendationWithModel(structuredResult, turnContext, { llm, ollama });
   return enhanced.final_answer;
 }
 
 export async function enhanceComparePresentationWithModel(
   result,
   presentation,
-  { ollama = defaultOllamaService } = {}
+  { llm = null, ollama = null } = {}
 ) {
   const fallback = presentation ?? {};
-  if (!shouldUseOllama(ollama) || !fallback.assistant_message) return fallback;
+  const modelClient = resolveLlmClient(llm, ollama);
+  if (!shouldUseLlm(modelClient) || !fallback.assistant_message) return fallback;
 
   try {
-    const response = await ollama.generate({
+    const response = await modelClient.generate({
       system: COMPARE_FORMAT_SYSTEM_PROMPT,
       prompt: buildCompareFormattingPrompt(result, fallback),
       format: "json",

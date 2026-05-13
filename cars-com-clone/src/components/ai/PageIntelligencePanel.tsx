@@ -1,16 +1,19 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { Gauge, Medal, TriangleAlert } from "lucide-react";
-import { ADVISOR_PROFILE_EVENT, getStoredAdvisorProfile } from "@/lib/advisor-profile";
-import { catalogApi, listingsApi } from "@/lib/carvista-api";
+import {
+  ADVISOR_PROFILE_EVENT,
+  getStoredAdvisorProfile,
+} from "@/lib/advisor-profile";
 import { toCurrency } from "@/lib/api-client";
+import { catalogApi, listingsApi } from "@/lib/carvista-api";
 import type {
+  AdvisorProfile,
   AiActionPath,
   AiPageIntelligenceResponse,
-  AdvisorProfile,
 } from "@/lib/types";
+import { Gauge, Medal, TriangleAlert } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 
 type PageIntelligencePanelProps = {
   subjectType: "variant" | "listing";
@@ -29,14 +32,64 @@ type PageIntelligencePanelProps = {
   allowedActionPathTypes?: string[];
 };
 
-function formatCardValue(title: string, value: string | number | null | undefined) {
+type InsightCardLike = {
+  title: string;
+  value?: string | number | null;
+  description?: string | null;
+};
+
+function hasText(value: string | null | undefined): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function cleanItems(items?: string[]) {
+  return (items ?? []).map((item) => item.trim()).filter(Boolean);
+}
+
+function hasStoredProfile(
+  profile: AdvisorProfile,
+  profileSnapshot?: string | null,
+) {
+  if (hasText(profileSnapshot)) return true;
+
+  return Object.values(profile).some((value) => {
+    if (Array.isArray(value))
+      return value.some((entry) => hasText(String(entry)));
+    if (typeof value === "number") return Number.isFinite(value);
+    return hasText(typeof value === "string" ? value : null);
+  });
+}
+
+function isMeaningfulInsightCard(card: InsightCardLike) {
+  return card.value != null || hasText(card.description);
+}
+
+function getMissingDataMessage(sectionKey: string, hasProfileData: boolean) {
+  switch (sectionKey) {
+    case "fit_for_you":
+      return hasProfileData
+        ? "Save more preferences to improve this score."
+        : "Not enough profile data yet. Save more preferences to improve this score.";
+    case "price_outlook":
+      return "Price outlook is limited because recent market data is not enough.";
+    case "ownership_cost":
+      return "Ownership cost estimate is not available for this market yet.";
+    default:
+      return "This insight is limited because some supporting data is still missing.";
+  }
+}
+
+function formatCardValue(
+  title: string,
+  value: string | number | null | undefined,
+) {
   if (value == null) return null;
   if (typeof value !== "number") return value;
 
   const normalizedTitle = title.toLowerCase();
   if (
     /cost|price|value|estimate|monthly|yearly|depreciation|insurance|maintenance|tax|tco|fair|ask/i.test(
-      normalizedTitle
+      normalizedTitle,
     )
   ) {
     return toCurrency(value);
@@ -51,10 +104,12 @@ function compactText(value: string, maxLength = 170) {
   return `${normalized.slice(0, maxLength).trimEnd()}...`;
 }
 
-function getFitScoreTone(sectionKey: string, card: { title: string; value?: string | number | null; description?: string | null }) {
-  if (sectionKey !== "fit_for_you" || card.title.toLowerCase() !== "fit score") return null;
+function getFitScoreTone(sectionKey: string, card: InsightCardLike) {
+  if (sectionKey !== "fit_for_you" || card.title.toLowerCase() !== "fit score")
+    return null;
 
-  const numericScore = typeof card.value === "number" ? card.value : Number(card.value);
+  const numericScore =
+    typeof card.value === "number" ? card.value : Number(card.value);
   const label = String(card.description || "").toLowerCase();
 
   if (numericScore >= 80 || label.includes("excellent")) {
@@ -89,7 +144,7 @@ function getFitScoreTone(sectionKey: string, card: { title: string; value?: stri
         "border border-orange-200 bg-[linear-gradient(180deg,#fff5eb_0%,#ffedde_100%)] dark:border-orange-400/20 dark:bg-none dark:bg-orange-500/10",
       value: "text-[#9a4f1a] dark:text-orange-100",
       description: "text-[#9c6a48] dark:text-orange-100/80",
-      label: "Average fit",
+      label: "Fair fit",
       iconShell: "bg-orange-100 dark:bg-orange-400/18",
       iconColor: "text-orange-700 dark:text-orange-100",
       Icon: Gauge,
@@ -101,11 +156,106 @@ function getFitScoreTone(sectionKey: string, card: { title: string; value?: stri
       "border border-rose-200 bg-[linear-gradient(180deg,#fff4f4_0%,#ffeaea_100%)] dark:border-rose-400/20 dark:bg-none dark:bg-rose-500/10",
     value: "text-[#a13d3d] dark:text-rose-100",
     description: "text-[#8b5a5a] dark:text-rose-100/80",
-    label: "Weak fit",
+    label: "Low fit",
     iconShell: "bg-rose-100 dark:bg-rose-400/18",
     iconColor: "text-rose-700 dark:text-rose-100",
     Icon: TriangleAlert,
   };
+}
+
+function AvailabilityNote({
+  message,
+  centered = false,
+}: {
+  message: string;
+  centered?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-[18px] border border-dashed border-cars-primary/14 bg-cars-off-white/90 px-4 py-4 text-sm leading-6 text-cars-gray dark:border-white/10 dark:bg-slate-900/60 ${
+        centered ? "text-center" : ""
+      }`}
+    >
+      <p className="font-medium text-cars-primary dark:text-white/90">
+        {message}
+      </p>
+    </div>
+  );
+}
+
+function FitScoreCard({
+  card,
+  tone,
+  fallbackCopy,
+}: {
+  card: InsightCardLike;
+  tone: ReturnType<typeof getFitScoreTone>;
+  fallbackCopy: string;
+}) {
+  const supportingCopy =
+    hasText(card.description) &&
+    tone?.label &&
+    card.description.trim().toLowerCase() !== tone.label.trim().toLowerCase()
+      ? card.description
+      : fallbackCopy;
+
+  return (
+    <div
+      className={`flex h-full min-h-[220px] flex-col items-center justify-center rounded-[22px] px-6 py-6 text-center ${
+        tone ? tone.shell : "bg-cars-off-white dark:bg-slate-900/70"
+      }`}
+    >
+      {tone?.Icon ? (
+        <span
+          className={`mb-4 flex h-12 w-12 items-center justify-center rounded-full ${
+            tone.iconShell
+          }`}
+        >
+          <tone.Icon className={`h-6 w-6 ${tone.iconColor}`} />
+        </span>
+      ) : null}
+      <p
+        className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${
+          tone ? tone.description : "text-cars-accent"
+        }`}
+      >
+        {card.title}
+      </p>
+      {card.value != null ? (
+        <p
+          className={`mt-4 text-6xl font-apercu-bold leading-none tracking-tight ${
+            tone ? tone.value : "text-cars-primary"
+          }`}
+        >
+          {formatCardValue(card.title, card.value)}
+        </p>
+      ) : (
+        <p
+          className={`mt-4 text-xl font-apercu-bold ${
+            tone ? tone.value : "text-cars-primary"
+          }`}
+        >
+          Not scored yet
+        </p>
+      )}
+      <p
+        className={`mt-3 text-base font-semibold ${
+          tone ? tone.value : "text-cars-primary"
+        }`}
+      >
+        {tone?.label || "Fit snapshot"}
+      </p>
+      {hasText(supportingCopy) ? (
+        <p
+          className={`mt-3 max-w-[15rem] text-sm leading-6 ${
+            tone ? tone.description : "text-cars-gray"
+          }`}
+        >
+          {compactText(supportingCopy, 120)}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function FitSignalGroup({
@@ -119,7 +269,10 @@ function FitSignalGroup({
 }) {
   if (!items?.length) return null;
 
-  const dotTone = tone === "good" ? "bg-emerald-500 dark:bg-emerald-300" : "bg-rose-400 dark:bg-rose-300";
+  const dotTone =
+    tone === "good"
+      ? "bg-emerald-500 dark:bg-emerald-300"
+      : "bg-rose-400 dark:bg-rose-300";
   const shellTone =
     tone === "good"
       ? "bg-[#f5f9ff] dark:bg-slate-900/70"
@@ -132,8 +285,13 @@ function FitSignalGroup({
       </p>
       <ul className="mt-3 space-y-2">
         {items.map((item) => (
-          <li key={item} className="flex items-start gap-2 text-sm leading-6 text-cars-primary dark:text-white/88">
-            <span className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${dotTone}`} />
+          <li
+            key={item}
+            className="flex items-start gap-2 text-sm leading-6 text-cars-primary dark:text-white/88"
+          >
+            <span
+              className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${dotTone}`}
+            />
             <span>{item}</span>
           </li>
         ))}
@@ -194,14 +352,24 @@ export default function PageIntelligencePanel({
   }, []);
 
   const visibleSections = useMemo(
-    () => (data?.sections ?? []).filter((section) => !hiddenSectionKeys.includes(section.key)),
-    [data?.sections, hiddenSectionKeys]
+    () =>
+      (data?.sections ?? []).filter(
+        (section) => !hiddenSectionKeys.includes(section.key),
+      ),
+    [data?.sections, hiddenSectionKeys],
+  );
+  const hasProfileData = useMemo(
+    () => hasStoredProfile(profile, data?.subject?.profile_snapshot),
+    [data?.subject?.profile_snapshot, profile],
   );
   const compactActionPaths = useMemo(() => {
     const seen = new Set<string>();
     return visibleSections
       .flatMap((section) => section.action_paths ?? [])
-      .filter((path) => !allowedActionPathTypes || allowedActionPathTypes.includes(path.type))
+      .filter(
+        (path) =>
+          !allowedActionPathTypes || allowedActionPathTypes.includes(path.type),
+      )
       .filter((path) => {
         const key = `${path.type}-${path.url}`;
         if (seen.has(key)) return false;
@@ -216,7 +384,7 @@ export default function PageIntelligencePanel({
         visibleSections
           .flatMap((section) => section.sources ?? [])
           .map((source) => source.provider)
-          .filter(Boolean)
+          .filter(Boolean),
       ),
     ];
     const pillars = [
@@ -236,7 +404,10 @@ export default function PageIntelligencePanel({
       description: pillars.length
         ? `Built from ${pillars.join(", ")}${sourceProviders.length ? ` and sources like ${sourceProviders.slice(0, 2).join(", ")}` : ""}.`
         : `Built from sources like ${sourceProviders.slice(0, 3).join(", ")}.`,
-      freshness: visibleSections.map((section) => section.freshness_note).find(Boolean) ?? null,
+      freshness:
+        visibleSections
+          .map((section) => section.freshness_note)
+          .find(Boolean) ?? null,
     };
   }, [data?.subject?.profile_snapshot, visibleSections]);
 
@@ -268,7 +439,7 @@ export default function PageIntelligencePanel({
         setError(
           loadError instanceof Error
             ? loadError.message
-            : "AI insights are temporarily unavailable for this vehicle."
+            : "AI insights are temporarily unavailable for this vehicle.",
         );
       } finally {
         if (!cancelled) setLoading(false);
@@ -283,13 +454,17 @@ export default function PageIntelligencePanel({
   }, [subjectType, subjectId, marketId, ownershipYears, kmPerYear, profile]);
 
   return (
-    <section className={`section-shell ${compactLayout ? "p-5 md:p-6" : "p-6"} ${className}`.trim()}>
+    <section
+      className={`section-shell ${compactLayout ? "p-5 md:p-6" : "p-6"} ${className}`.trim()}
+    >
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cars-accent">
             Embedded intelligence
           </p>
-          <h2 className="mt-2 text-2xl font-apercu-bold text-cars-primary">{title}</h2>
+          <h2 className="mt-2 text-2xl font-apercu-bold text-cars-primary">
+            {title}
+          </h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-cars-gray">
             {compactLayout
               ? "Short, buyer-friendly signals from CarVista's pricing and ownership engines."
@@ -306,8 +481,13 @@ export default function PageIntelligencePanel({
       </div>
 
       {loading ? (
-        <div className={`mt-6 grid gap-4 ${compactLayout ? "md:grid-cols-2" : "xl:grid-cols-3"}`}>
-          {Array.from({ length: compactLayout ? 2 : 3 }, (_, index) => `skeleton-${index}`).map((key) => (
+        <div
+          className={`mt-6 grid gap-4 ${compactLayout ? "md:grid-cols-2" : "xl:grid-cols-3"}`}
+        >
+          {Array.from(
+            { length: compactLayout ? 2 : 3 },
+            (_, index) => `skeleton-${index}`,
+          ).map((key) => (
             <div
               key={key}
               className="rounded-[26px] border border-cars-gray-light/70 bg-white px-5 py-5"
@@ -328,12 +508,34 @@ export default function PageIntelligencePanel({
 
       {!loading && !error && visibleSections.length ? (
         <>
-          <div className={`mt-6 grid gap-4 ${compactLayout ? "lg:grid-cols-2" : "xl:grid-cols-3"}`}>
-            {visibleSections.map((section) => (
-            (() => {
-              const isHorizontalCompactFit = compactLayout && section.key === "fit_for_you";
-              const topCard = section.insight_cards?.[0] ?? null;
-              const topHighlight = section.highlights?.[0] ?? null;
+          <div
+            className={`mt-6 grid gap-4 ${compactLayout ? "lg:grid-cols-2" : "xl:grid-cols-3"}`}
+          >
+            {visibleSections.map((section) => {
+              const isHorizontalCompactFit =
+                compactLayout && section.key === "fit_for_you";
+              const insightCards = (section.insight_cards ?? []).filter(
+                isMeaningfulInsightCard,
+              );
+              const fitHighlights = cleanItems(section.highlights).slice(0, 3);
+              const fitCaveats = cleanItems(section.caveats).slice(0, 2);
+              const topCard = insightCards[0] ?? null;
+              const sectionHighlights = cleanItems(section.highlights).slice(
+                0,
+                compactLayout ? 2 : 3,
+              );
+              const sectionFallbackMessage = getMissingDataMessage(
+                section.key,
+                hasProfileData,
+              );
+              const visibleInsightCards = insightCards.slice(
+                0,
+                compactLayout ? 3 : 2,
+              );
+              const hasDualFitColumns =
+                isHorizontalCompactFit &&
+                fitHighlights.length > 0 &&
+                fitCaveats.length > 0;
               const topCardTone = topCard
                 ? getFitScoreTone(section.key, {
                     title: topCard.title,
@@ -343,244 +545,295 @@ export default function PageIntelligencePanel({
                 : null;
 
               return (
-            <article
-              key={section.key}
-              className={`rounded-[26px] border border-cars-gray-light/70 bg-white px-5 py-5 shadow-sm dark:border-cars-gray-light/25 dark:bg-slate-950/45 ${
-                compactLayout ? "flex h-full flex-col" : ""
-              } ${
-                isHorizontalCompactFit ? "lg:col-span-2" : ""
-              }`}
-            >
-              {isHorizontalCompactFit ? (
-                <div className="min-w-0">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
-                        {section.title}
-                      </p>
-                      {section.confidence?.label ? (
-                        <span className="rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-semibold text-cars-primary dark:bg-white/10 dark:text-white/80">
-                          {section.confidence.label}
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-cars-primary">
-                      {compactText(section.assistant_message, 150)}
-                    </p>
-                  </div>
-                  {section.highlights?.length || section.caveats?.length || topCard ? (
-                    <div className="mt-4 grid items-stretch gap-3 lg:grid-cols-3">
-                      <div className="h-full">
-                        <FitSignalGroup
-                          title="The good"
-                          items={section.highlights?.slice(0, 3)}
-                          tone="good"
-                        />
-                      </div>
-                      <div className="h-full">
-                        <FitSignalGroup
-                          title="Watch-outs"
-                          items={section.caveats?.slice(0, 2)}
-                          tone="bad"
-                        />
-                      </div>
-                      {topCard ? (
-                        <div
-                          className={`flex h-full min-h-[168px] flex-col items-center justify-center rounded-[18px] px-5 py-5 text-center ${
-                            topCardTone ? topCardTone.shell : "bg-cars-off-white dark:bg-slate-900/70"
-                          }`}
-                        >
-                          {topCardTone?.Icon ? (
-                            <span
-                              className={`mb-3 flex h-12 w-12 items-center justify-center rounded-full ${
-                                topCardTone.iconShell
-                              }`}
-                            >
-                              <topCardTone.Icon className={`h-6 w-6 ${topCardTone.iconColor}`} />
+                <article
+                  key={section.key}
+                  className={`rounded-[26px] border border-cars-gray-light/70 bg-white px-5 py-5 shadow-sm dark:border-cars-gray-light/25 dark:bg-slate-950/45 ${
+                    compactLayout || isHorizontalCompactFit
+                      ? "flex h-full flex-col"
+                      : ""
+                  } ${isHorizontalCompactFit ? "lg:col-span-2" : ""}`}
+                >
+                  {isHorizontalCompactFit ? (
+                    <div className="min-w-0">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
+                            {section.title}
+                          </p>
+                          {section.confidence?.label ? (
+                            <span className="rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-semibold text-cars-primary dark:bg-white/10 dark:text-white/80">
+                              {section.confidence.label}
                             </span>
                           ) : null}
-                          <p
-                            className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${
-                              topCardTone ? topCardTone.description : "text-cars-accent"
-                            }`}
-                          >
-                            {topCard.title}
-                          </p>
-                          {topCard.value != null ? (
-                            <p
-                              className={`mt-3 text-5xl font-apercu-bold leading-none ${
-                                topCardTone ? topCardTone.value : "text-cars-primary"
-                              }`}
-                            >
-                              {formatCardValue(topCard.title, topCard.value)}
-                            </p>
+                        </div>
+                        <p className="mt-3 text-sm leading-6 text-cars-primary">
+                          {compactText(section.assistant_message, 150)}
+                        </p>
+                      </div>
+
+                      {hasDualFitColumns ? (
+                        <div className="mt-4 grid items-stretch gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,380px)]">
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <FitSignalGroup
+                              title="The good"
+                              items={fitHighlights}
+                              tone="good"
+                            />
+                            <FitSignalGroup
+                              title="Watch-outs"
+                              items={fitCaveats}
+                              tone="bad"
+                            />
+                          </div>
+                          {topCard ? (
+                            <FitScoreCard
+                              card={topCard}
+                              tone={topCardTone}
+                              fallbackCopy={section.assistant_message}
+                            />
+                          ) : (
+                            <AvailabilityNote
+                              message={sectionFallbackMessage}
+                              centered
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        <div className="mt-4 space-y-4">
+                          {topCard ? (
+                            <div className="mx-auto max-w-sm">
+                              <FitScoreCard
+                                card={topCard}
+                                tone={topCardTone}
+                                fallbackCopy={section.assistant_message}
+                              />
+                            </div>
                           ) : null}
-                          <p
-                            className={`mt-3 text-sm font-semibold ${
-                              topCardTone ? topCardTone.value : "text-cars-primary"
-                            }`}
-                          >
-                            {topCardTone?.label || compactText(topCard.description || "", 40)}
-                          </p>
-                          {(topCard.description || section.assistant_message) ? (
-                            <p
-                              className={`mt-2 max-w-[14rem] text-xs leading-5 ${
-                                topCardTone ? topCardTone.description : "text-cars-gray"
-                              }`}
+
+                          {fitHighlights.length || fitCaveats.length ? (
+                            <div
+                              className={`grid gap-3 ${fitHighlights.length && fitCaveats.length ? "md:grid-cols-2" : ""}`}
                             >
-                              {compactText(
-                                topCard.description &&
-                                  topCardTone?.label &&
-                                  topCard.description.trim().toLowerCase() !==
-                                    topCardTone.label.trim().toLowerCase()
-                                  ? topCard.description
-                                  : section.assistant_message,
-                                88
-                              )}
-                            </p>
+                              {fitHighlights.length ? (
+                                <FitSignalGroup
+                                  title="The good"
+                                  items={fitHighlights}
+                                  tone="good"
+                                />
+                              ) : null}
+                              {fitCaveats.length ? (
+                                <FitSignalGroup
+                                  title="Watch-outs"
+                                  items={fitCaveats}
+                                  tone="bad"
+                                />
+                              ) : null}
+                            </div>
+                          ) : (
+                            <AvailabilityNote
+                              message={sectionFallbackMessage}
+                              centered
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
+                            {section.title}
+                          </p>
+                          {section.confidence?.label ? (
+                            <div className="mt-3 inline-flex rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-semibold text-cars-primary dark:bg-white/10 dark:text-white/80">
+                              {section.confidence.label}
+                            </div>
                           ) : null}
                         </div>
-                      ) : null}
-                      {!section.highlights?.length && topHighlight && !topCard ? (
-                        <span className="inline-flex h-full items-center justify-center rounded-[18px] bg-cars-off-white px-4 py-3 text-center text-xs font-medium text-cars-primary dark:bg-slate-900/70">
-                          {compactText(topHighlight, 56)}
-                        </span>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  {!section.highlights?.length && topHighlight && !topCard ? (
-                    <span className="mt-4 inline-flex items-center rounded-full bg-cars-off-white px-3 py-2 text-xs font-medium text-cars-primary dark:bg-slate-900/70">
-                      {compactText(topHighlight, 56)}
-                    </span>
-                  ) : null}
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
-                        {section.title}
+                      </div>
+
+                      <p
+                        className={`mt-4 text-sm text-cars-primary ${
+                          compactLayout ? "leading-6" : "leading-7"
+                        }`}
+                      >
+                        {compactLayout
+                          ? compactText(section.assistant_message)
+                          : section.assistant_message}
                       </p>
-                      {!compactLayout && section.confidence?.label ? (
-                        <div className="mt-3 inline-flex rounded-full bg-[#eef4ff] px-3 py-1 text-[11px] font-semibold text-cars-primary dark:bg-white/10 dark:text-white/80">
-                          {section.confidence.label}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
 
-                  <p className={`mt-4 text-sm text-cars-primary ${compactLayout ? "leading-6" : "leading-7"}`}>
-                    {compactLayout ? compactText(section.assistant_message) : section.assistant_message}
-                  </p>
-
-                  {section.key === "fit_for_you" && (section.highlights?.length || section.caveats?.length) ? (
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      <FitSignalGroup
-                        title="The good"
-                        items={section.highlights?.slice(0, 3)}
-                        tone="good"
-                      />
-                      <FitSignalGroup
-                        title="Watch-outs"
-                        items={section.caveats?.slice(0, 2)}
-                        tone="bad"
-                      />
-                    </div>
-                  ) : null}
-
-                  {section.insight_cards?.length ? (
-                    <div className={`mt-4 grid gap-3 ${compactLayout ? "md:grid-cols-2" : ""}`}>
-                      {section.insight_cards.slice(0, compactLayout ? 1 : 2).map((card, index) => {
-                        const cardTone = getFitScoreTone(section.key, {
-                          title: card.title,
-                          value: card.value,
-                          description: card.description,
-                        });
-
-                        return (
-                          <div
-                            key={`${card.title}-${index}`}
-                            className={`rounded-[20px] px-4 py-4 ${
-                              cardTone
-                                ? cardTone.shell
-                                : "bg-cars-off-white dark:bg-slate-900/70"
-                            }`}
-                          >
-                            <p
-                              className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${
-                                cardTone ? cardTone.description : "text-cars-accent"
-                              }`}
+                      {section.key === "fit_for_you" ? (
+                        <div className="mt-4 space-y-4">
+                          {topCard ? (
+                            <div className="mx-auto max-w-sm">
+                              <FitScoreCard
+                                card={topCard}
+                                tone={topCardTone}
+                                fallbackCopy={section.assistant_message}
+                              />
+                            </div>
+                          ) : null}
+                          {fitHighlights.length || fitCaveats.length ? (
+                            <div
+                              className={`grid gap-3 ${fitHighlights.length && fitCaveats.length ? "md:grid-cols-2" : ""}`}
                             >
-                              {card.title}
-                            </p>
-                            {card.value != null ? (
-                              <p
-                                className={`mt-2 text-lg font-apercu-bold ${
-                                  cardTone ? cardTone.value : "text-cars-primary"
+                              {fitHighlights.length ? (
+                                <FitSignalGroup
+                                  title="The good"
+                                  items={fitHighlights}
+                                  tone="good"
+                                />
+                              ) : null}
+                              {fitCaveats.length ? (
+                                <FitSignalGroup
+                                  title="Watch-outs"
+                                  items={fitCaveats}
+                                  tone="bad"
+                                />
+                              ) : null}
+                            </div>
+                          ) : (
+                            <AvailabilityNote
+                              message={sectionFallbackMessage}
+                              centered
+                            />
+                          )}
+                        </div>
+                      ) : visibleInsightCards.length ? (
+                        <div
+                          className={`mt-4 grid auto-rows-fr gap-3 ${
+                            compactLayout
+                              ? "md:grid-cols-2 xl:grid-cols-3"
+                              : "md:grid-cols-2"
+                          }`}
+                        >
+                          {visibleInsightCards.map((card, index) => {
+                            const cardTone = getFitScoreTone(section.key, {
+                              title: card.title,
+                              value: card.value,
+                              description: card.description,
+                            });
+
+                            return (
+                              <div
+                                key={`${card.title}-${index}`}
+                                className={`flex h-full flex-col rounded-[20px] px-4 py-4 ${
+                                  cardTone
+                                    ? cardTone.shell
+                                    : "bg-cars-off-white dark:bg-slate-900/70"
                                 }`}
                               >
-                                {formatCardValue(card.title, card.value)}
-                              </p>
-                            ) : null}
-                            <p
-                              className={`mt-2 text-sm leading-6 ${
-                                cardTone ? cardTone.description : "text-cars-gray"
-                              }`}
+                                <p
+                                  className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${
+                                    cardTone
+                                      ? cardTone.description
+                                      : "text-cars-accent"
+                                  }`}
+                                >
+                                  {card.title}
+                                </p>
+                                {card.value != null ? (
+                                  <p
+                                    className={`mt-2 text-lg font-apercu-bold ${
+                                      cardTone
+                                        ? cardTone.value
+                                        : "text-cars-primary"
+                                    }`}
+                                  >
+                                    {formatCardValue(card.title, card.value)}
+                                  </p>
+                                ) : null}
+                                {hasText(card.description) ? (
+                                  <p
+                                    className={`mt-2 text-sm leading-6 ${
+                                      cardTone
+                                        ? cardTone.description
+                                        : "text-cars-gray"
+                                    }`}
+                                  >
+                                    {compactLayout
+                                      ? compactText(card.description, 130)
+                                      : card.description}
+                                  </p>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="mt-4">
+                          <AvailabilityNote message={sectionFallbackMessage} />
+                        </div>
+                      )}
+
+                      {sectionHighlights.length &&
+                      section.key !== "fit_for_you" ? (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {sectionHighlights.map((highlight) => (
+                            <span
+                              key={highlight}
+                              className="rounded-full bg-cars-off-white px-3 py-2 text-xs font-medium text-cars-primary dark:bg-slate-900/70"
                             >
-                              {compactLayout ? compactText(card.description, 130) : card.description}
-                            </p>
+                              {compactLayout
+                                ? compactText(highlight, 90)
+                                : highlight}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {section.key !== "fit_for_you" &&
+                      visibleInsightCards.length > 0 &&
+                      visibleInsightCards.length < 2 ? (
+                        <div className="mt-4">
+                          <AvailabilityNote message={sectionFallbackMessage} />
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+
+                  {showActionPaths &&
+                  !compactLayout &&
+                  section.action_paths?.length
+                    ? (() => {
+                        const actionPaths = allowedActionPathTypes
+                          ? section.action_paths.filter((path) =>
+                              allowedActionPathTypes.includes(path.type),
+                            )
+                          : section.action_paths;
+
+                        if (!actionPaths.length) return null;
+
+                        return (
+                          <div className="mt-5 flex flex-wrap gap-2">
+                            {actionPaths.slice(0, 3).map((path) => (
+                              <ActionLink
+                                key={`${path.type}-${path.url}`}
+                                path={path}
+                              />
+                            ))}
                           </div>
                         );
-                      })}
+                      })()
+                    : null}
+
+                  {showSectionCaveats &&
+                  section.caveats?.length &&
+                  section.key !== "fit_for_you" ? (
+                    <div className="mt-4 rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
+                      {section.caveats[0]}
                     </div>
                   ) : null}
 
-                  {section.highlights?.length && section.key !== "fit_for_you" ? (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {section.highlights.slice(0, compactLayout ? 1 : 3).map((highlight) => (
-                        <span
-                          key={highlight}
-                          className="rounded-full bg-cars-off-white px-3 py-2 text-xs font-medium text-cars-primary dark:bg-slate-900/70"
-                        >
-                          {compactLayout ? compactText(highlight, 90) : highlight}
-                        </span>
-                      ))}
-                    </div>
+                  {showSectionSources && section.freshness_note ? (
+                    <p className="mt-4 text-xs leading-5 text-cars-gray">
+                      {section.freshness_note}
+                    </p>
                   ) : null}
-                </>
-              )}
-
-              {showActionPaths && !compactLayout && section.action_paths?.length ? (
-                (() => {
-                  const actionPaths = allowedActionPathTypes
-                    ? section.action_paths.filter((path) => allowedActionPathTypes.includes(path.type))
-                    : section.action_paths;
-
-                  if (!actionPaths.length) return null;
-
-                  return (
-                    <div className="mt-5 flex flex-wrap gap-2">
-                      {actionPaths.slice(0, 3).map((path) => (
-                        <ActionLink key={`${path.type}-${path.url}`} path={path} />
-                      ))}
-                    </div>
-                  );
-                })()
-              ) : null}
-
-              {showSectionCaveats && section.caveats?.length && section.key !== "fit_for_you" ? (
-                <div className="mt-4 rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900">
-                  {section.caveats[0]}
-                </div>
-              ) : null}
-
-              {showSectionSources && section.freshness_note ? (
-                <p className="mt-4 text-xs leading-5 text-cars-gray">{section.freshness_note}</p>
-              ) : null}
-            </article>
+                </article>
               );
-            })()
-            ))}
+            })}
           </div>
 
           {compactLayout && showActionPaths && compactActionPaths.length ? (
@@ -596,13 +849,24 @@ export default function PageIntelligencePanel({
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
                 {compactSourceSummary.title}
               </p>
-              <p className="mt-2 text-cars-primary">{compactSourceSummary.description}</p>
+              <p className="mt-2 text-cars-primary">
+                {compactSourceSummary.description}
+              </p>
               {compactSourceSummary.freshness ? (
-                <p className="mt-2 text-xs text-cars-gray">{compactSourceSummary.freshness}</p>
+                <p className="mt-2 text-xs text-cars-gray">
+                  {compactSourceSummary.freshness}
+                </p>
               ) : null}
             </div>
           ) : null}
         </>
+      ) : null}
+
+      {!loading && !error && !visibleSections.length ? (
+        <div className="mt-6 rounded-[24px] border border-dashed border-cars-primary/20 bg-cars-off-white px-5 py-5 text-sm leading-6 text-cars-gray">
+          AI insights are available in a limited form for this vehicle right
+          now.
+        </div>
       ) : null}
     </section>
   );

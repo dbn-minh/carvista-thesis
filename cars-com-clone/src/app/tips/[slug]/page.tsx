@@ -89,7 +89,7 @@ export default async function TipArticlePage({
                 </ul>
               </div>
 
-              <div className="rounded-[26px] border border-cars-primary/10 bg-[linear-gradient(180deg,rgba(233,241,255,0.72),rgba(255,255,255,1))] p-5">
+              <div className="rounded-[26px] border border-cars-gray-light/70 bg-cars-off-white p-5">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
                   Next step
                 </p>
