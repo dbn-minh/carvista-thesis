@@ -1,6 +1,6 @@
 node_modules
 .gitnexus
-.env
+.env.backup
 .env.*
 !.env.example
 cars-com-clone/.env.local

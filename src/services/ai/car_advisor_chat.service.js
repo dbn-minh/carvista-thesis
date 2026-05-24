@@ -13,7 +13,11 @@ import {
   pickNextDiscoveryQuestion as pickNextDiscoveryQuestionFromProfile,
   pickNextDiscoveryQuestions as pickNextDiscoveryQuestionsFromProfile,
 } from "./advisor_profile.service.js";
-import { extractAdvisorProfilePatchWithModel, formatAdvisorNextQuestionWithModel } from "./advisor_llm.service.js";
+import {
+  extractAdvisorProfilePatchWithModel,
+  formatAdvisorDetourWithModel,
+  formatAdvisorNextQuestionWithModel,
+} from "./advisor_llm.service.js";
 import {
   buildActiveTopic,
   buildConversationState,
@@ -74,10 +78,6 @@ function escapeRegExp(value) {
 
 function containsTerm(text, term) {
   return new RegExp(`\\b${escapeRegExp(term)}\\b`, "i").test(text);
-}
-
-function hasOwn(obj, key) {
-  return Object.prototype.hasOwnProperty.call(obj, key);
 }
 
 function setIfPresent(target, key, value) {
@@ -594,6 +594,45 @@ function didAnswerDiscoveryQuestion(previousProfile = {}, nextProfile = {}, ques
   return isDiscoveryQuestionStillMissing(previousProfile, question) && !isDiscoveryQuestionStillMissing(nextProfile, question);
 }
 
+function hasAdvisorReplySignal(message) {
+  const normalized = normalizeText(message);
+  if (!normalized) return false;
+  if (wantsTemporaryShortlist(message) || wantsFreshAdvisorFlow(message)) return true;
+
+  return [
+    /\b(taxi|ride[-\s]?hailing|commute|daily|family|business|road trip|long trip|performance|sport|sporty|drift|fun|cargo|off[-\s]?road|city|highway)\b/i,
+    /\b(suv|sedan|mpv|pickup|truck|hatchback|coupe|crossover|convertible|van|seat|seats|5[-\s]?seater|7[-\s]?seater)\b/i,
+    /\b(budget|under|around|about|million|billion|vnd|cheap|affordable|expensive|mid[-\s]?range|premium|flagship)\b/i,
+    /\b(durable|durability|reliable|reliability|maintenance|comfort|comfortable|safety|safe|fuel|efficient|hybrid|electric|ev|gasoline|diesel|balanced)\b/i,
+    /\b(toyota|honda|hyundai|kia|mazda|ford|vinfast|mercedes|benz|bmw|audi|lexus|porsche|lamborghini|byd|volkswagen|volvo|tesla)\b/i,
+    /\b(xe|oto|o to|di lai|gia dinh|kinh doanh|duong dai|ben bi|bao duong|tiet kiem|xang|dien|ghe|cho ngoi|ty|ti|trieu)\b/i,
+  ].some((pattern) => pattern.test(normalized));
+}
+
+function isLikelyOffTopicPendingAdvisorReply({
+  pendingQuestion,
+  answeredPendingQuestion = false,
+  classifierIntent = "recommend_car",
+  legacyIntent = "advisor",
+  message = "",
+}) {
+  if (!pendingQuestion) return false;
+  if (wantsTemporaryShortlist(message)) return false;
+
+  const normalized = normalizeText(message);
+  if (!normalized) return false;
+  const hasAdvisorSignal = hasAdvisorReplySignal(message);
+  const questionLike =
+    /\?/.test(message) ||
+    /\b(what|why|how|which|can|could|should|is|are|do|does|explain|tell me|difference between)\b/i.test(normalized);
+  const nonAdvisorIntent = classifierIntent && classifierIntent !== "recommend_car";
+  const legacyNonAdvisorIntent = legacyIntent && legacyIntent !== "advisor";
+  if (questionLike || nonAdvisorIntent || legacyNonAdvisorIntent) return false;
+  if (answeredPendingQuestion && hasAdvisorSignal) return false;
+
+  return !hasAdvisorSignal;
+}
+
 function shouldHandlePendingAdvisorInterruption({
   pendingQuestion,
   answeredPendingQuestion = false,
@@ -602,7 +641,6 @@ function shouldHandlePendingAdvisorInterruption({
   message = "",
 }) {
   if (!pendingQuestion) return false;
-  if (answeredPendingQuestion) return false;
   if (wantsTemporaryShortlist(message)) return false;
 
   const normalized = normalizeText(message);
@@ -611,8 +649,16 @@ function shouldHandlePendingAdvisorInterruption({
     /\b(what|why|how|which|can|could|should|is|are|do|does|explain|tell me|difference between)\b/i.test(normalized);
   const nonAdvisorIntent = classifierIntent && classifierIntent !== "recommend_car";
   const legacyNonAdvisorIntent = legacyIntent && legacyIntent !== "advisor";
+  const offTopicPendingReply = isLikelyOffTopicPendingAdvisorReply({
+    pendingQuestion,
+    answeredPendingQuestion,
+    classifierIntent,
+    legacyIntent,
+    message,
+  });
+  if (answeredPendingQuestion && !offTopicPendingReply) return false;
 
-  return questionLike || nonAdvisorIntent || legacyNonAdvisorIntent;
+  return questionLike || nonAdvisorIntent || legacyNonAdvisorIntent || offTopicPendingReply;
 }
 
 function buildQuestionPrompt(question) {
@@ -1225,7 +1271,7 @@ function buildFactsUsed(intent, structuredResult, market_id) {
 }
 
 function buildAdvisorQuestionReminder(question) {
-  return `To continue your vehicle recommendation, please answer this: ${buildQuestionPrompt(question)}`;
+  return `To bring this back to your vehicle search, ${buildQuestionPrompt(question)}`;
 }
 
 function buildSellGuidanceAnswer() {
@@ -1582,9 +1628,15 @@ export async function chatAdvisor(ctx, input) {
   });
   const rawRecognizedPendingQuestion =
     initialPendingQuestion &&
-    (hasOwn(extractedProfile, initialPendingQuestion.key) ||
-      didAnswerDiscoveryQuestion(existingProfile, tentativeAdvisorProfile, initialPendingQuestion));
+    didAnswerDiscoveryQuestion(existingProfile, tentativeAdvisorProfile, initialPendingQuestion);
   const pendingQuestionInterruption = shouldHandlePendingAdvisorInterruption({
+    pendingQuestion: initialPendingQuestion,
+    answeredPendingQuestion: rawRecognizedPendingQuestion,
+    classifierIntent: freshClassifierPreview.intent,
+    legacyIntent,
+    message,
+  });
+  const offTopicPendingAdvisorReply = isLikelyOffTopicPendingAdvisorReply({
     pendingQuestion: initialPendingQuestion,
     answeredPendingQuestion: rawRecognizedPendingQuestion,
     classifierIntent: freshClassifierPreview.intent,
@@ -1736,7 +1788,11 @@ export async function chatAdvisor(ctx, input) {
             country: context?.country ?? persistedContext.country ?? null,
           },
           advisor_profile,
-          forced_intent: freshClassifierPreview.intent === "recommend_car" ? null : freshClassifierPreview.intent,
+          forced_intent: offTopicPendingAdvisorReply
+            ? "out_of_scope"
+            : freshClassifierPreview.intent === "recommend_car"
+              ? null
+              : freshClassifierPreview.intent,
           flow_id: activeFlowId,
           turn_context: {
             turn_type: "advisor_interruption",
@@ -1749,8 +1805,33 @@ export async function chatAdvisor(ctx, input) {
       }
     }
 
-    const interruptionIntent = interruptionEnvelope?.intent ?? freshClassifierPreview.intent ?? "unknown";
+    const interruptionIntent = offTopicPendingAdvisorReply
+      ? "out_of_scope"
+      : interruptionEnvelope?.intent ?? freshClassifierPreview.intent ?? "unknown";
     const interruptionAnswer = buildInterruptionAnswer(interruptionEnvelope, interruptionIntent);
+    const detourType =
+      interruptionIntent === "vehicle_general_qa"
+        ? "car_side_question"
+        : interruptionIntent === "small_talk"
+          ? "small_talk"
+          : interruptionIntent === "compare_car" ||
+              interruptionIntent === "calculate_tco" ||
+              interruptionIntent === "predict_vehicle_value" ||
+              interruptionIntent === "market_trend_analysis" ||
+              interruptionIntent === "sell_guidance"
+            ? "car_task_interruption"
+            : "off_topic";
+    const detourAnswer = await formatAdvisorDetourWithModel(
+      {
+        userMessage: message,
+        pendingQuestion: pendingQuestionToRepeat,
+        advisorProfile: advisor_profile,
+        detourType,
+        groundedAnswer: interruptionAnswer,
+        fallback: combineInterruptionWithAdvisorQuestion(interruptionAnswer, pendingQuestionToRepeat),
+      },
+      { ollama: ctx.services?.ollama ?? ctx.ai?.ollama }
+    );
     const recommendationPendingFlow = buildPendingFlow({
       id: activeFlowId,
       intent: "recommend_car",
@@ -1808,7 +1889,7 @@ export async function chatAdvisor(ctx, input) {
         session_id: session.session_id,
         flow_id: activeFlowId,
         intent: interruptionIntent,
-        answer: combineInterruptionWithAdvisorQuestion(interruptionAnswer, pendingQuestionToRepeat),
+        answer: detourAnswer,
         cards: buildCardsFromStructuredResult(interruptionIntent, interruptionEnvelope?.structured_result, advisor_profile, null),
         advisor_profile,
         advisor_state: buildAdvisorState(advisor_profile, pendingQuestionToRepeat.key),
@@ -1837,6 +1918,7 @@ export async function chatAdvisor(ctx, input) {
           services_used: [
             ...(interruptionEnvelope?.meta?.services_used ?? []),
             "AdvisorInterruptionPolicy",
+            "AdvisorDetourFormatter",
           ],
           sources_used: interruptionEnvelope?.meta?.sources_used ?? [],
           fallback_used: interruptionEnvelope == null,

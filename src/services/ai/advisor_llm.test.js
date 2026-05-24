@@ -5,6 +5,7 @@ import {
   enhanceAdvisorRecommendationWithModel,
   enhanceComparePresentationWithModel,
   extractAdvisorProfilePatchWithModel,
+  formatAdvisorDetourWithModel,
   formatAdvisorNextQuestionWithModel,
   formatConversationPolicyWithModel,
   formatAdvisorRecommendationWithModel,
@@ -363,6 +364,40 @@ test("conversation policy formatter uses Ollama for a softer dealership redirect
 
   assert.match(answer, /choosing your next car/i);
   assert.doesNotMatch(answer, /recipe/i);
+});
+
+test("advisor detour formatter lets the model answer briefly before returning to the pending question", async () => {
+  let seenPrompt = "";
+  const ollama = {
+    async generate(request) {
+      seenPrompt = request.prompt;
+      return {
+        text: JSON.stringify({
+          answer:
+            "Argentina won the 2022 World Cup, and it was a memorable final. Bringing this back to your car search, what type of vehicle do you prefer?",
+        }),
+      };
+    },
+  };
+
+  const answer = await formatAdvisorDetourWithModel(
+    {
+      userMessage: "Who won the World Cup?",
+      pendingQuestion: {
+        key: "passenger_setup",
+        question: "What type of vehicle do you prefer?",
+      },
+      advisorProfile: { primary_use_cases: ["family"] },
+      detourType: "off_topic",
+      fallback: "To bring this back to your vehicle search, What type of vehicle do you prefer?",
+    },
+    { ollama }
+  );
+
+  assert.match(answer, /Argentina won the 2022 World Cup/i);
+  assert.match(answer, /what type of vehicle do you prefer\?/i);
+  assert.match(seenPrompt, /customer_message:/);
+  assert.match(seenPrompt, /pending_advisor_question:/);
 });
 
 test("advisor question formatter uses Qwen for one concise next question", async () => {

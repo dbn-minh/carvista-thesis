@@ -22,9 +22,22 @@ const POLICY_SYSTEM_PROMPT = [
   "You are a warm dealership AI concierge.",
   "Stay within the dealership and vehicle-buying context.",
   "For small talk, reply naturally and lightly, then invite the customer back to vehicle help.",
-  "For off-topic requests, do not answer the unrelated task in detail. Give a brief friendly pivot back to cars.",
+  "For off-topic requests, you may answer or acknowledge the side topic briefly using general knowledge when it is safe and simple, then pivot back to cars.",
+  "If the side topic depends on current events or facts you cannot verify, avoid pretending certainty.",
   "Use English only and keep it to one or two short sentences.",
   "Return strict JSON only.",
+].join(" ");
+
+const ADVISOR_DETOUR_SYSTEM_PROMPT = [
+  "You are CarVista's friendly vehicle advisor.",
+  "The customer briefly moved away from the car-buying conversation.",
+  "Respond naturally to the side topic using general knowledge when safe and simple.",
+  "Keep the side-topic response brief, then smoothly bring the conversation back to helping the customer choose a car.",
+  "End by asking the pending advisor question exactly once, but phrase the transition naturally.",
+  "Do not pretend to browse the internet or know live facts.",
+  "Do not provide long off-topic explanations.",
+  "Do not invent vehicle data, prices, availability, or recommendations.",
+  "English only. Return strict JSON only.",
 ].join(" ");
 
 const ADVISOR_QUESTION_SYSTEM_PROMPT = [
@@ -484,6 +497,32 @@ function sanitizeSingleAdvisorQuestion(value, fallback) {
   return text;
 }
 
+function sanitizeAdvisorDetourAnswer(value, fallback, pendingQuestion) {
+  const text = normalizeGeneratedSentence(value, fallback, 520).trim();
+  if (!text) return fallback;
+
+  const questionCount = (text.match(/\?/g) ?? []).length;
+  const tooLong = text.split(/\s+/).filter(Boolean).length > 95;
+  const hasBadFormat = /(^|\n)\s*(\d+\.|-)\s+/m.test(text) || /```/.test(text);
+  const asksForTooMuch =
+    questionCount > 2 ||
+    /\b(answer all|few details|still needed|before recommending|moderate confidence)\b/i.test(text);
+  if (tooLong || hasBadFormat || asksForTooMuch || questionCount === 0) return fallback;
+
+  const pending = String(pendingQuestion?.question || "").trim();
+  if (!pending) return text;
+  const pendingAnchor = pending
+    .replace(/[?!.]+$/g, "")
+    .split(/\s+/)
+    .filter((word) => word.length > 3)
+    .slice(0, 4);
+  const matchedAnchor = pendingAnchor.some((word) => {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`\\b${escaped}\\b`, "i").test(text);
+  });
+  return matchedAnchor ? text : fallback;
+}
+
 function buildAdvisorQuestionPrompt({ profile, nextQuestion, latestMessage, fallback }) {
   return [
     "/no_think",
@@ -690,6 +729,53 @@ export async function formatConversationPolicyWithModel(
     return normalizeGeneratedSentence(parsed?.answer, fallback, 240);
   } catch {
     return fallback;
+  }
+}
+
+export async function formatAdvisorDetourWithModel(
+  {
+    userMessage = "",
+    pendingQuestion = null,
+    advisorProfile = {},
+    detourType = "off_topic",
+    groundedAnswer = "",
+    fallback = "",
+  } = {},
+  { llm = null, ollama = null } = {}
+) {
+  const safeFallback =
+    normalizeGeneratedSentence(
+      fallback,
+      `I can touch on that briefly, but I am here to help with your car search. ${
+        pendingQuestion?.question || "What should I help you find?"
+      }`,
+      520
+    ) || fallback;
+  const modelClient = resolveLlmClient(llm, ollama);
+  if (!pendingQuestion?.question || !shouldUseLlm(modelClient)) return safeFallback;
+
+  try {
+    const result = await modelClient.generate({
+      system: ADVISOR_DETOUR_SYSTEM_PROMPT,
+      prompt: [
+        "/no_think",
+        `detour_type: ${detourType}`,
+        `customer_message: ${JSON.stringify(String(userMessage || ""))}`,
+        `pending_advisor_question: ${JSON.stringify(pendingQuestion.question)}`,
+        `grounded_context_answer: ${JSON.stringify(String(groundedAnswer || ""))}`,
+        `advisor_profile_json: ${JSON.stringify(advisorProfile || {})}`,
+        "Write the next customer-facing message.",
+        "If grounded_context_answer is useful, preserve its factual meaning without copying it mechanically.",
+        "If the customer asked about live or current facts, acknowledge the topic without making a dated factual claim.",
+        'Return JSON as {"answer": string}.',
+      ].join("\n"),
+      format: "json",
+      options: { temperature: 0.65, num_predict: 180 },
+    });
+    const parsed = parseModelJson(result.text);
+    return sanitizeAdvisorDetourAnswer(parsed?.answer, safeFallback, pendingQuestion);
+  } catch {
+    return safeFallback;
   }
 }
 

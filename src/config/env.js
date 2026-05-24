@@ -182,6 +182,13 @@ export const env = {
       model: process.env.FPT_AI_MODEL || "",
       timeoutMs: toInt(process.env.FPT_AI_TIMEOUT_MS, 30000),
     },
+    openaiCompatible: {
+      baseUrl: trimSlash(process.env.AI_BASE_URL || process.env.FPT_AI_BASE_URL || ""),
+      apiKey: process.env.AI_API_KEY || process.env.FPT_AI_API_KEY || "",
+      model: process.env.AI_MODEL || process.env.FPT_AI_MODEL || "",
+      timeoutMs: toInt(process.env.AI_TIMEOUT_MS || process.env.FPT_AI_TIMEOUT_MS, 30000),
+      chatCompletionsPath: process.env.AI_CHAT_COMPLETIONS_PATH || "/chat/completions",
+    },
   },
   priceDropThreshold: toFloat(process.env.PRICE_DROP_THRESHOLD, 0.03),
 };

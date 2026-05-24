@@ -53,6 +53,7 @@ function mockFetchFactory() {
 test("conversation router distinguishes vehicle advice from off-topic chat", () => {
   assert.equal(classifyConversationRoute("How reliable is this car on long trips?", { focus_variant_id: 7 }), "vehicle_question");
   assert.equal(classifyConversationRoute("What is the weather today?"), "off_topic");
+  assert.equal(classifyConversationRoute("Who won the World Cup?"), "off_topic");
   assert.equal(classifyConversationRoute("Compare these two cars for me"), "compare");
 });
 
@@ -1181,6 +1182,62 @@ test("chat advisor answers an interruption and repeats the pending buyer-profile
 
   const ctx = {
     sequelize: {},
+    services: {
+      ollama: {
+        async generate(request) {
+          const prompt = String(request?.prompt || "");
+          if (prompt.includes("Convert the latest customer reply")) {
+            const replyMatch = prompt.match(/Customer reply:\s*(".*")/);
+            const customerReply = replyMatch ? JSON.parse(replyMatch[1]) : "";
+            return {
+              text: JSON.stringify({
+                use_case: /iphone/i.test(customerReply) || /family/i.test(customerReply) ? "family" : null,
+                vehicle_type: null,
+                seat_count: null,
+                budget_min: null,
+                budget_max: null,
+                ownership_preference: null,
+                is_unsure: false,
+              }),
+            };
+          }
+          if (prompt.includes("next_missing_field")) {
+            return {
+              text: JSON.stringify({
+                answer: "Got it, family use. What type of vehicle do you prefer?",
+              }),
+            };
+          }
+          if (prompt.includes("pending_advisor_question")) {
+            if (/iphone 17/i.test(prompt)) {
+              const asksUseCase = /what will you mainly use/i.test(prompt);
+              return {
+                text: JSON.stringify({
+                  answer: asksUseCase
+                    ? "The iPhone 17 sounds like a tech detour, not a vehicle-use answer yet. Bringing this back to your car search, what will you mainly use the vehicle for?"
+                    : "The iPhone 17 sounds like a tech detour, not a car preference yet. Bringing this back to your car search, what type of vehicle do you prefer?",
+                }),
+              };
+            }
+            if (/world cup/i.test(prompt)) {
+              return {
+                text: JSON.stringify({
+                  answer:
+                    "Argentina won the 2022 World Cup, and it was a memorable final. Bringing this back to your car search, what type of vehicle do you prefer?",
+                }),
+              };
+            }
+            return {
+              text: JSON.stringify({
+                answer:
+                  "A regular hybrid can run briefly on electric power, while a plug-in hybrid has a larger battery you can charge for more electric-only driving. Bringing this back to your search, what type of vehicle do you prefer?",
+              }),
+            };
+          }
+          return { text: JSON.stringify({ answer: "" }) };
+        },
+      },
+    },
     models: {
       AiChatSessions: {
         async create(payload) {
@@ -1209,12 +1266,37 @@ test("chat advisor answers an interruption and repeats the pending buyer-profile
 
   const first = await chatAdvisor(ctx, {
     user_id: 42,
-    message: "Family use",
+    message: "Recommend me a car",
     context: { market_id: 1 },
   });
 
   assert.equal(first.intent, "recommend_car");
-  assert.equal(first.follow_up_questions[0], "What type of vehicle do you prefer?");
+  assert.equal(first.follow_up_questions[0], "What will you mainly use the vehicle for?");
+
+  const phoneDetour = await chatAdvisor(ctx, {
+    session_id: first.session_id,
+    user_id: 42,
+    message: "iphone 17",
+    context: { market_id: 1 },
+  });
+
+  assert.equal(phoneDetour.intent, "out_of_scope");
+  assert.equal(phoneDetour.needs_clarification, true);
+  assert.match(phoneDetour.answer, /iPhone 17/i);
+  assert.match(phoneDetour.answer, /what will you mainly use the vehicle for\?/i);
+  assert.equal(sessions[0].context_json.pending_question_key, "primary_use_cases");
+  assert.deepEqual(sessions[0].context_json.advisor_profile.primary_use_cases, []);
+
+  const familyStep = await chatAdvisor(ctx, {
+    session_id: first.session_id,
+    user_id: 42,
+    message: "Family use",
+    context: { market_id: 1 },
+  });
+
+  assert.equal(familyStep.intent, "recommend_car");
+  assert.equal(familyStep.follow_up_questions[0], "What type of vehicle do you prefer?");
+  assert.equal(sessions[0].context_json.pending_question_key, "passenger_setup");
 
   const second = await chatAdvisor(ctx, {
     session_id: first.session_id,
@@ -1226,13 +1308,26 @@ test("chat advisor answers an interruption and repeats the pending buyer-profile
   assert.equal(second.intent, "vehicle_general_qa");
   assert.equal(second.needs_clarification, true);
   assert.match(second.answer, /regular hybrid|plug-?in hybrid/i);
-  assert.match(second.answer, /please answer this: What type of vehicle do you prefer\?/i);
+  assert.match(second.answer, /what type of vehicle do you prefer\?/i);
   assert.deepEqual(second.follow_up_questions, ["What type of vehicle do you prefer?"]);
   assert.equal(sessions[0].context_json.pending_question_key, "passenger_setup");
   assert.equal(sessions[0].context_json.conversation_state.pending_clarification.intent, "recommend_car");
   assert.equal(sessions[0].context_json.conversation_state.pending_clarification.field, "passenger_setup");
   assert.equal(sessions[0].context_json.active_topic.intent, "recommend_car");
   assert.deepEqual(sessions[0].context_json.advisor_profile.preferred_fuel_types, []);
+
+  const third = await chatAdvisor(ctx, {
+    session_id: first.session_id,
+    user_id: 42,
+    message: "Who won the World Cup?",
+    context: { market_id: 1 },
+  });
+
+  assert.equal(third.intent, "out_of_scope");
+  assert.equal(third.needs_clarification, true);
+  assert.match(third.answer, /Argentina won the 2022 World Cup/i);
+  assert.match(third.answer, /what type of vehicle do you prefer\?/i);
+  assert.equal(sessions[0].context_json.pending_question_key, "passenger_setup");
 });
 
 test("chat advisor completes the guided recommendation flow in four short steps", async () => {

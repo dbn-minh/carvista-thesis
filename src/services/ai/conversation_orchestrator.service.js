@@ -23,7 +23,8 @@ const GENERAL_AUTOMOTIVE_QA_PATTERNS = [
 
 const AUTOMOTIVE_SIGNAL_PATTERNS = [
   /\b(car|vehicle|suv|sedan|truck|ev|hybrid|mileage|trim|model|variant|drivetrain|horsepower)\b/i,
-  /\b(xe|oto|o to|mau xe|dong xe|dong co|hop so|gia xe|lan banh)\b/i,
+  /\b(budget|price|pricing|ownership|insurance|maintenance|fuel|commute|family|road trip|dealer|listing)\b/i,
+  /\b(xe|oto|o to|mau xe|dong xe|dong co|hop so|gia xe|lan banh|bao duong)\b/i,
 ];
 
 const RECOMMENDATION_PATTERNS = [
@@ -57,11 +58,18 @@ export function classifyConversationRoute(message, options = {}) {
     return "calculate_tco";
   }
   if (/\b(sell|listing|dang ban|ban xe)\b/i.test(normalized)) return "sell_guidance";
+  const hasAutomotiveSignal = isAutomotiveMessage(normalized);
+  const hasRecommendationSignal = RECOMMENDATION_PATTERNS.some((pattern) => pattern.test(normalized));
+
   if (SMALL_TALK_PATTERNS.some((pattern) => pattern.test(normalized)) && !hasFocusVehicle) return "small_talk";
-  if (OFF_TOPIC_PATTERNS.some((pattern) => pattern.test(normalized)) && !isAutomotiveMessage(normalized)) {
+  if (
+    (OFF_TOPIC_PATTERNS.some((pattern) => pattern.test(normalized)) ||
+      (hasQuestionShape && !hasAutomotiveSignal && !hasRecommendationSignal && !hasFocusVehicle)) &&
+    !hasAutomotiveSignal
+  ) {
     return "off_topic";
   }
-  if (RECOMMENDATION_PATTERNS.some((pattern) => pattern.test(normalized))) return "advisor";
+  if (hasRecommendationSignal) return "advisor";
   if (hasQuestionShape && GENERAL_AUTOMOTIVE_QA_PATTERNS.some((pattern) => pattern.test(normalized)) && isAutomotiveMessage(normalized)) {
     return "vehicle_question";
   }
