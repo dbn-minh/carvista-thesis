@@ -77,6 +77,15 @@ export function buildConfidence(score, rationale = []) {
   });
 }
 
+export function buildStatusConfidence(score, label, rationale = []) {
+  const normalized = Math.max(0, Math.min(1, Number(score) || 0));
+  return confidenceSchema.parse({
+    score: normalized,
+    label,
+    rationale: rationale.filter(Boolean),
+  });
+}
+
 export function buildSource(input) {
   return sourceSchema.parse({
     provider: input.provider,

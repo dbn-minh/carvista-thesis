@@ -12,6 +12,7 @@ import {
   parseModelJson,
 } from "./advisor_llm.service.js";
 import { OllamaService } from "./ollama.service.js";
+import { buildAdvisorScopePolicy } from "./advisor_scope_policy.service.js";
 
 test("advisor LLM extraction maps fuzzy customer input into profile fields", async () => {
   const ollama = {
@@ -344,37 +345,79 @@ test("compare formatter uses Qwen to shorten verdict copy without raw score lang
   assert.ok(!/score|points|confidence/i.test(enhanced.assistant_message));
 });
 
-test("conversation policy formatter uses Ollama for a softer dealership redirect", async () => {
+test("conversation policy formatter delegates off-topic wording to the model", async () => {
+  let calls = 0;
+  let seenPrompt = "";
+  let seenOptions = null;
+  const ollama = {
+    async generate(request) {
+      calls += 1;
+      seenPrompt = request.prompt;
+      seenOptions = request.options;
+      return {
+        text: JSON.stringify({
+          answer:
+            "A useful B2B SaaS product idea is a simple sales CRM for small teams: lead capture, pipeline stages, reminders, email templates, and a dashboard for next actions. If you want the automotive version, it could become dealership CRM, fleet lead tracking, inventory follow-up, or auto-sales workflow software. CarVista Advisor's main purpose is vehicle recommendations, comparisons, pricing, and ownership guidance, so I can connect the software idea back to vehicle needs when useful.",
+        }),
+      };
+    },
+  };
+  const policy = buildAdvisorScopePolicy("Give me a B2B SaaS product");
+
+  const answer = await formatConversationPolicyWithModel(
+    "out_of_scope",
+    "Give me a B2B SaaS product",
+    policy,
+    { ollama }
+  );
+
+  assert.equal(calls, 1);
+  assert.match(seenPrompt, /policy_insight_payload_json/i);
+  assert.ok(seenOptions?.num_predict >= 1000);
+  assert.match(answer, /B2B SaaS|CRM|pipeline|dashboard/i);
+  assert.match(answer, /dealership|fleet|auto-sales|vehicle/i);
+  assert.match(answer, /CarVista Advisor's main purpose|vehicle recommendations/i);
+});
+
+test("conversation policy formatter preserves a complete longer model answer", async () => {
+  const longAnswer = [
+    "For a message like that, token usage depends on the exact text, model tokenizer, and how much conversation context is sent with it.",
+    ...Array.from({ length: 10 }, () =>
+      "A rough planning estimate is that short English chat messages often land around one token for every three or four characters, while longer prompts also include hidden system and history context."
+    ),
+    "The important part is to check the provider's usage metadata after the call, especially for OpenAI-compatible APIs.",
+  ].join(" ");
   const ollama = {
     async generate() {
       return {
-        text: JSON.stringify({
-          answer: "I can't help much with dinner, but I can make choosing your next car painless. Tell me how you'll use it most.",
-        }),
+        text: JSON.stringify({ answer: longAnswer }),
       };
     },
   };
 
   const answer = await formatConversationPolicyWithModel(
     "out_of_scope",
-    "What should I cook tonight?",
-    { final_answer: "I can help with cars and vehicle ownership." },
+    "for 1 message like this, how many token it cost usually",
+    buildAdvisorScopePolicy("for 1 message like this, how many token it cost usually"),
     { ollama }
   );
 
-  assert.match(answer, /choosing your next car/i);
-  assert.doesNotMatch(answer, /recipe/i);
+  assert.equal(answer, longAnswer);
+  assert.match(answer, /OpenAI-compatible APIs\.$/);
+  assert.doesNotMatch(answer, /Open\.\.\.$/);
 });
 
-test("advisor detour formatter lets the model answer briefly before returning to the pending question", async () => {
+test("advisor detour formatter uses Qwen to redirect off-topic turns", async () => {
   let seenPrompt = "";
+  let seenOptions = null;
   const ollama = {
     async generate(request) {
       seenPrompt = request.prompt;
+      seenOptions = request.options;
       return {
         text: JSON.stringify({
           answer:
-            "Argentina won the 2022 World Cup, and it was a memorable final. Bringing this back to your car search, what type of vehicle do you prefer?",
+            "Argentina won the 2022 World Cup after a 3-3 draw with France and a penalty shootout. Since CarVista Advisor is mainly here for vehicle recommendations, comparisons, pricing, and ownership costs, I can now bring us back to your search: what type of vehicle do you prefer?",
         }),
       };
     },
@@ -389,15 +432,17 @@ test("advisor detour formatter lets the model answer briefly before returning to
       },
       advisorProfile: { primary_use_cases: ["family"] },
       detourType: "off_topic",
-      fallback: "To bring this back to your vehicle search, What type of vehicle do you prefer?",
+      fallback:
+        "I can help best with car recommendations, comparisons, pricing, and ownership costs. To bring this back to your vehicle search, what type of vehicle do you prefer?",
     },
     { ollama }
   );
 
+  assert.match(answer, /CarVista Advisor/i);
   assert.match(answer, /Argentina won the 2022 World Cup/i);
   assert.match(answer, /what type of vehicle do you prefer\?/i);
-  assert.match(seenPrompt, /customer_message:/);
-  assert.match(seenPrompt, /pending_advisor_question:/);
+  assert.match(seenPrompt, /customer_message/i);
+  assert.ok(seenOptions?.num_predict >= 800);
 });
 
 test("advisor question formatter uses Qwen for one concise next question", async () => {
@@ -489,6 +534,38 @@ test("advisor question formatter rejects checklist-style model output", async ()
   );
 
   assert.equal(answer, "What type of vehicle do you prefer?");
+});
+
+test("advisor question formatter rejects premature vehicle suggestions during profile collection", async () => {
+  const ollama = {
+    async generate() {
+      return {
+        text: JSON.stringify({
+          answer:
+            "That's great to hear. With no budget constraints, the Range Rover SV Autobiography, Audi Q8 V12, or Tesla Cybertruck are excellent choices. What kind of experience or features matter most to you in a vehicle?",
+        }),
+      };
+    },
+  };
+
+  const fallback =
+    "Got it, I can treat budget as open. Do you prefer durability and low maintenance, or stronger performance and a sportier feel?";
+  const answer = await formatAdvisorNextQuestionWithModel(
+    {
+      profile: { budget_mode: "open", budget_flexibility: "open" },
+      nextQuestion: {
+        key: "tradeoff_preferences",
+        question: "Do you prefer durability and low maintenance, or stronger performance and a sportier feel?",
+        examples: ["durability", "performance"],
+      },
+      latestMessage: "money is not a problem",
+      fallback,
+    },
+    { ollama }
+  );
+
+  assert.equal(answer, fallback);
+  assert.doesNotMatch(answer, /Range Rover|Audi|Tesla|Cybertruck/i);
 });
 
 test("advisor JSON parser strips qwen thinking blocks", () => {

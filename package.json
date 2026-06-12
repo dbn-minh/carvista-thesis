@@ -7,6 +7,7 @@
     "dev": "nodemon src/server.js",
     "build": "node -e \"console.log('No build step required for CarVista backend')\"",
     "start": "node src/server.js",
+    "worker:notification": "node src/workers/notification.worker.js",
     "data:seed": "python seed.py",
     "data:refresh": "python -m data.ingestion.refresh_intelligence_materializations",
     "data:ingest:facts": "python -m data.ingestion.ingest_vehicle_facts",
@@ -16,7 +17,8 @@
     "data:ingest:recalls": "python -m data.ingestion.ingest_safety_recalls",
     "gen:models": "sequelize-auto -h localhost -d carvista -u user -x password -p 3308 --dialect mysql -o ./src/models -l esm --cm p",
     "test:ai": "node --test src/services/ai/assistant.test.js",
-    "test:auth": "node --test src/services/auth/auth.test.js"
+    "test:auth": "node --test src/services/auth/auth.test.js",
+    "test:scalability": "node --test src/services/cache/*.test.js src/services/queue/*.test.js"
   },
   "keywords": [],
   "author": "",
@@ -24,10 +26,13 @@
   "description": "",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "bullmq": "^5.76.8",
     "cloudinary": "^2.9.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.5.1",
+    "ioredis": "^5.10.1",
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.1",
     "multer": "^2.1.1",

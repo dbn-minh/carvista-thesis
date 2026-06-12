@@ -1,12 +1,10 @@
 import { buildConfidence } from "./contracts.js";
-import { predictPrice } from "./predict_price.service.js";
-import {
-  evaluateVariantFit,
-  recommendCars,
-} from "./recommendation.service.js";
 import { linkRecommendationTargets } from "./recommendation_linking.service.js";
 import { loadVariantContext } from "./source_retrieval.service.js";
-import { calculateTco } from "./tco.service.js";
+import {
+  calculateTcoWithCache,
+  predictPriceWithCache,
+} from "../cache/cached-ai.service.js";
 import { summarizePreferenceProfile } from "./user_preference_profile.service.js";
 
 function hasProfile(profile) {
@@ -203,7 +201,11 @@ export async function buildVariantPageIntelligence(ctx, {
   ownershipYears = 5,
   kmPerYear = null,
   profile = {},
+  skipSections = [],
 }) {
+  const hiddenSections = new Set(
+    (skipSections ?? []).map((item) => String(item || "").trim()).filter(Boolean),
+  );
   const variantContext = await loadVariantContext(ctx, {
     variant_id: variantId,
     market_id: marketId,
@@ -213,30 +215,26 @@ export async function buildVariantPageIntelligence(ctx, {
   }
 
   const actionPaths = await buildVariantActionPaths(ctx, variantContext);
-  const [tcoResult, predictionResult, fitAssessment, recommendations] = await Promise.all([
-    calculateTco(ctx, {
-      variant_id: variantId,
-      market_id: marketId,
-      ownership_years: ownershipYears,
-      km_per_year: kmPerYear ?? undefined,
-    }).catch(() => null),
-    predictPrice(ctx, {
-      variant_id: variantId,
-      market_id: marketId,
-      horizon_months: 6,
-    }).catch(() => null),
-    hasProfile(profile)
-      ? evaluateVariantFit(ctx, { variant_id: variantId, profile, market_id: marketId }).catch(() => null)
+  const shouldIncludeOwnership = !hiddenSections.has("ownership_cost");
+  const shouldIncludePriceOutlook = !hiddenSections.has("price_outlook");
+
+  const [tcoResult, predictionResult] = await Promise.all([
+    shouldIncludeOwnership
+      ? calculateTcoWithCache(ctx, {
+          variant_id: variantId,
+          market_id: marketId,
+          ownership_years: ownershipYears,
+          km_per_year: kmPerYear ?? undefined,
+        }).catch(() => null)
       : Promise.resolve(null),
-    hasProfile(profile)
-      ? recommendCars(ctx, { profile, market_id: marketId }).catch(() => null)
+    shouldIncludePriceOutlook
+      ? predictPriceWithCache(ctx, {
+          variant_id: variantId,
+          market_id: marketId,
+          horizon_months: 6,
+        }).catch(() => null)
       : Promise.resolve(null),
   ]);
-
-  const recommendationPaths = (recommendations?.ranked_vehicles ?? [])
-    .filter((vehicle) => vehicle.variant_id !== variantId)
-    .map((vehicle) => vehicle.links)
-    .filter(Boolean);
 
   return {
     subject: {
@@ -249,9 +247,8 @@ export async function buildVariantPageIntelligence(ctx, {
     sections: [
       buildNarrativeSection("ownership_cost", "Ownership Cost Snapshot", tcoResult, actionPaths),
       buildNarrativeSection("price_outlook", "AI Price Outlook", predictionResult, actionPaths),
-      buildFitSection(fitAssessment, recommendationPaths),
     ].filter(Boolean),
-    recommendation_paths: recommendationPaths,
+    recommendation_paths: [],
   };
 }
 
@@ -295,7 +292,11 @@ export async function buildListingPageIntelligence(ctx, {
   ownershipYears = 5,
   kmPerYear = null,
   profile = {},
+  skipSections = [],
 }) {
+  const hiddenSections = new Set(
+    (skipSections ?? []).map((item) => String(item || "").trim()).filter(Boolean),
+  );
   const listing = await ctx.models.Listings.findByPk(listingId);
   if (!listing) {
     throw { status: 404, safe: true, message: "Listing not found." };
@@ -307,13 +308,16 @@ export async function buildListingPageIntelligence(ctx, {
     ownershipYears,
     kmPerYear: kmPerYear ?? undefined,
     profile,
+    skipSections,
   });
   const baseActionPaths = intelligence.sections.flatMap((section) => section.action_paths ?? []).slice(0, 3);
-  const predictionResult = await predictPrice(ctx, {
-    variant_id: listing.variant_id,
-    market_id: marketId,
-    horizon_months: 6,
-  }).catch(() => null);
+  const predictionResult = hiddenSections.has("listing_value_position")
+    ? null
+    : await predictPriceWithCache(ctx, {
+        variant_id: listing.variant_id,
+        market_id: marketId,
+        horizon_months: 6,
+      }).catch(() => null);
 
   return {
     subject: {

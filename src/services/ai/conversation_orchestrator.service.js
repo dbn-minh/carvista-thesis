@@ -1,3 +1,9 @@
+import {
+  ADVISOR_SCOPE_STATUS,
+  buildAdvisorScopeReply,
+  classifyAdvisorMessageScope,
+} from "./advisor_scope_policy.service.js";
+
 const SMALL_TALK_PATTERNS = [
   /\b(hello|hi|hey|yo|xin chao|chao)\b/i,
   /\b(thank you|thanks|cam on)\b/i,
@@ -29,7 +35,9 @@ const AUTOMOTIVE_SIGNAL_PATTERNS = [
 
 const RECOMMENDATION_PATTERNS = [
   /\b(recommend|suggest|find me|looking for|need a car|want a car|buy a car|which car should i buy)\b/i,
+  /\b(need|want|looking for|find|recommend|suggest)\b[\w\s'-]{0,50}\b(car|vehicle|suv|sedan|mpv|pickup|truck|crossover|hatchback|ev|hybrid)\b/i,
   /\b(tu van|chon xe|mua xe|can mua xe|muon mua xe|nen mua xe|xe nao phu hop|phu hop voi toi|goi y xe|tim xe)\b/i,
+  /\b([d\u0111]e xuat|goi y|tu van|chon|tim|can|muon)\b[\w\s'-]{0,50}\b(xe|oto|o to|suv|sedan|mpv|pickup)\b/i,
 ];
 
 export function normalizeConversationText(value) {
@@ -49,7 +57,12 @@ export function classifyConversationRoute(message, options = {}) {
   const normalized = normalizeConversationText(message);
   const hasFocusVehicle = Number.isInteger(options.focus_variant_id);
   const hasQuestionShape = /\?/.test(message) || /\b(what|why|how|should|can|difference|explain|which|is|are|co|tai sao|khac nhau|la gi)\b/i.test(normalized);
+  const scope = classifyAdvisorMessageScope(message);
 
+  if (SMALL_TALK_PATTERNS.some((pattern) => pattern.test(normalized)) && !hasFocusVehicle) return "small_talk";
+  if (scope.route === "off_topic") return "off_topic";
+  if (scope.route === "ambiguous_automotive_business") return "ambiguous_automotive_business";
+  if (scope.route === "low_signal") return "low_signal";
   if (/\b(compare|versus| vs |so sanh)\b/i.test(normalized)) return "compare";
   if (/\b(predict|forecast|future value|resale|depreciation|du doan|gia tuong lai)\b/i.test(normalized)) {
     return "predict_price";
@@ -61,7 +74,6 @@ export function classifyConversationRoute(message, options = {}) {
   const hasAutomotiveSignal = isAutomotiveMessage(normalized);
   const hasRecommendationSignal = RECOMMENDATION_PATTERNS.some((pattern) => pattern.test(normalized));
 
-  if (SMALL_TALK_PATTERNS.some((pattern) => pattern.test(normalized)) && !hasFocusVehicle) return "small_talk";
   if (
     (OFF_TOPIC_PATTERNS.some((pattern) => pattern.test(normalized)) ||
       (hasQuestionShape && !hasAutomotiveSignal && !hasRecommendationSignal && !hasFocusVehicle)) &&
@@ -91,9 +103,7 @@ export function buildSmallTalkReply(message) {
 }
 
 export function buildOffTopicReply(message) {
-  const normalized = normalizeConversationText(message);
-  if (/\b(joke|funny|dua)\b/i.test(normalized)) {
-    return "I can appreciate a good detour, but my sweet spot is still cars. Bring me a model, budget, or ownership question and I will be much more useful.";
-  }
-  return "I can respond briefly, but my main expertise is automotive advice: comparing cars, forecasting value, ownership costs, and buying or selling decisions.";
+  const scope = classifyAdvisorMessageScope(message);
+  const status = scope.status === ADVISOR_SCOPE_STATUS.IN_SCOPE ? ADVISOR_SCOPE_STATUS.OFF_TOPIC : scope.status;
+  return buildAdvisorScopeReply(status);
 }

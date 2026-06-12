@@ -11,8 +11,19 @@ const EXPLICIT_INTENT_PATTERNS = [
   ["market_trend_analysis", /\b(market trend|trend analysis|xu huong|market outlook)\b/i],
   ["calculate_tco", /\b(tco|ownership cost|tax|insurance|maintenance cost|lan banh)\b/i],
   ["vehicle_general_qa", /\b(what is|what's|difference between|explain|how does|why does|should i buy|reliable|safe|maintenance|hybrid|plug-in hybrid|phev)\b/i],
-  ["recommend_car", /\b(recommend|suggest|find me|looking for|need a car|want a car|family car|phu hop voi toi)\b/i],
+  ["recommend_car", /\b(recommend|suggest|find me|looking for|need a car|want a car|family car|phu hop voi toi|[d\u0111]e xuat xe|goi y xe|tu van xe|chon xe|tim xe)\b/i],
 ];
+
+const VEHICLE_TASK_INTENTS = new Set([
+  "recommend_car",
+  "compare_car",
+  "predict_vehicle_value",
+  "market_trend_analysis",
+  "calculate_tco",
+  "vehicle_general_qa",
+]);
+
+const POLICY_CONVERSATION_INTENTS = new Set(["out_of_scope", "unknown", "small_talk"]);
 
 const FOLLOW_UP_PATTERNS = [
   /\b(what about|how about|and what about|how is|what if)\b/i,
@@ -57,6 +68,14 @@ function mapIntentToSkill(intent) {
     default:
       return "conversation";
   }
+}
+
+function isVehicleTaskIntent(intent) {
+  return VEHICLE_TASK_INTENTS.has(intent);
+}
+
+function isPolicyConversationIntent(intent) {
+  return POLICY_CONVERSATION_INTENTS.has(intent);
 }
 
 function uniqueIntegers(values) {
@@ -392,6 +411,26 @@ export function classifyConversationTurn({
       linked_entities: linkedEntities,
       follow_up_dimension: null,
       notes: replacementSignal ? ["explicit_replacement"] : ["compare_entities_replaced"],
+    };
+  }
+
+  if (
+    activeIntent &&
+    isPolicyConversationIntent(activeIntent) &&
+    isVehicleTaskIntent(previewIntent)
+  ) {
+    return {
+      turn_type: "new_topic",
+      confidence: 0.9,
+      should_preserve_topic: false,
+      should_replace_active_task: false,
+      should_clear_stale_result: true,
+      bind_pending_flow: false,
+      preserve_focus: false,
+      effective_intent: previewIntent,
+      linked_entities: linkedEntities,
+      follow_up_dimension: null,
+      notes: ["policy_to_vehicle_task_handoff"],
     };
   }
 

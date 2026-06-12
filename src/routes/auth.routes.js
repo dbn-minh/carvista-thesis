@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { env } from "../config/env.js";
 import { requireAuth } from "../middlewares/auth.js";
+import { authLimiter } from "../middlewares/rateLimit.middleware.js";
 import { validate } from "../middlewares/validate.js";
 import { createAuthService } from "../services/auth/auth.service.js";
 
@@ -74,6 +75,7 @@ const UpdateProfileSchema = z.object({
 
 authRoutes.post(
   ["/auth/register", "/auth/password/register"],
+  authLimiter,
   validate(RegisterSchema),
   async (req, res, next) => {
     try {
@@ -96,6 +98,7 @@ authRoutes.post(
 
 authRoutes.post(
   ["/auth/login", "/auth/password/login"],
+  authLimiter,
   validate(LoginSchema),
   async (req, res, next) => {
     try {
@@ -114,7 +117,7 @@ authRoutes.post(
   }
 );
 
-authRoutes.post("/auth/otp/request", validate(OtpRequestSchema), async (req, res, next) => {
+authRoutes.post("/auth/otp/request", authLimiter, validate(OtpRequestSchema), async (req, res, next) => {
   try {
     const authService = createAuthService(req.ctx);
     const result = await authService.requestOtp({
@@ -131,7 +134,7 @@ authRoutes.post("/auth/otp/request", validate(OtpRequestSchema), async (req, res
   }
 });
 
-authRoutes.post("/auth/otp/verify", validate(OtpVerifySchema), async (req, res, next) => {
+authRoutes.post("/auth/otp/verify", authLimiter, validate(OtpVerifySchema), async (req, res, next) => {
   try {
     const authService = createAuthService(req.ctx);
     const result = await authService.verifyOtp({

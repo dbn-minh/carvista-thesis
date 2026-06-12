@@ -19,25 +19,25 @@ const FORMAT_SYSTEM_PROMPT = [
 ].join(" ");
 
 const POLICY_SYSTEM_PROMPT = [
-  "You are a warm dealership AI concierge.",
-  "Stay within the dealership and vehicle-buying context.",
-  "For small talk, reply naturally and lightly, then invite the customer back to vehicle help.",
-  "For off-topic requests, you may answer or acknowledge the side topic briefly using general knowledge when it is safe and simple, then pivot back to cars.",
-  "If the side topic depends on current events or facts you cannot verify, avoid pretending certainty.",
-  "Use English only and keep it to one or two short sentences.",
+  "You are CarVista Advisor, an automotive shopping and ownership assistant.",
+  "Your primary mission is helping users choose, compare, price, and evaluate vehicles.",
+  "For off-topic requests, answer the user's actual request naturally as a general AI answer, then close by connecting back to CarVista Advisor's vehicle recommendation, comparison, pricing, or ownership mission.",
+  "Do not refuse only because the request is outside cars, and do not use fixed fallback copy.",
+  "Off-topic replies may include code, pseudo-code, examples, or general recommendations when the user asks for them.",
+  "Use the user's language unless the caller explicitly asks for another language.",
   "Return strict JSON only.",
 ].join(" ");
 
 const ADVISOR_DETOUR_SYSTEM_PROMPT = [
-  "You are CarVista's friendly vehicle advisor.",
-  "The customer briefly moved away from the car-buying conversation.",
-  "Respond naturally to the side topic using general knowledge when safe and simple.",
-  "Keep the side-topic response brief, then smoothly bring the conversation back to helping the customer choose a car.",
+  "You are CarVista Advisor, an automotive shopping and ownership assistant.",
+  "The customer briefly moved away from an active car-buying conversation.",
+  "For off-topic detours, answer the customer's actual request naturally, then bridge back to the active vehicle-shopping conversation.",
+  "The bridge can mention CarVista Advisor focuses on vehicle recommendations, comparisons, pricing, and ownership costs.",
   "End by asking the pending advisor question exactly once, but phrase the transition naturally.",
   "Do not pretend to browse the internet or know live facts.",
-  "Do not provide long off-topic explanations.",
+  "If code is useful, include a practical snippet or pseudo-code.",
   "Do not invent vehicle data, prices, availability, or recommendations.",
-  "English only. Return strict JSON only.",
+  "Use the customer's language unless they clearly ask for another language. Return strict JSON only.",
 ].join(" ");
 
 const ADVISOR_QUESTION_SYSTEM_PROMPT = [
@@ -45,6 +45,8 @@ const ADVISOR_QUESTION_SYSTEM_PROMPT = [
   "Use the provided CarVista advisor skill as your operating rules.",
   "Write only the next customer-facing chat message.",
   "English only. Ask one focused question. No numbered lists, no progress reports, no multi-question forms.",
+  "During profile collection, do not suggest, rank, or list vehicle models or brands.",
+  "Vehicle recommendations must wait until backend-ranked catalog candidates are provided.",
   "Return strict JSON only.",
 ].join(" ");
 
@@ -68,7 +70,7 @@ const ADVISOR_SKILL_FALLBACK = [
   "Use English only. Ask one focused question at a time.",
   "Do not use numbered lists, checklists, progress reports, or still-needed language.",
   "Acknowledge useful customer input briefly, then ask the single next question in your own natural phrasing.",
-  "Do not recommend vehicles until backend-ranked catalog candidates are supplied.",
+  "Prefer backend-ranked catalog candidates when they are supplied.",
 ].join("\n");
 
 const ADVISOR_SKILL_URL = new URL("./advisor_concierge.skill.md", import.meta.url);
@@ -491,19 +493,21 @@ function sanitizeSingleAdvisorQuestion(value, fallback) {
     /\b(still needed|moderate confidence|answer all|few details|core buying priorities|before recommending|responsibly)\b/i.test(text) ||
     /(^|\s)[1-9][.)]\s/.test(text) ||
     /(^|\s)(first|second|third|finally):/i.test(text);
-  if (hasBadChecklistLanguage) return fallback;
+  const hasPrematureVehicleSuggestion =
+    /\b(range rover|audi|tesla|cybertruck|toyota|honda|mazda|ford|bmw|mercedes|benz|vinfast|hyundai|kia|lexus|nissan|porsche|mitsubishi|suzuki|subaru|volvo|peugeot|byd|isuzu|chevrolet|lamborghini|ferrari|mclaren|rav4|cr-v|cx-5|camry|civic|corolla|fortuner|everest|tucson|santa fe|seltos|carnival|xpander|urus)\b/i.test(text);
+  if (hasBadChecklistLanguage || hasPrematureVehicleSuggestion) return fallback;
   if (questionCount > 1) return fallback;
   if (questionCount === 0 || !normalized.includes("?")) return fallback;
   return text;
 }
 
 function sanitizeAdvisorDetourAnswer(value, fallback, pendingQuestion) {
-  const text = normalizeGeneratedSentence(value, fallback, 520).trim();
+  const text = normalizeGeneratedSentence(value, fallback, 2400).trim();
   if (!text) return fallback;
 
   const questionCount = (text.match(/\?/g) ?? []).length;
-  const tooLong = text.split(/\s+/).filter(Boolean).length > 95;
-  const hasBadFormat = /(^|\n)\s*(\d+\.|-)\s+/m.test(text) || /```/.test(text);
+  const tooLong = text.split(/\s+/).filter(Boolean).length > 450;
+  const hasBadFormat = /(^|\n)\s*(\d+\.|-)\s+/m.test(text);
   const asksForTooMuch =
     questionCount > 2 ||
     /\b(answer all|few details|still needed|before recommending|moderate confidence)\b/i.test(text);
@@ -531,6 +535,8 @@ function buildAdvisorQuestionPrompt({ profile, nextQuestion, latestMessage, fall
     "The backend provides a data goal, not a script. Use your own natural phrasing.",
     "Ask one focused question that moves the sale forward. Do not ask for multiple details.",
     "If the customer's latest message already implies a priority, acknowledge it and ask the next useful angle without repeating the same forced choice.",
+    "Do not recommend, list, rank, or name vehicle models or brands in this step.",
+    "Do not mention catalog candidates, listings, inventory, or availability while asking the next profile question.",
     "Do not mention confidence, missing fields, state, extraction, backend, JSON, or catalog internals.",
     `next_missing_field: ${nextQuestion?.key || "unknown"}`,
     `data_goal: ${JSON.stringify(describeAdvisorDataGoal(nextQuestion))}`,
@@ -591,7 +597,11 @@ export async function extractAdvisorProfilePatchWithModel(
 
 function fallbackRecommendationCopy(structuredResult, turnContext = {}) {
   const ranked = (structuredResult?.ranked_vehicles ?? []).slice(0, 3);
-  if (!ranked.length) return "I do not have enough grounded catalog matches to recommend a vehicle yet.";
+  if (!ranked.length) {
+    return structuredResult?.general_vehicle_suggestions_allowed
+      ? "The local catalog did not return a strong match, so the AI model can suggest general outside-catalog vehicles while clearly marking them as not confirmed CarVista inventory."
+      : "I do not have enough catalog matches to recommend a vehicle yet.";
+  }
   const profileSummary = structuredResult?.profile_summary;
   const intro = turnContext.directional_shortlist || /partial/i.test(profileSummary || "")
     ? "These are the closest matches currently available in our catalog."
@@ -605,17 +615,23 @@ function fallbackRecommendationCopy(structuredResult, turnContext = {}) {
 
 function buildRecommendationFormattingPrompt(structuredResult, turnContext = {}) {
   const candidates = (structuredResult?.ranked_vehicles ?? []).slice(0, 3).map(compactVehicleForPrompt);
+  const allowGeneralSuggestions = Boolean(structuredResult?.general_vehicle_suggestions_allowed);
   return [
     "/no_think",
     "Format the backend-ranked recommendation result for a dealership chat.",
-    "Use only the vehicles in candidate_vehicles. Do not add or rename vehicles.",
-    "Each reason should sound like a smart sales advisor and reflect the customer profile, but it must be based only on fields present in candidate_vehicles.",
-    "Good reasons are specific, short, and practical: use case fit, seating, budget, ownership style, fuel type, or body type if present.",
-    "Do not mention exact prices or specs unless they are present in candidate_vehicles.",
+    candidates.length
+      ? "Use candidate_vehicles first. If the customer asked for something not covered and general suggestions are allowed, you may add outside-catalog suggestions marked as not confirmed inventory."
+      : "No candidate_vehicles were supplied. If general suggestions are allowed, suggest well-known outside-catalog vehicles and mark them as not confirmed CarVista inventory.",
+    "Each reason should sound like a smart sales advisor and reflect the customer profile.",
+    "Good reasons are specific, practical, and tied to use case fit, seating, budget, ownership style, fuel type, or body type when known.",
+    "Do not mention exact prices, local availability, or trim specs unless they are present in candidate_vehicles.",
     "Return JSON with this exact shape:",
     '{"intro": string, "items": [{"variant_id": number|null, "title": string, "reason": string}]}',
     `directional_shortlist: ${Boolean(turnContext.directional_shortlist)}`,
     `profile_summary: ${JSON.stringify(structuredResult?.profile_summary || "")}`,
+    `customer_message: ${JSON.stringify(structuredResult?.user_message || "")}`,
+    `general_suggestions_allowed: ${allowGeneralSuggestions}`,
+    `catalog_coverage: ${JSON.stringify(structuredResult?.catalog_coverage || null)}`,
     `candidate_vehicles: ${JSON.stringify(candidates)}`,
   ].join("\n");
 }
@@ -659,11 +675,18 @@ function sanitizeFormattedRecommendation(parsed, structuredResult, turnContext =
   const allowedByTitle = new Map(ranked.map((item) => [String(item.name || "").toLowerCase(), item]));
   const lines = [];
   const enhancedReasons = new Map();
+  const allowGeneralSuggestions = Boolean(structuredResult?.general_vehicle_suggestions_allowed);
 
   for (const formattedItem of parsed.items.slice(0, 3)) {
     const byId = allowedById.get(Number(formattedItem.variant_id));
     const byTitle = allowedByTitle.get(String(formattedItem.title || "").toLowerCase());
     const source = byId ?? byTitle;
+    if (!source && allowGeneralSuggestions && !ranked.length) {
+      const title = normalizeGeneratedSentence(formattedItem.title, "", 80);
+      const reason = normalizeGeneratedSentence(formattedItem.reason, "a sensible outside-catalog option to compare", 180);
+      if (title) lines.push(`${title}: ${reason.replace(/[.]+$/g, "")}.`);
+      continue;
+    }
     if (!source) continue;
     const fallbackReason = source.reasons?.[0] || "A strong fit for your stated needs";
     const reason = normalizeGeneratedSentence(formattedItem.reason, fallbackReason, 145);
@@ -716,17 +739,20 @@ export async function formatConversationPolicyWithModel(
       system: POLICY_SYSTEM_PROMPT,
       prompt: [
         "/no_think",
-        "Rewrite the policy response so it feels natural but still redirects to dealership help.",
+        "Write the final CarVista Advisor policy response from this classification payload.",
+        "Use the payload as guardrails and context, not as fixed copy.",
+        "If this is off-topic, answer the user's request naturally first, then close by connecting back to CarVista Advisor's vehicle recommendation, comparison, pricing, or ownership mission.",
         `intent: ${intent}`,
         `customer_message: ${JSON.stringify(String(message || ""))}`,
-        `fallback_policy_response: ${JSON.stringify(fallback)}`,
+        `policy_insight_payload_json: ${JSON.stringify(policyResponse?.insight_payload || policyResponse || {})}`,
+        `emergency_fallback_text: ${JSON.stringify(fallback)}`,
         'Return JSON as {"answer": string}.',
       ].join("\n"),
       format: "json",
-      options: { temperature: 0.4, num_predict: 120 },
+      options: { temperature: 0.68, num_predict: 1200 },
     });
     const parsed = parseModelJson(result.text);
-    return normalizeGeneratedSentence(parsed?.answer, fallback, 240);
+    return normalizeGeneratedSentence(parsed?.answer, fallback, 2400);
   } catch {
     return fallback;
   }
@@ -746,7 +772,7 @@ export async function formatAdvisorDetourWithModel(
   const safeFallback =
     normalizeGeneratedSentence(
       fallback,
-      `I can touch on that briefly, but I am here to help with your car search. ${
+      `The AI model is unavailable right now, so I can't generate the flexible detour answer yet. ${
         pendingQuestion?.question || "What should I help you find?"
       }`,
       520
@@ -770,7 +796,7 @@ export async function formatAdvisorDetourWithModel(
         'Return JSON as {"answer": string}.',
       ].join("\n"),
       format: "json",
-      options: { temperature: 0.65, num_predict: 180 },
+      options: { temperature: 0.65, num_predict: 900 },
     });
     const parsed = parseModelJson(result.text);
     return sanitizeAdvisorDetourAnswer(parsed?.answer, safeFallback, pendingQuestion);

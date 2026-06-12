@@ -1,8 +1,9 @@
 import { env } from "../config/env.js";
-import { createNotification } from "./notify.service.js";
+import { processPriceDropAlertNotification } from "./notifications/notification-job.service.js";
+import { enqueueNotificationJob } from "./queue/queue.service.js";
 
 export async function addVariantPricePoint(ctx, { variantId, marketId, price, capturedAt, source = "manual" }) {
-  const { VariantPriceHistory, WatchedVariants, Notifications } = ctx.models;
+  const { VariantPriceHistory, WatchedVariants } = ctx.models;
 
   // get latest price
   const latest = await VariantPriceHistory.findOne({
@@ -24,15 +25,34 @@ export async function addVariantPricePoint(ctx, { variantId, marketId, price, ca
     const drop = (latest.price - price) / latest.price;
     if (drop >= env.priceDropThreshold) {
       const watchers = await WatchedVariants.findAll({ where: { variant_id: variantId } });
-      for (const w of watchers) {
-        await createNotification(
-          { Notifications },
-          w.user_id,
-          "price_alert",
-          created.price_id,
-          "Price drop alert",
-          `A watched variant dropped by ${(drop * 100).toFixed(1)}%. New price: ${price}.`
+      if (watchers.length > 0) {
+        const queueResult = await enqueueNotificationJob(
+          "priceDropAlert",
+          {
+            variantId,
+            pricePointId: created.price_id,
+            dropRatio: drop,
+            newPrice: price,
+          },
+          {
+            jobId: `price-drop-alert:${variantId}:${created.price_id}`,
+          }
         );
+
+        if (!queueResult.queued) {
+          await processPriceDropAlertNotification(ctx, {
+            variantId,
+            pricePointId: created.price_id,
+            dropRatio: drop,
+            newPrice: price,
+          }).catch((error) => {
+            console.warn("[price] price-drop fallback notification failed", {
+              variantId,
+              priceId: created.price_id,
+              message: error?.message || String(error),
+            });
+          });
+        }
       }
     }
   }

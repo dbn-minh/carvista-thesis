@@ -243,85 +243,6 @@ function InsightCards({
   );
 }
 
-function FollowUpList({ questions }: { questions?: string[] }) {
-  const visibleQuestions = sanitizeFollowUps(questions);
-  if (visibleQuestions.length === 0) return null;
-
-  return (
-    <div className="mt-3 rounded-[18px] bg-cars-off-white px-3 py-3 text-xs leading-5 text-cars-gray dark:bg-[#111c31] dark:text-white/68">
-      <p className="font-semibold uppercase tracking-[0.14em] text-cars-accent dark:text-[#7da7ff]">Next</p>
-      {visibleQuestions.map((question) => (
-        <p key={question} className="mt-2 break-words text-cars-primary dark:text-white/88">
-          {question}
-        </p>
-      ))}
-    </div>
-  );
-}
-
-function ConfidenceBadge({ confidence }: { confidence?: AiConfidence | null }) {
-  if (!confidence) return null;
-
-  return (
-    <div className="mt-3 inline-flex rounded-full bg-[#eef4ff] px-3 py-1 text-xs font-semibold text-cars-primary dark:bg-[#182844] dark:text-white/88">
-      {confidence.label}
-    </div>
-  );
-}
-
-function SourceList({
-  sources,
-  freshnessNote,
-}: {
-  sources?: AiSource[];
-  freshnessNote?: string | null;
-}) {
-  if (!sources || sources.length === 0) return null;
-
-  return (
-    <div className="mt-3 space-y-2 rounded-[18px] bg-cars-off-white px-3 py-3 dark:bg-[#111c31]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cars-accent">
-        Sources
-      </p>
-      <div className="space-y-2 text-xs leading-5 text-cars-gray dark:text-white/68">
-        {sources.slice(0, 4).map((source, index) => (
-          <div key={`${source.provider}-${source.title}-${index}`}>
-            <p className="font-semibold text-cars-primary dark:text-white/88">
-              {source.provider}: {source.title}
-            </p>
-            {source.url ? (
-              <a
-                href={source.url}
-                target="_blank"
-                rel="noreferrer"
-                className="break-all text-cars-accent underline underline-offset-2 dark:text-[#7da7ff]"
-              >
-                {source.url}
-              </a>
-            ) : null}
-          </div>
-        ))}
-        {freshnessNote ? <p>{freshnessNote}</p> : null}
-      </div>
-    </div>
-  );
-}
-
-function CaveatList({ caveats }: { caveats?: string[] }) {
-  if (!caveats || caveats.length === 0) return null;
-
-  return (
-    <div className="mt-3 rounded-[18px] border border-amber-200 bg-amber-50 px-3 py-3 text-xs leading-5 text-amber-900 dark:border-amber-400/20 dark:bg-[#2c2112] dark:text-amber-100">
-      <p className="font-semibold uppercase tracking-[0.14em] text-amber-900/80 dark:text-amber-100/80">Caveats</p>
-      <ul className="mt-2 space-y-1">
-        {caveats.slice(0, 3).map((caveat) => (
-          <li key={caveat}>- {caveat}</li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 function getActionLabel(action: AiSuggestedAction) {
   const payloadLabel = action.payload?.label;
   if (typeof payloadLabel === "string" && payloadLabel.trim()) return payloadLabel;
@@ -752,11 +673,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                     }
                   >
                     <p>{message.content}</p>
-                    <ConfidenceBadge confidence={message.confidence} />
                     <InsightCards cards={message.cards} onAction={handleSuggestedAction} />
-                    <SourceList sources={message.sources} freshnessNote={message.freshnessNote} />
-                    <CaveatList caveats={message.caveats} />
-                    <FollowUpList questions={message.followUps} />
                     {message.role === "assistant" && getRenderableActions(message.suggestedActions).length > 0 ? (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {getRenderableActions(message.suggestedActions).map((action, index) => {
@@ -977,7 +894,6 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                       <h3 className="mt-3 text-2xl font-apercu-bold text-cars-primary">
                         {compareState.result.title}
                       </h3>
-                      <ConfidenceBadge confidence={compareState.result.confidence} />
                       <p className="mt-3 break-words text-sm leading-7 text-cars-gray">
                         {compareState.result.assistant_message}
                       </p>
@@ -993,11 +909,6 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                     </div>
 
                     <InsightCards cards={compareState.result.insight_cards} />
-                    <SourceList
-                      sources={compareState.result.sources}
-                      freshnessNote={compareState.result.freshness_note}
-                    />
-                    <CaveatList caveats={compareState.result.caveats} />
 
                     <div className="rounded-[26px] border border-cars-gray-light/70 px-5 py-5">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">

@@ -60,6 +60,7 @@ const appHost = process.env.APP_HOST || "0.0.0.0";
 const appPort = toInt(process.env.PORT || process.env.APP_PORT, 4000);
 const appPublicUrl = trimSlash(process.env.APP_PUBLIC_URL || `http://localhost:${appPort}`);
 const frontendUrl = trimSlash(process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000");
+const redisUrl = process.env.REDIS_URL || "";
 const databaseUrl =
   process.env.DATABASE_URL ||
   process.env.MYSQL_URL ||
@@ -189,6 +190,24 @@ export const env = {
       timeoutMs: toInt(process.env.AI_TIMEOUT_MS || process.env.FPT_AI_TIMEOUT_MS, 30000),
       chatCompletionsPath: process.env.AI_CHAT_COMPLETIONS_PATH || "/chat/completions",
     },
+  },
+  redis: {
+    url: redisUrl || null,
+    cacheEnabled: toBool(process.env.CACHE_ENABLED, true),
+    queueEnabled: toBool(process.env.QUEUE_ENABLED, true),
+    ttlSeconds: toInt(process.env.CACHE_TTL_SECONDS, 300),
+    catalogTtlSeconds: toInt(process.env.CATALOG_CACHE_TTL_SECONDS, 1800),
+    vehicleDetailTtlSeconds: toInt(process.env.VEHICLE_DETAIL_CACHE_TTL_SECONDS, 900),
+    listingSearchTtlSeconds: toInt(process.env.LISTING_SEARCH_CACHE_TTL_SECONDS, 180),
+    listingDetailTtlSeconds: toInt(process.env.LISTING_DETAIL_CACHE_TTL_SECONDS, 180),
+    tcoTtlSeconds: toInt(process.env.TCO_CACHE_TTL_SECONDS, 3600),
+    priceOutlookTtlSeconds: toInt(process.env.PRICE_OUTLOOK_CACHE_TTL_SECONDS, 1800),
+  },
+  rateLimit: {
+    windowMs: toInt(process.env.RATE_LIMIT_WINDOW_MS, 60000),
+    max: toInt(process.env.RATE_LIMIT_MAX, 120),
+    aiMax: toInt(process.env.AI_RATE_LIMIT_MAX, 20),
+    authMax: toInt(process.env.AUTH_RATE_LIMIT_MAX, 10),
   },
   priceDropThreshold: toFloat(process.env.PRICE_DROP_THRESHOLD, 0.03),
 };

@@ -48,6 +48,20 @@ function appendAdvisorProfileParams(qs: URLSearchParams, profile?: AdvisorProfil
   }
 }
 
+function appendMultiValueParams(
+  qs: URLSearchParams,
+  key: string,
+  values?: string[],
+) {
+  if (!values?.length) return;
+
+  for (const value of values) {
+    const normalized = String(value || "").trim();
+    if (!normalized) continue;
+    qs.append(key, normalized);
+  }
+}
+
 export const authApi = {
   register(payload: {
     name: string;
@@ -159,6 +173,7 @@ export const catalogApi = {
       ownershipYears?: number;
       kmPerYear?: number;
       profile?: AdvisorProfile;
+      skipSections?: string[];
     }
   ) {
     const qs = new URLSearchParams();
@@ -166,6 +181,7 @@ export const catalogApi = {
     if (params?.ownershipYears) qs.set("ownershipYears", String(params.ownershipYears));
     if (params?.kmPerYear) qs.set("kmPerYear", String(params.kmPerYear));
     appendAdvisorProfileParams(qs, params?.profile);
+    appendMultiValueParams(qs, "skipSections", params?.skipSections);
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return apiFetch<AiPageIntelligenceResponse>(`/catalog/variants/${id}/ai-insights${suffix}`);
   },
@@ -196,6 +212,7 @@ export const listingsApi = {
       ownershipYears?: number;
       kmPerYear?: number;
       profile?: AdvisorProfile;
+      skipSections?: string[];
     }
   ) {
     const qs = new URLSearchParams();
@@ -203,6 +220,7 @@ export const listingsApi = {
     if (params?.ownershipYears) qs.set("ownershipYears", String(params.ownershipYears));
     if (params?.kmPerYear) qs.set("kmPerYear", String(params.kmPerYear));
     appendAdvisorProfileParams(qs, params?.profile);
+    appendMultiValueParams(qs, "skipSections", params?.skipSections);
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return apiFetch<AiPageIntelligenceResponse>(`/listings/${id}/ai-insights${suffix}`);
   },

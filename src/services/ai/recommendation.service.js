@@ -511,6 +511,7 @@ export async function recommendCars(ctx, { profile, market_id = 1 }) {
   const reviewCoverage = rankedSource.filter((item) => (item.review_count ?? 0) > 0).length;
   const specCoverage = rankedSource.filter((item) => Object.keys(item.feature_map ?? {}).length > 0 || item.power_hp != null).length;
   const coverageDenominator = Math.max(rankedSource.length, 1);
+  const hasCatalogCandidates = ranked.length > 0;
 
   return recommendationResultSchema.parse({
     intent: "recommend_car",
@@ -518,25 +519,39 @@ export async function recommendCars(ctx, { profile, market_id = 1 }) {
     profile_summary: closestAvailableFallback
       ? `closest available matches${profileSummary ? ` for ${profileSummary}` : ""}`
       : profileSummary || "partial buyer profile",
+    recommendation_mode: hasCatalogCandidates ? "backend_catalog_ranked" : "ai_general_fallback",
+    catalog_coverage: hasCatalogCandidates
+      ? closestAvailableFallback
+        ? "closest_available_catalog_matches"
+        : "catalog_ranked_matches"
+      : "no_catalog_matches",
+    general_vehicle_suggestions_allowed: true,
     confidence: buildConfidence(
       clamp(
-        0.45 +
+        (hasCatalogCandidates ? 0.45 : 0.28) +
           Object.keys(normalizedProfile || {}).length * 0.01 +
           (marketCoverage / coverageDenominator) * 0.12 +
           (reviewCoverage / coverageDenominator) * 0.08 +
           (specCoverage / coverageDenominator) * 0.12,
-        0.45,
+        hasCatalogCandidates ? 0.45 : 0.28,
         0.9
       ),
       [
-        "The recommendation is grounded to the current internal catalog, marketplace listings, and buyer profile.",
+        hasCatalogCandidates
+          ? "The recommendation is grounded to the current internal catalog, marketplace listings, and buyer profile."
+          : "No current internal catalog candidates matched strongly enough, so the AI explanation may use general vehicle knowledge.",
         marketCoverage > 0 ? "Persisted market-signal snapshots improved the ranking." : "Market-signal coverage is still partial for some candidates.",
         reviewCoverage > 0 ? "Local owner-review data was used where available." : "Owner-review coverage is still light for some candidates.",
         specCoverage > 0 ? "Structured vehicle specs and feature signals were used to score practical fit." : "Some trim-level feature detail is still missing for part of the shortlist.",
       ]
     ),
     assumptions: [
-      { label: "Recommendations are based on current catalog and listing coverage, not the full market.", type: "verified" },
+      {
+        label: hasCatalogCandidates
+          ? "Recommendations are based on current catalog and listing coverage, not the full market."
+          : "The local catalog did not provide enough matches, so any vehicle names in the AI answer are general suggestions rather than confirmed inventory.",
+        type: hasCatalogCandidates ? "verified" : "estimated",
+      },
       { label: "Trim-specific equipment can vary by region, so some convenience and safety fit is estimated from current spec coverage.", type: "estimated" },
     ],
     sources: [buildInternalSource("Local catalog, structured specs, marketplace listings, and market price data used for recommendation ranking")],

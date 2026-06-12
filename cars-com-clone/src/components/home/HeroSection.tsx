@@ -35,21 +35,9 @@ export default function HeroSection() {
 
       <div className="container-cars relative z-10 grid gap-10 py-12 sm:py-14 lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:py-20">
         <div className="text-foreground dark:text-white">
-          {/*<div className="mb-5 inline-flex items-center gap-2 rounded-full border border-cars-primary/12 bg-white/80 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-cars-primary backdrop-blur-xl dark:border-white/10 dark:bg-white/5 dark:text-[#b6c4ec]">*/}
-          {/*  <span className="h-2 w-2 rounded-full bg-cars-primary-light dark:bg-[#7de2ff]" />*/}
-          {/*  Editorial marketplace*/}
-          {/*</div>*/}
-          <p className="mb-4 text-sm font-semibold uppercase tracking-[0.24em] text-cars-gray dark:text-[#b7c4df]">
-            Buy, sell, compare, and decide with context
-          </p>
           <h1 className="editorial-heading max-w-3xl text-[2.65rem] leading-[0.96] sm:text-5xl lg:text-[5.15rem]">
             Find the right car before the market moves.
           </h1>
-          <p className="mt-6 max-w-2xl text-base leading-7 text-cars-gray dark:text-slate-300 md:text-lg md:leading-8">
-            Research models, browse live listings, compare trims side by side, and use
-            built-in pricing intelligence before you make a call.
-          </p>
-
           <form
             onSubmit={onSubmit}
             className="section-shell theme-surface-card mt-8 max-w-2xl rounded-[28px] border-white/10 bg-white/5 p-4 text-foreground shadow-[0_30px_90px_rgba(0,0,0,0.4)] dark:text-white sm:p-5"

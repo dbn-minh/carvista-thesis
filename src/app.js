@@ -8,6 +8,7 @@ import YAML from "yaml";
 import { fileURLToPath } from "url";
 
 import { env } from "./config/env.js";
+import { generalLimiter } from "./middlewares/rateLimit.middleware.js";
 import { apiRouter } from "./routes/index.js";
 import { notFound, errorHandler } from "./middlewares/error.js";
 
@@ -72,7 +73,7 @@ export function createApp(db) {
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(doc));
   app.get("/api-docs.yaml", (_req, res) => res.type("text/yaml").send(fs.readFileSync(yamlPath, "utf8")));
 
-  app.use("/api", apiRouter);
+  app.use("/api", generalLimiter, apiRouter);
 
   app.use(notFound);
   app.use(errorHandler);

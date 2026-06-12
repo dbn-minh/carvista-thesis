@@ -1,5 +1,5 @@
 import { clamp } from "./_helpers.js";
-import { buildConfidence, buildEvidence } from "./contracts.js";
+import { buildConfidence, buildEvidence, buildStatusConfidence } from "./contracts.js";
 import { mapAiChatErrorToResponse } from "./error_mapper.service.js";
 import { orchestrateChatRequest } from "./chat_orchestrator.service.js";
 import { classifyIntent } from "./intent_classifier.service.js";
@@ -622,6 +622,8 @@ function isLikelyOffTopicPendingAdvisorReply({
   const normalized = normalizeText(message);
   if (!normalized) return false;
   const hasAdvisorSignal = hasAdvisorReplySignal(message);
+  if (classifierIntent === "out_of_scope" && !hasAdvisorSignal) return true;
+  if (classifierIntent === "unknown" && !answeredPendingQuestion && !hasAdvisorSignal) return true;
   const questionLike =
     /\?/.test(message) ||
     /\b(what|why|how|which|can|could|should|is|are|do|does|explain|tell me|difference between)\b/i.test(normalized);
@@ -1297,7 +1299,7 @@ function buildInterruptionAnswer(interruptionEnvelope, fallbackIntent = "unknown
       return interruptionEnvelope.final_answer || "I can answer that once I know the exact vehicle or topic.";
     }
     if (interruptionEnvelope.intent === "out_of_scope" || fallbackIntent === "out_of_scope") {
-      return interruptionEnvelope.final_answer || "That is outside my main vehicle-advisor scope.";
+      return interruptionEnvelope.final_answer || "I handled that and can connect it back to vehicle recommendations, comparisons, pricing, or ownership costs.";
     }
   }
 
@@ -1901,7 +1903,11 @@ export async function chatAdvisor(ctx, input) {
         caveats: interruptionEnvelope?.caveats ?? [],
         confidence:
           interruptionEnvelope?.result_confidence ??
-          buildConfidence(0.54, ["The assistant answered an interruption and preserved the pending advisor question."]),
+          (interruptionIntent === "out_of_scope" || interruptionIntent === "unknown"
+            ? buildStatusConfidence(0.28, "Out of scope", [
+                "The latest message was outside the vehicle-advisor scope, so the buyer-profile question stayed active.",
+              ])
+            : buildConfidence(0.54, ["The assistant answered an interruption and preserved the pending advisor question."])),
         evidence:
           interruptionEnvelope?.evidence ??
           buildEvidence({

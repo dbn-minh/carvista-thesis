@@ -4,9 +4,14 @@ import { z } from "zod";
 import { env } from "../config/env.js";
 import { requireAuth } from "../middlewares/auth.js";
 import { listingImageUpload } from "../middlewares/listing-image-upload.js";
+import { actionLimiter } from "../middlewares/rateLimit.middleware.js";
 import { validate } from "../middlewares/validate.js";
 import { buildListingPageIntelligence } from "../services/ai/page_intelligence.service.js";
 import { parsePreferenceProfileQuery } from "../services/ai/user_preference_profile.service.js";
+import {
+  invalidateListingReadCaches,
+} from "../services/cache/cache-invalidation.service.js";
+import { buildCacheKey, remember } from "../services/cache/cache.service.js";
 import { LISTING_IMAGE_LIMITS } from "../services/listing-images/image-validation.service.js";
 import { createListingImageService } from "../services/listing-images/listing-image.service.js";
 
@@ -70,6 +75,28 @@ function parseNumber(value, fallback = null) {
   if (value == null || value === "") return fallback;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function parseSkipSections(value) {
+  const entries = Array.isArray(value) ? value : value == null ? [] : [value];
+  return [...new Set(
+    entries
+      .flatMap((entry) => String(entry || "").split(","))
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+  )];
+}
+
+async function respondWithCachedJson(res, { cacheKey, ttlSeconds, producer }) {
+  let cacheStatus = "bypass";
+  const payload = await remember(cacheKey, ttlSeconds, producer, {
+    onStatus(status) {
+      cacheStatus = status;
+    },
+  });
+
+  res.set("X-Cache-Status", cacheStatus);
+  res.json(payload);
 }
 
 const OptionalTrimmedString = z.preprocess((value) => {
@@ -291,233 +318,254 @@ async function resolveVariantForListing(models, payload) {
 
 listingsRoutes.get("/listings", async (req, res, next) => {
   try {
-    const {
-      Listings,
-      ListingImages,
-      VariantImages,
-      CarVariants,
-      CarModels,
-      CarMakes,
-    } = req.ctx.models;
     const { status = "active", ownerId, variantId } = req.query;
     const requestedLimit = Number(req.query.limit);
     const limit =
       Number.isInteger(requestedLimit) && requestedLimit > 0
         ? Math.min(requestedLimit, 1000)
         : 50;
-
-    const where = { status };
-    if (ownerId) where.owner_id = Number(ownerId);
-    if (variantId) where.variant_id = Number(variantId);
-
-    const rows = await Listings.findAll({
-      where,
-      order: [["created_at", "DESC"]],
+    const cacheKey = buildCacheKey("listing:search", {
+      status,
+      owner_id: ownerId ? Number(ownerId) : null,
+      variant_id: variantId ? Number(variantId) : null,
       limit,
-      include: [
-        {
-          model: CarVariants,
-          as: "variant",
-          attributes: [
-            "variant_id",
-            "model_year",
-            "trim_name",
-            "body_type",
-            "fuel_type",
-            "transmission",
-            "engine",
-          ],
+    });
+
+    await respondWithCachedJson(res, {
+      cacheKey,
+      ttlSeconds: env.redis.listingSearchTtlSeconds,
+      producer: async () => {
+        const {
+          Listings,
+          ListingImages,
+          VariantImages,
+          CarVariants,
+          CarModels,
+          CarMakes,
+        } = req.ctx.models;
+
+        const where = { status };
+        if (ownerId) where.owner_id = Number(ownerId);
+        if (variantId) where.variant_id = Number(variantId);
+
+        const rows = await Listings.findAll({
+          where,
+          order: [["created_at", "DESC"]],
+          limit,
           include: [
             {
-              model: CarModels,
-              as: "model",
-              attributes: ["model_id", "name"],
+              model: CarVariants,
+              as: "variant",
+              attributes: [
+                "variant_id",
+                "model_year",
+                "trim_name",
+                "body_type",
+                "fuel_type",
+                "transmission",
+                "engine",
+              ],
               include: [
                 {
-                  model: CarMakes,
-                  as: "make",
-                  attributes: ["make_id", "name"],
+                  model: CarModels,
+                  as: "model",
+                  attributes: ["model_id", "name"],
+                  include: [
+                    {
+                      model: CarMakes,
+                      as: "make",
+                      attributes: ["make_id", "name"],
+                    },
+                  ],
                 },
               ],
             },
           ],
-        },
-      ],
+        });
+
+        const listingIds = rows.map((row) => row.listing_id);
+        const variantIds = rows.map((row) => row.variant_id);
+
+        const [listingImageRows, variantImageRows] = await Promise.all([
+          listingIds.length > 0
+            ? ListingImages.findAll({
+                where: { listing_id: { [Op.in]: listingIds } },
+                order: [
+                  ["listing_id", "ASC"],
+                  ["sort_order", "ASC"],
+                ],
+              })
+            : Promise.resolve([]),
+          variantIds.length > 0
+            ? VariantImages.findAll({
+                where: { variant_id: { [Op.in]: variantIds } },
+                order: [
+                  ["variant_id", "ASC"],
+                  ["sort_order", "ASC"],
+                ],
+              })
+            : Promise.resolve([]),
+        ]);
+
+        const listingImageService = createListingImageService(req.ctx);
+        const listingImageMap = new Map();
+        for (const image of listingImageService.normalizeRecords(listingImageRows)) {
+          const existing = listingImageMap.get(image.listing_id) || [];
+          existing.push(image.url);
+          listingImageMap.set(image.listing_id, existing);
+        }
+
+        const variantImageMap = new Map();
+        for (const image of variantImageRows) {
+          const existing = variantImageMap.get(image.variant_id) || [];
+          existing.push(image.url);
+          variantImageMap.set(image.variant_id, existing);
+        }
+
+        const items = rows.map((row) => {
+          const plain = row.get({ plain: true });
+          const listingPhotos = listingImageMap.get(row.listing_id) || [];
+          const catalogPhotos = variantImageMap.get(row.variant_id) || [];
+          const images = listingPhotos.length > 0 ? listingPhotos : catalogPhotos;
+          const photoSource =
+            listingPhotos.length > 0 ? "listing" : images.length > 0 ? "catalog" : "none";
+
+          return {
+            listing_id: plain.listing_id,
+            owner_id: plain.owner_id,
+            variant_id: plain.variant_id,
+            asking_price: plain.asking_price,
+            mileage_km: plain.mileage_km,
+            location_city: plain.location_city,
+            location_country_code: plain.location_country_code,
+            description: plain.description,
+            status: plain.status,
+            created_at: plain.created_at,
+            title: buildListingTitle(plain.variant),
+            model_year: plain.variant?.model_year ?? null,
+            trim_name: plain.variant?.trim_name ?? null,
+            body_type: plain.variant?.body_type ?? null,
+            fuel_type: plain.variant?.fuel_type ?? null,
+            transmission: plain.variant?.transmission ?? null,
+            engine: plain.variant?.engine ?? null,
+            make_name: plain.variant?.model?.make?.name ?? null,
+            model_name: plain.variant?.model?.name ?? null,
+            seller_type: "Private seller",
+            photo_source: photoSource,
+            image_count: images.length,
+            cover_image: images[0] ?? null,
+            thumbnail: images[0] ?? null,
+            images,
+          };
+        });
+
+        return { items, limit };
+      },
     });
-
-    const listingIds = rows.map((row) => row.listing_id);
-    const variantIds = rows.map((row) => row.variant_id);
-
-    const [listingImageRows, variantImageRows] = await Promise.all([
-      listingIds.length > 0
-        ? ListingImages.findAll({
-            where: { listing_id: { [Op.in]: listingIds } },
-            order: [
-              ["listing_id", "ASC"],
-              ["sort_order", "ASC"],
-            ],
-          })
-        : Promise.resolve([]),
-      variantIds.length > 0
-        ? VariantImages.findAll({
-            where: { variant_id: { [Op.in]: variantIds } },
-            order: [
-              ["variant_id", "ASC"],
-              ["sort_order", "ASC"],
-            ],
-          })
-        : Promise.resolve([]),
-    ]);
-
-    const listingImageService = createListingImageService(req.ctx);
-    const listingImageMap = new Map();
-    for (const image of listingImageService.normalizeRecords(listingImageRows)) {
-      const existing = listingImageMap.get(image.listing_id) || [];
-      existing.push(image.url);
-      listingImageMap.set(image.listing_id, existing);
-    }
-
-    const variantImageMap = new Map();
-    for (const image of variantImageRows) {
-      const existing = variantImageMap.get(image.variant_id) || [];
-      existing.push(image.url);
-      variantImageMap.set(image.variant_id, existing);
-    }
-
-    const items = rows.map((row) => {
-      const plain = row.get({ plain: true });
-      const listingPhotos = listingImageMap.get(row.listing_id) || [];
-      const catalogPhotos = variantImageMap.get(row.variant_id) || [];
-      const images = listingPhotos.length > 0 ? listingPhotos : catalogPhotos;
-      const photoSource =
-        listingPhotos.length > 0 ? "listing" : images.length > 0 ? "catalog" : "none";
-
-      return {
-        listing_id: plain.listing_id,
-        owner_id: plain.owner_id,
-        variant_id: plain.variant_id,
-        asking_price: plain.asking_price,
-        mileage_km: plain.mileage_km,
-        location_city: plain.location_city,
-        location_country_code: plain.location_country_code,
-        description: plain.description,
-        status: plain.status,
-        created_at: plain.created_at,
-        title: buildListingTitle(plain.variant),
-        model_year: plain.variant?.model_year ?? null,
-        trim_name: plain.variant?.trim_name ?? null,
-        body_type: plain.variant?.body_type ?? null,
-        fuel_type: plain.variant?.fuel_type ?? null,
-        transmission: plain.variant?.transmission ?? null,
-        engine: plain.variant?.engine ?? null,
-        make_name: plain.variant?.model?.make?.name ?? null,
-        model_name: plain.variant?.model?.name ?? null,
-        seller_type: "Private seller",
-        photo_source: photoSource,
-        image_count: images.length,
-        cover_image: images[0] ?? null,
-        thumbnail: images[0] ?? null,
-        images,
-      };
-    });
-
-    res.json({ items, limit });
   } catch (e) { next(e); }
 });
 
 listingsRoutes.get("/listings/:id", async (req, res, next) => {
   try {
-    const { Listings, Users, CarVariants, CarModels, CarMakes, VariantImages } = req.ctx.models;
-    const listingImageService = createListingImageService(req.ctx);
     const id = Number(req.params.id);
+    const cacheKey = buildCacheKey("listing:detail", { listing_id: id });
 
-    const listing = await Listings.findByPk(id, {
-      include: [
-        {
-          model: CarVariants,
-          as: "variant",
-          attributes: [
-            "variant_id",
-            "model_year",
-            "trim_name",
-            "body_type",
-            "fuel_type",
-            "transmission",
-            "engine",
-          ],
+    await respondWithCachedJson(res, {
+      cacheKey,
+      ttlSeconds: env.redis.listingDetailTtlSeconds,
+      producer: async () => {
+        const { Listings, Users, CarVariants, CarModels, CarMakes, VariantImages } = req.ctx.models;
+        const listingImageService = createListingImageService(req.ctx);
+
+        const listing = await Listings.findByPk(id, {
           include: [
             {
-              model: CarModels,
-              as: "model",
-              attributes: ["model_id", "name"],
+              model: CarVariants,
+              as: "variant",
+              attributes: [
+                "variant_id",
+                "model_year",
+                "trim_name",
+                "body_type",
+                "fuel_type",
+                "transmission",
+                "engine",
+              ],
               include: [
                 {
-                  model: CarMakes,
-                  as: "make",
-                  attributes: ["make_id", "name"],
+                  model: CarModels,
+                  as: "model",
+                  attributes: ["model_id", "name"],
+                  include: [
+                    {
+                      model: CarMakes,
+                      as: "make",
+                      attributes: ["make_id", "name"],
+                    },
+                  ],
                 },
               ],
             },
           ],
-        },
-      ],
-    });
-    if (!listing) return next({ status: 404, message: "Listing not found" });
+        });
+        if (!listing) throw { status: 404, message: "Listing not found" };
 
-    const plain = listing.get({ plain: true });
-    const listingImages = await listingImageService.listImages(id);
-    const variantImages =
-      listingImages.length === 0 && listing.variant_id
-        ? await VariantImages.findAll({
-            where: { variant_id: listing.variant_id },
-            order: [["sort_order", "ASC"]],
-          })
-        : [];
+        const plain = listing.get({ plain: true });
+        const listingImages = await listingImageService.listImages(id);
+        const variantImages =
+          listingImages.length === 0 && listing.variant_id
+            ? await VariantImages.findAll({
+                where: { variant_id: listing.variant_id },
+                order: [["sort_order", "ASC"]],
+              })
+            : [];
 
-    const normalizedImages =
-      listingImages.length > 0
-        ? listingImages
-        : variantImages.map((image) => ({
-            listing_id: listing.listing_id,
-            listing_image_id: null,
-            url: image.url,
-            provider: image.provider || "placeholder",
-            sortOrder: image.sort_order ?? null,
-            storage: "catalog_variant",
-            createdAt: image.created_at ?? null,
-          }));
-
-    const seller = await Users.findByPk(listing.owner_id, {
-      attributes: ["user_id", "name", "email", "phone", "preferred_contact_method"],
-    });
-
-    const firstImage = normalizedImages[0]?.url ?? null;
-
-    res.json({
-      listing: {
-        ...plain,
-        title: buildListingTitle(plain.variant),
-        model_year: plain.variant?.model_year ?? null,
-        trim_name: plain.variant?.trim_name ?? null,
-        body_type: plain.variant?.body_type ?? null,
-        fuel_type: plain.variant?.fuel_type ?? null,
-        transmission: plain.variant?.transmission ?? null,
-        engine: plain.variant?.engine ?? null,
-        make_name: plain.variant?.model?.make?.name ?? null,
-        model_name: plain.variant?.model?.name ?? null,
-        seller_type: plain.seller_type ?? null,
-        photo_source:
+        const normalizedImages =
           listingImages.length > 0
-            ? "listing"
-            : normalizedImages.length > 0
-              ? "catalog"
-              : "none",
-        image_count: normalizedImages.length,
-        cover_image: firstImage,
-        thumbnail: firstImage,
+            ? listingImages
+            : variantImages.map((image) => ({
+                listing_id: listing.listing_id,
+                listing_image_id: null,
+                url: image.url,
+                provider: image.provider || "placeholder",
+                sortOrder: image.sort_order ?? null,
+                storage: "catalog_variant",
+                createdAt: image.created_at ?? null,
+              }));
+
+        const seller = await Users.findByPk(listing.owner_id, {
+          attributes: ["user_id", "name", "email", "phone", "preferred_contact_method"],
+        });
+
+        const firstImage = normalizedImages[0]?.url ?? null;
+
+        return {
+          listing: {
+            ...plain,
+            title: buildListingTitle(plain.variant),
+            model_year: plain.variant?.model_year ?? null,
+            trim_name: plain.variant?.trim_name ?? null,
+            body_type: plain.variant?.body_type ?? null,
+            fuel_type: plain.variant?.fuel_type ?? null,
+            transmission: plain.variant?.transmission ?? null,
+            engine: plain.variant?.engine ?? null,
+            make_name: plain.variant?.model?.make?.name ?? null,
+            model_name: plain.variant?.model?.name ?? null,
+            seller_type: plain.seller_type ?? null,
+            photo_source:
+              listingImages.length > 0
+                ? "listing"
+                : normalizedImages.length > 0
+                  ? "catalog"
+                  : "none",
+            image_count: normalizedImages.length,
+            cover_image: firstImage,
+            thumbnail: firstImage,
+          },
+          images: normalizedImages,
+          seller: seller ? seller.get({ plain: true }) : null,
+        };
       },
-      images: normalizedImages,
-      seller: seller ? seller.get({ plain: true }) : null,
     });
   } catch (e) { next(e); }
 });
@@ -564,7 +612,7 @@ listingsRoutes.post(
   async (req, res, next) => {
     try {
       const listingId = req.validated.params.id;
-      await loadOwnedListing(req.ctx, listingId, req.user.userId);
+      const listing = await loadOwnedListing(req.ctx, listingId, req.user.userId);
 
       const uploadedFiles = Array.isArray(req.files) ? req.files : [];
       if (uploadedFiles.length === 0) {
@@ -577,6 +625,10 @@ listingsRoutes.post(
 
       const listingImageService = createListingImageService(req.ctx);
       const items = await listingImageService.persistUploadedImages(listingId, uploadedFiles);
+      await invalidateListingReadCaches({
+        listingId,
+        variantId: listing.variant_id,
+      });
 
       res.status(201).json({
         listing_id: listingId,
@@ -594,7 +646,7 @@ listingsRoutes.delete(
   async (req, res, next) => {
     try {
       const { id, imageId } = req.validated.params;
-      await loadOwnedListing(req.ctx, id, req.user.userId);
+      const listing = await loadOwnedListing(req.ctx, id, req.user.userId);
 
       const listingImageService = createListingImageService(req.ctx);
       const removed = await listingImageService.deleteImage(id, imageId);
@@ -602,6 +654,11 @@ listingsRoutes.delete(
       if (!removed) {
         return next({ status: 404, safe: true, message: "Listing image not found." });
       }
+
+      await invalidateListingReadCaches({
+        listingId: id,
+        variantId: listing.variant_id,
+      });
 
       res.json({ ok: true, removed });
     } catch (e) { next(e); }
@@ -615,13 +672,17 @@ listingsRoutes.patch(
   async (req, res, next) => {
     try {
       const listingId = req.validated.params.id;
-      await loadOwnedListing(req.ctx, listingId, req.user.userId);
+      const listing = await loadOwnedListing(req.ctx, listingId, req.user.userId);
 
       const listingImageService = createListingImageService(req.ctx);
       const items = await listingImageService.reorderImages(
         listingId,
         req.validated.body.image_ids
       );
+      await invalidateListingReadCaches({
+        listingId,
+        variantId: listing.variant_id,
+      });
 
       res.json({ listing_id: listingId, items });
     } catch (e) { next(e); }
@@ -639,6 +700,7 @@ listingsRoutes.get("/listings/:id/ai-insights", async (req, res, next) => {
     const ownershipYears = parseNumber(req.query.ownershipYears, 5);
     const kmPerYear = parseNumber(req.query.kmPerYear, null);
     const profile = parsePreferenceProfileQuery(req.query);
+    const skipSections = parseSkipSections(req.query.skipSections);
 
     const intelligence = await buildListingPageIntelligence(req.ctx, {
       listingId,
@@ -646,13 +708,14 @@ listingsRoutes.get("/listings/:id/ai-insights", async (req, res, next) => {
       ownershipYears,
       kmPerYear,
       profile,
+      skipSections,
     });
 
     res.json(intelligence);
   } catch (e) { next(e); }
 });
 
-listingsRoutes.post("/listings", requireAuth, listingImageUpload, async (req, res, next) => {
+listingsRoutes.post("/listings", requireAuth, actionLimiter, listingImageUpload, async (req, res, next) => {
   let created = null;
 
   try {
@@ -684,6 +747,11 @@ listingsRoutes.post("/listings", requireAuth, listingImageUpload, async (req, re
     } else if (Array.isArray(b.image_urls) && b.image_urls.length > 0) {
       storedImages = await listingImageService.persistImageReferences(created.listing_id, b.image_urls);
     }
+
+    await invalidateListingReadCaches({
+      listingId: created.listing_id,
+      variantId,
+    });
 
     const detailPath = `/listings/${created.listing_id}`;
 
@@ -866,6 +934,11 @@ listingsRoutes.delete(
         });
       });
 
+      await invalidateListingReadCaches({
+        listingId,
+        variantId: listing.variant_id,
+      });
+
       res.json({
         ok: true,
         removed: {
@@ -931,6 +1004,10 @@ listingsRoutes.put("/listings/:id", requireAuth, validate(UpdateListingSchema), 
 
     await transaction.commit();
     transaction = null;
+    await invalidateListingReadCaches({
+      listingId: id,
+      variantId: listing.variant_id,
+    });
     res.json({ ok: true });
   } catch (e) {
     if (transaction) await transaction.rollback();

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
 import { validate } from "../middlewares/validate.js";
+import { invalidateVariantReadCaches } from "../services/cache/cache-invalidation.service.js";
 import { addVariantPricePoint } from "../services/price.service.js";
 
 export const adminRoutes = Router();
@@ -85,6 +86,8 @@ adminRoutes.post("/admin/variants/:id/price", validate(AddPriceSchema), async (r
       capturedAt: b.captured_at ? new Date(b.captured_at) : new Date(),
       source: b.source ?? "admin",
     });
+
+    await invalidateVariantReadCaches({ variantId });
 
     res.status(201).json({ price_id: created.price_id });
   } catch (e) { next(e); }

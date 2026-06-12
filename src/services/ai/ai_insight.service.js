@@ -1,6 +1,7 @@
-import { defaultOllamaService } from "./ollama.service.js";
+import { defaultLlmService } from "./llm.service.js";
 import { parseModelJson } from "./advisor_llm.service.js";
 import { logAiEvent } from "./logger.service.js";
+import { EMERGENCY_POLICY_FALLBACK } from "./advisor_scope_policy.service.js";
 
 // Shared explanation layer: backend services calculate and validate; Qwen3 only
 // interprets already-structured results and must fall back safely when unavailable.
@@ -20,11 +21,12 @@ function providerDisabledByEnv() {
   return DISABLED_AI_PROVIDERS.has(configured);
 }
 
-function shouldUseInsightModel(ollama) {
-  if (!ollama?.generate) return false;
+function shouldUseInsightModel(modelClient) {
+  if (!modelClient?.generate) return false;
   if (providerDisabledByEnv()) return false;
-  if (ollama === defaultOllamaService && process.env.NODE_ENV === "test") return false;
-  if (ollama.provider === "fpt" && (!ollama.apiKey || !ollama.model)) return false;
+  if (modelClient === defaultLlmService && process.env.NODE_ENV === "test") return false;
+  if (modelClient.provider === "fpt" && (!modelClient.apiKey || !modelClient.model)) return false;
+  if (modelClient.apiKey != null && (!modelClient.apiKey || !modelClient.model)) return false;
   return true;
 }
 
@@ -57,10 +59,10 @@ function normalizeInsight(parsed, fallback) {
   };
 }
 
-function buildMeta(ollama, { aiUsed, fallbackUsed, error = null }) {
+function buildMeta(modelClient, { aiUsed, fallbackUsed, error = null }) {
   return {
-    aiProvider: ollama?.provider ?? null,
-    aiModel: ollama?.model ?? null,
+    aiProvider: modelClient?.provider ?? modelClient?.providerLabel ?? modelClient?.constructor?.name ?? null,
+    aiModel: modelClient?.model ?? null,
     aiUsed: Boolean(aiUsed),
     fallbackUsed: Boolean(fallbackUsed),
     ...(error ? { error: compactString(error.message || error).slice(0, 180) } : {}),
@@ -121,6 +123,30 @@ function fallbackAdvisorInsight(fallbackAnswer, structuredResult) {
     advice: "Ask a follow-up question if you want the result narrowed to your budget, market, or ownership plan.",
   };
 }
+
+function fallbackPolicyInsight(fallbackAnswer = EMERGENCY_POLICY_FALLBACK) {
+  return {
+    summary: compactString(fallbackAnswer, EMERGENCY_POLICY_FALLBACK),
+    reasons: [],
+    caveats: [],
+    advice: "",
+  };
+}
+
+const ADVISOR_POLICY_INSIGHT_SYSTEM = [
+  "You are CarVista Advisor.",
+  "When the user's message is not a vehicle-shopping request, answer the actual request naturally as a general AI answer instead of refusing because it is off-topic.",
+  "Do not use a scripted fallback. Do not say you can only help with cars.",
+  "Give enough useful detail for the user's request in normal chat style. If the user asks for code, you may include a compact code or pseudo-code example.",
+  "After the requested answer is complete, add a natural final bridge back to CarVista Advisor's main purpose: vehicle recommendations, comparisons, pricing, and ownership guidance.",
+  "If the off-topic request has an automotive angle, use that bridge naturally, but do not force a question.",
+  "For low-signal messages, say what is unclear and invite either a clearer general task or a vehicle need.",
+  "For vehicle-shopping requests, use the backend structuredResult and provided context first.",
+  "Never claim live inventory, exact pricing, availability, or vehicle specs unless they are in the provided JSON context.",
+  "If the payload allows general vehicle suggestions because catalog coverage is weak or empty, you may suggest well-known vehicles outside the local database, but clearly say they are general suggestions rather than confirmed CarVista catalog inventory.",
+  "Reply in the user's language unless the payload explicitly requests another language.",
+  'Return JSON exactly as {"summary": string, "reasons": string[], "caveats": string[], "advice": string}.',
+].join(" ");
 
 function vehicleName(item) {
   return [item?.year, item?.make, item?.model, item?.trim, item?.name]
@@ -212,7 +238,7 @@ async function runInsightGeneration({
   fallbackInsight,
   fallbackPresentation = null,
   presentationTitle,
-  ollama = defaultOllamaService,
+  ollama = defaultLlmService,
   options = { temperature: 0.25, num_predict: 360 },
 }) {
   if (!shouldUseInsightModel(ollama)) {
@@ -261,7 +287,7 @@ async function runInsightGeneration({
 
 export async function generateComparisonInsight(
   { structuredResult, presentation = null } = {},
-  { ollama = defaultOllamaService } = {}
+  { ollama = defaultLlmService } = {}
 ) {
   const fallbackInsight = fallbackComparisonInsight(structuredResult, presentation);
   return runInsightGeneration({
@@ -291,7 +317,7 @@ export async function generateComparisonInsight(
 
 export async function generatePriceOutlookInsight(
   { structuredResult, presentation = null } = {},
-  { ollama = defaultOllamaService } = {}
+  { ollama = defaultLlmService } = {}
 ) {
   const fallbackInsight = fallbackPriceInsight(structuredResult, presentation);
   return runInsightGeneration({
@@ -322,7 +348,7 @@ export async function generatePriceOutlookInsight(
 
 export async function generateTcoInsight(
   { structuredResult, presentation = null } = {},
-  { ollama = defaultOllamaService } = {}
+  { ollama = defaultLlmService } = {}
 ) {
   const fallbackInsight = fallbackTcoInsight(structuredResult, presentation);
   return runInsightGeneration({
@@ -351,9 +377,43 @@ export async function generateTcoInsight(
   });
 }
 
+export async function generateConversationPolicyInsight(
+  { policyPayload = {}, fallbackAnswer = EMERGENCY_POLICY_FALLBACK } = {},
+  { ollama = defaultLlmService } = {}
+) {
+  const fallbackInsight = fallbackPolicyInsight(fallbackAnswer);
+  const result = await runInsightGeneration({
+    feature: "advisor_policy_insight",
+    ollama,
+    fallbackInsight,
+    fallbackPresentation: {
+      title: "CarVista advisor scope response",
+      assistant_message: fallbackInsight.summary,
+      highlights: [],
+      caveats: [],
+    },
+    presentationTitle: "CarVista advisor scope response",
+    system: ADVISOR_POLICY_INSIGHT_SYSTEM,
+    prompt: [
+      "/no_think",
+      "Generate the final conversational response from this classification payload.",
+      "Use the payload as context, not fixed copy.",
+      "If the request is off-topic, complete the user's actual request first, then add a natural final bridge back to CarVista Advisor's vehicle recommendation, comparison, pricing, or ownership mission.",
+      `policy_insight_payload_json: ${JSON.stringify(policyPayload || {})}`,
+      `emergency_fallback_text: ${JSON.stringify(fallbackInsight.summary)}`,
+    ].join("\n"),
+    options: { temperature: 0.78, num_predict: 1800 },
+  });
+
+  return {
+    ...result,
+    final_answer: result.aiInsight.summary || fallbackInsight.summary,
+  };
+}
+
 export async function generateAdvisorFinalResponse(
   { intent, userMessage = "", structuredResult, rawPayload = null, fallbackAnswer = "", turnContext = {} } = {},
-  { ollama = defaultOllamaService } = {}
+  { ollama = defaultLlmService } = {}
 ) {
   const fallbackInsight = fallbackAdvisorInsight(fallbackAnswer, structuredResult);
   const result = await runInsightGeneration({
@@ -371,8 +431,10 @@ export async function generateAdvisorFinalResponse(
       "You are CarVista's expert car advisor final response layer.",
       COMMON_GUARDRAILS,
       "The backend has already routed the intent, validated inputs, retrieved data, and calculated or scored the result.",
-      "Prefer backend-provided data over general knowledge.",
-      "Do not invent vehicle inventory, specs, prices, taxes, fees, or market results.",
+      "For normal in-catalog results, prefer backend-provided data over general knowledge.",
+      "For recommend_car only, if structuredResult says general_vehicle_suggestions_allowed or catalog coverage is empty/weak, you may suggest well-known vehicles outside the local database as general market suggestions.",
+      "When suggesting outside-catalog vehicles, clearly say they are not confirmed CarVista catalog inventory and avoid exact prices, availability, or trim specs unless provided.",
+      "Do not invent live inventory, exact local prices, taxes, fees, or market results.",
       "Ask one concise follow-up question only when the backend result says information is incomplete.",
       "Use a professional dealership advisor tone.",
       'Return JSON exactly as {"answer": string, "reasons": string[], "caveats": string[], "advice": string}.',
@@ -387,7 +449,7 @@ export async function generateAdvisorFinalResponse(
       `structured_backend_result_json: ${JSON.stringify(structuredResult || {})}`,
       `raw_backend_payload_json: ${JSON.stringify(rawPayload || null)}`,
     ].join("\n"),
-    options: { temperature: 0.34, num_predict: 420 },
+    options: { temperature: intent === "recommend_car" ? 0.58 : 0.34, num_predict: intent === "recommend_car" ? 900 : 420 },
   });
 
   return {

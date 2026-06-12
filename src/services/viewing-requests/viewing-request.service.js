@@ -1,4 +1,8 @@
-import { createNotificationService } from "../notifications/notification.service.js";
+import {
+  processViewingRequestCreatedNotification,
+  processViewingRequestUpdatedNotification,
+} from "../notifications/notification-job.service.js";
+import { enqueueNotificationJob } from "../queue/queue.service.js";
 import { ensureViewingRequestSchema } from "./viewing-request-schema.service.js";
 
 const SELLER_FOLLOW_UP_STATUSES = new Set([
@@ -14,7 +18,43 @@ const SELLER_FOLLOW_UP_STATUSES = new Set([
 export class ViewingRequestService {
   constructor(ctx) {
     this.ctx = ctx;
-    this.notificationService = createNotificationService(ctx);
+  }
+
+  async dispatchNotificationJob({ type, payload, jobId, fallback }) {
+    const queueResult = await enqueueNotificationJob(type, payload, { jobId });
+    if (queueResult.queued) {
+      console.log("[viewing-request] notification queued", {
+        type,
+        jobId,
+      });
+      return {
+        queued: true,
+        provider: "bullmq",
+        fallbackUsed: false,
+        result: null,
+      };
+    }
+
+    let fallbackResult = null;
+    try {
+      fallbackResult = typeof fallback === "function" ? await fallback() : null;
+      console.log("[viewing-request] notification fallback completed inline", {
+        type,
+        jobId,
+      });
+    } catch (error) {
+      console.warn("[viewing-request] notification fallback failed", {
+        type,
+        message: error?.message || String(error),
+      });
+    }
+
+    return {
+      queued: false,
+      provider: fallbackResult?.notificationProvider ?? null,
+      fallbackUsed: true,
+      result: fallbackResult,
+    };
   }
 
   async createRequest({
@@ -114,6 +154,7 @@ export class ViewingRequestService {
       };
     }
 
+    let transaction = null;
     const recentRequests = await ViewingRequests.findAll({
       where: {
         listing_id: listingId,
@@ -140,64 +181,48 @@ export class ViewingRequestService {
       };
     }
 
-    const viewingRequest = await ViewingRequests.create({
-      listing_id: listingId,
-      buyer_id: requesterUserId,
-      seller_user_id: listing.owner_id,
-      contact_name: effectiveContact.contactName,
-      contact_email: effectiveContact.contactEmail,
-      contact_phone: effectiveContact.contactPhone,
-      preferred_contact_method: effectiveContact.preferredContactMethod,
-      preferred_viewing_time: preferredViewingTime ?? null,
-      message: message ?? null,
-      status: "pending",
-      follow_up_status: "new",
-      notified_at: null,
-    });
-
-    const listingTitle = buildListingTitle(listing);
-
-    await this.notificationService.createInAppNotification({
-      userId: listing.owner_id,
-      entityType: "viewing_request",
-      entityId: viewingRequest.request_id,
-      title: "New viewing request",
-      message: `You received a new request for ${listingTitle}.`,
-    });
-
-    let sellerNotified = false;
-    let notificationProvider = null;
-
     try {
-      const emailResult = await this.notificationService.sendSellerViewingRequestEmail({
-        seller: listing.owner,
-        listingTitle,
-        listingId,
-        buyerName: effectiveContact.contactName,
-        buyerEmail: effectiveContact.contactEmail,
-        buyerPhone: effectiveContact.contactPhone,
-        preferredViewingTime: viewingRequest.preferred_viewing_time,
-        message: viewingRequest.message,
+      transaction = await this.ctx.sequelize.transaction();
+      const viewingRequest = await ViewingRequests.create(
+        {
+          listing_id: listingId,
+          buyer_id: requesterUserId,
+          seller_user_id: listing.owner_id,
+          contact_name: effectiveContact.contactName,
+          contact_email: effectiveContact.contactEmail,
+          contact_phone: effectiveContact.contactPhone,
+          preferred_contact_method: effectiveContact.preferredContactMethod,
+          preferred_viewing_time: preferredViewingTime ?? null,
+          message: message ?? null,
+          status: "pending",
+          follow_up_status: "new",
+          notified_at: null,
+        },
+        { transaction }
+      );
+      await transaction.commit();
+      transaction = null;
+
+      const notificationResult = await this.dispatchNotificationJob({
+        type: "viewingRequestCreated",
+        payload: { requestId: viewingRequest.request_id },
+        jobId: `viewing-request-created:${viewingRequest.request_id}`,
+        fallback: async () =>
+          processViewingRequestCreatedNotification(this.ctx, {
+            requestId: viewingRequest.request_id,
+          }),
       });
 
-      if (emailResult.delivered) {
-        await viewingRequest.update({ notified_at: new Date() });
-        sellerNotified = true;
-        notificationProvider = emailResult.provider || null;
-      }
+      return {
+        viewingRequest: normalizeViewingRequest(viewingRequest),
+        sellerNotified: Boolean(notificationResult.result?.sellerNotified),
+        notificationProvider: notificationResult.provider,
+        notificationQueued: notificationResult.queued,
+      };
     } catch (error) {
-      console.error("[viewing-request] seller email delivery failed", {
-        listingId,
-        requestId: viewingRequest.request_id,
-        message: error?.message || String(error),
-      });
+      if (transaction) await transaction.rollback();
+      throw error;
     }
-
-    return {
-      viewingRequest: normalizeViewingRequest(viewingRequest),
-      sellerNotified,
-      notificationProvider,
-    };
   }
 
   async listOutbox(userId) {
@@ -228,83 +253,89 @@ export class ViewingRequestService {
   async updateStatus({ requestId, actorUserId, status }) {
     await ensureViewingRequestSchema(this.ctx);
     const { ViewingRequests, Listings } = this.ctx.models;
-    const vr = await ViewingRequests.findByPk(requestId);
-    if (!vr) {
-      throw { status: 404, safe: true, message: "Request not found" };
-    }
+    let transaction = null;
 
-    const listing = await Listings.findByPk(vr.listing_id);
-    const isSeller = listing?.owner_id === actorUserId;
-    const isBuyer = vr.buyer_id === actorUserId;
+    try {
+      transaction = await this.ctx.sequelize.transaction();
+      const vr = await ViewingRequests.findByPk(requestId, { transaction });
+      if (!vr) {
+        throw { status: 404, safe: true, message: "Request not found" };
+      }
 
-    if (status === "cancelled" && !isBuyer) {
-      throw {
-        status: 403,
-        safe: true,
-        message: "Only the buyer can cancel this request.",
-      };
-    }
+      const listing = await Listings.findByPk(vr.listing_id, { transaction });
+      const isSeller = listing?.owner_id === actorUserId;
+      const isBuyer = vr.buyer_id === actorUserId;
 
-    if (status !== "cancelled" && !isSeller) {
-      throw {
-        status: 403,
-        safe: true,
-        message: "Only the seller can update this request status.",
-      };
-    }
-
-    if (vr.status === "cancelled" && status !== "cancelled") {
-      throw {
-        status: 400,
-        safe: true,
-        message: "Cancelled requests cannot be updated again.",
-      };
-    }
-
-    if (status === "cancelled") {
-      await vr.update({ status: "cancelled" });
-    } else {
-      if (!SELLER_FOLLOW_UP_STATUSES.has(status)) {
+      if (status === "cancelled" && !isBuyer) {
         throw {
-          status: 400,
+          status: 403,
           safe: true,
-          message: "Unsupported viewing request status.",
+          message: "Only the buyer can cancel this request.",
         };
       }
 
-      await vr.update({
-        follow_up_status: status,
-        status: vr.status === "cancelled" ? "cancelled" : "pending",
-      });
-    }
+      if (status !== "cancelled" && !isSeller) {
+        throw {
+          status: 403,
+          safe: true,
+          message: "Only the seller can update this request status.",
+        };
+      }
 
-    if (status !== "cancelled") {
-      const listing = await Listings.findByPk(vr.listing_id);
-      await this.notificationService.createInAppNotification({
-        userId: vr.buyer_id,
-        entityType: "viewing_request",
-        entityId: vr.request_id,
-        title: "Request update",
-        message: `Your request for ${buildListingTitle(listing)} is now marked as ${humanizeStatus(status)}.`,
-      });
-    }
+      if (vr.status === "cancelled" && status !== "cancelled") {
+        throw {
+          status: 400,
+          safe: true,
+          message: "Cancelled requests cannot be updated again.",
+        };
+      }
 
-    return normalizeViewingRequest(vr);
+      if (status === "cancelled") {
+        await vr.update({ status: "cancelled" }, { transaction });
+      } else {
+        if (!SELLER_FOLLOW_UP_STATUSES.has(status)) {
+          throw {
+            status: 400,
+            safe: true,
+            message: "Unsupported viewing request status.",
+          };
+        }
+
+        await vr.update(
+          {
+            follow_up_status: status,
+            status: vr.status === "cancelled" ? "cancelled" : "pending",
+          },
+          { transaction }
+        );
+      }
+
+      await transaction.commit();
+      transaction = null;
+
+      if (status !== "cancelled") {
+        await this.dispatchNotificationJob({
+          type: "viewingRequestUpdated",
+          payload: { requestId: vr.request_id, status },
+          jobId: `viewing-request-updated:${vr.request_id}:${status}`,
+          fallback: async () =>
+            processViewingRequestUpdatedNotification(this.ctx, {
+              requestId: vr.request_id,
+              status,
+            }),
+        });
+      }
+
+      return normalizeViewingRequest(vr);
+    } catch (error) {
+      if (transaction) await transaction.rollback();
+      throw error;
+    }
   }
 }
 
 export function createViewingRequestService(ctx) {
   return new ViewingRequestService(ctx);
-}
-
-function buildListingTitle(listing) {
-  if (!listing) return "this car";
-  const make = listing.variant?.model?.make?.name;
-  const model = listing.variant?.model?.name;
-  const trim = listing.variant?.trim_name;
-  const year = listing.variant?.model_year;
-  const parts = [year, make, model, trim].filter(Boolean);
-  return parts.join(" ") || "this car";
 }
 
 function normalizeViewingRequest(input) {
@@ -338,10 +369,4 @@ function normalizeViewingRequestStatus(item) {
 
 function isActiveViewingRequestStatus(status) {
   return !["cancelled", "closed", "completed"].includes(String(status || ""));
-}
-
-function humanizeStatus(status) {
-  return String(status || "")
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
 }

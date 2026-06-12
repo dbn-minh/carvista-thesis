@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { requireAuth } from "../middlewares/auth.js";
+import { actionLimiter } from "../middlewares/rateLimit.middleware.js";
 import { validate } from "../middlewares/validate.js";
 import { createViewingRequestService } from "../services/viewing-requests/viewing-request.service.js";
 
@@ -22,6 +23,7 @@ const CreateRequestSchema = z.object({
 requestsRoutes.post(
   "/listings/:id/requests",
   requireAuth,
+  actionLimiter,
   validate(CreateRequestSchema),
   async (req, res, next) => {
     try {
@@ -44,6 +46,7 @@ requestsRoutes.post(
         request: result.viewingRequest,
         seller_notified: result.sellerNotified,
         notification_provider: result.notificationProvider,
+        notification_queued: result.notificationQueued ?? false,
       });
     } catch (e) {
       next(e);

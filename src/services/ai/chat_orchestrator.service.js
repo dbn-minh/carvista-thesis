@@ -1,6 +1,6 @@
 import { formatFinalAnswer } from "./ai_formatter.service.js";
-import { generateAdvisorFinalResponse } from "./ai_insight.service.js";
-import { formatConversationPolicyWithModel } from "./advisor_llm.service.js";
+import { generateAdvisorFinalResponse, generateConversationPolicyInsight } from "./ai_insight.service.js";
+import { buildStatusConfidence } from "./contracts.js";
 import { compareVariants } from "./compare_variants.service.js";
 import { handleConversationPolicy } from "./conversation_policy.service.js";
 import {
@@ -48,6 +48,108 @@ function buildClarificationMessage(intentResult) {
     return "I can do that once I know exactly which vehicle you mean. Open a vehicle detail page or tell me the make, model, and year.";
   }
   return "I need a bit more detail before I can route this request confidently.";
+}
+
+function buildClarificationStatusConfidence(intentResult) {
+  const missing = intentResult.missing_fields ?? [];
+  if (intentResult.intent === "out_of_scope" && missing.includes("automotive_business_context")) {
+    return buildStatusConfidence(0.38, "Needs clarification", [
+      "The request may be related to an automotive business, but not enough vehicle-advisory context was provided.",
+    ]);
+  }
+  if (intentResult.intent === "unknown" && missing.includes("vehicle_need")) {
+    return buildStatusConfidence(0.24, "Needs clarification", [
+      "The message does not contain enough vehicle-shopping detail to route confidently.",
+    ]);
+  }
+  return null;
+}
+
+function buildPolicyStatusConfidence(policyResponse) {
+  if (!policyResponse?.status_label) return null;
+  if (policyResponse.status_label === "Out of scope") {
+    return buildStatusConfidence(0.18, "Out of scope", [
+      "The request is outside CarVista Advisor's vehicle-shopping scope.",
+    ]);
+  }
+  if (policyResponse.status_label === "Needs clarification") {
+    return buildStatusConfidence(0.34, "Needs clarification", [
+      "The assistant needs a vehicle-related clarification before giving advice.",
+    ]);
+  }
+  return null;
+}
+
+function shouldRouteClarificationToPolicyInsight(intentResult) {
+  const missing = intentResult?.missing_fields ?? [];
+  return (
+    (intentResult?.intent === "out_of_scope" && missing.includes("automotive_business_context")) ||
+    (intentResult?.intent === "unknown" && missing.includes("vehicle_need"))
+  );
+}
+
+async function buildPolicyInsightEnvelope(ctx, {
+  flow_id,
+  intentResult,
+  message,
+  route,
+  startedAt,
+  validationStatus = "policy_insight",
+}) {
+  const policyResponse = handleConversationPolicy(intentResult.intent, message);
+  const fallbackAnswer = policyResponse.fallback_answer || policyResponse.final_answer;
+  const policyInsight = policyResponse.insight_payload
+    ? await generateConversationPolicyInsight({
+        policyPayload: policyResponse.insight_payload,
+        fallbackAnswer,
+      }, {
+        ollama: ctx.services?.ollama ?? ctx.ai?.ollama,
+      })
+    : {
+        final_answer: fallbackAnswer,
+        aiInsight: { summary: fallbackAnswer, reasons: [], caveats: [], advice: "" },
+        meta: { aiProvider: null, aiModel: null, aiUsed: false, fallbackUsed: false },
+      };
+  const needsClarification = policyResponse.status_label === "Needs clarification";
+  const servicesUsed = [
+    "IntentClassifier",
+    "ConversationPolicyService",
+    ...(policyResponse.insight_payload
+      ? [policyInsight.meta?.aiUsed ? "Qwen3PolicyInsight" : "AiInsightFallback"]
+      : []),
+  ];
+
+  return chatEnvelopeSchema.parse({
+    flow_id,
+    intent: intentResult.intent,
+    confidence: intentResult.confidence,
+    needs_clarification: needsClarification,
+    structured_result: {
+      policy: policyResponse.policy,
+      classification: policyResponse.classification,
+      aiInsight: policyInsight.aiInsight,
+    },
+    final_answer: policyInsight.final_answer,
+    context_updates: {},
+    result_confidence: buildPolicyStatusConfidence(policyResponse),
+    evidence: null,
+    sources: [],
+    caveats: [],
+    freshness_note: null,
+    meta: {
+      services_used: servicesUsed,
+      sources_used: [],
+      fallback_used: Boolean(policyInsight.meta?.fallbackUsed),
+      aiProvider: policyInsight.meta?.aiProvider ?? null,
+      aiModel: policyInsight.meta?.aiModel ?? null,
+      aiUsed: Boolean(policyInsight.meta?.aiUsed),
+      aiFallbackUsed: Boolean(policyInsight.meta?.fallbackUsed),
+      latency_ms: Date.now() - startedAt,
+      route_service: route.service,
+      missing_fields: intentResult.missing_fields ?? [],
+      validation_status: validationStatus,
+    },
+  });
 }
 
 async function resolveVehicleId(ctx, message, context, index = 0) {
@@ -229,6 +331,22 @@ export async function orchestrateChatRequest(
     needs_clarification: intentResult.needs_clarification,
   });
 
+  if (
+    intentResult.needs_clarification &&
+    intentResult.intent !== "vehicle_general_qa" &&
+    forced_intent == null &&
+    shouldRouteClarificationToPolicyInsight(intentResult)
+  ) {
+    return buildPolicyInsightEnvelope(ctx, {
+      flow_id,
+      intentResult,
+      message,
+      route,
+      startedAt,
+      validationStatus: "classifier_policy_clarification",
+    });
+  }
+
   if (intentResult.needs_clarification && intentResult.intent !== "vehicle_general_qa" && forced_intent == null) {
     return chatEnvelopeSchema.parse({
       flow_id,
@@ -238,7 +356,7 @@ export async function orchestrateChatRequest(
       structured_result: null,
       final_answer: buildClarificationMessage(intentResult),
       context_updates: {},
-      result_confidence: null,
+      result_confidence: buildClarificationStatusConfidence(intentResult),
       evidence: null,
       sources: [],
       caveats: [],
@@ -256,39 +374,13 @@ export async function orchestrateChatRequest(
   }
 
   if (route.service === "ConversationPolicyService") {
-    const policyResponse = handleConversationPolicy(intentResult.intent, message);
-    const formatted = formatFinalAnswer({
-      intent: intentResult.intent,
-      structured_result: null,
-      policy_response: policyResponse,
-    });
-    formatted.final_answer = await formatConversationPolicyWithModel(intentResult.intent, message, policyResponse, {
-      ollama: ctx.services?.ollama ?? ctx.ai?.ollama,
-    });
-    return chatEnvelopeSchema.parse({
+    return buildPolicyInsightEnvelope(ctx, {
       flow_id,
-      intent: intentResult.intent,
-      confidence: intentResult.confidence,
-      needs_clarification: false,
-      structured_result: {
-        policy: policyResponse.policy,
-      },
-      final_answer: formatted.final_answer,
-      context_updates: {},
-      result_confidence: null,
-      evidence: null,
-      sources: [],
-      caveats: [],
-      freshness_note: null,
-      meta: {
-        services_used: ["IntentClassifier", "ConversationPolicyService", "AiFormatter", "OllamaPolicyFormatter"],
-        sources_used: [],
-        fallback_used: false,
-        latency_ms: Date.now() - startedAt,
-        route_service: route.service,
-        missing_fields: [],
-        validation_status: "skipped",
-      },
+      intentResult,
+      message,
+      route,
+      startedAt,
+      validationStatus: "policy_insight",
     });
   }
 
@@ -373,13 +465,17 @@ export async function orchestrateChatRequest(
     });
     structuredResult = toKnowledgeResult(rawPayload);
   } else if (intentResult.intent === "recommend_car") {
-    structuredResult = await recommendCars(ctx, {
+    const recommendationResult = await recommendCars(ctx, {
       profile: {
         ...advisor_profile,
         budget_max: intentResult.entities.budget ?? advisor_profile.budget_max ?? null,
       },
       market_id: context.market_id ?? 1,
     });
+    structuredResult = {
+      ...recommendationResult,
+      user_message: message,
+    };
     rawPayload = structuredResult;
   }
 

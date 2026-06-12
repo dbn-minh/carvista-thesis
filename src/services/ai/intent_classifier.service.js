@@ -103,13 +103,17 @@ function mapRouteToIntent(route, message, context) {
   if (route === "vehicle_question") return "vehicle_general_qa";
   if (route === "small_talk") return "small_talk";
   if (route === "off_topic") return "out_of_scope";
+  if (route === "ambiguous_automotive_business") return "out_of_scope";
+  if (route === "low_signal") return "unknown";
 
   if (context.focus_variant_id && /\b(this car|this vehicle|xe nay)\b/i.test(normalized)) return "vehicle_general_qa";
   return "recommend_car";
 }
 
-function buildMissingFields(intent, entities, context) {
+function buildMissingFields(intent, entities, context, route = null) {
   const missing = [];
+  if (route === "ambiguous_automotive_business") missing.push("automotive_business_context");
+  if (route === "low_signal") missing.push("vehicle_need");
   if (intent === "compare_car" && entities.vehicles.length < 2 && !context.focus_variant_id && !hasCompareContext(context)) missing.push("vehicles");
   if (intent === "predict_vehicle_value" && entities.vehicles.length < 1 && !context.focus_variant_id) missing.push("vehicle");
   if (intent === "market_trend_analysis" && entities.vehicles.length < 1 && !context.focus_variant_id) missing.push("vehicle");
@@ -134,15 +138,19 @@ export function classifyIntent(message, context = {}) {
     focus_variant_id: context.focus_variant_id ?? null,
   };
 
-  const missing_fields = buildMissingFields(intent, entities, context);
+  const missing_fields = buildMissingFields(intent, entities, context, route);
   const confidence =
-    intent === "unknown"
-      ? 0.2
-      : intent === "small_talk" || intent === "out_of_scope"
-        ? 0.9
-        : missing_fields.length === 0
-          ? 0.82
-          : 0.64;
+    route === "low_signal"
+      ? 0.22
+      : route === "ambiguous_automotive_business"
+        ? 0.48
+        : intent === "unknown"
+          ? 0.2
+          : intent === "small_talk" || intent === "out_of_scope"
+            ? 0.9
+            : missing_fields.length === 0
+              ? 0.82
+              : 0.64;
 
   return intentResultSchema.parse({
     intent,

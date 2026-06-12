@@ -1,8 +1,10 @@
 import { Router } from "express";
-import { calculateTco } from "../services/ai/tco.service.js";
+import { env } from "../config/env.js";
 import { buildVariantPageIntelligence } from "../services/ai/page_intelligence.service.js";
 import { normalizeVariantPriceHistoryRows } from "../services/ai/source_retrieval.service.js";
 import { parsePreferenceProfileQuery } from "../services/ai/user_preference_profile.service.js";
+import { calculateTcoWithCache } from "../services/cache/cached-ai.service.js";
+import { buildCacheKey, remember } from "../services/cache/cache.service.js";
 
 export const catalogRoutes = Router();
 
@@ -10,6 +12,28 @@ function parseNumber(value, fallback = null) {
   if (value == null || value === "") return fallback;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function parseSkipSections(value) {
+  const entries = Array.isArray(value) ? value : value == null ? [] : [value];
+  return [...new Set(
+    entries
+      .flatMap((entry) => String(entry || "").split(","))
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+  )];
+}
+
+async function respondWithCachedJson(res, { cacheKey, ttlSeconds, producer }) {
+  let cacheStatus = "bypass";
+  const payload = await remember(cacheKey, ttlSeconds, producer, {
+    onStatus(status) {
+      cacheStatus = status;
+    },
+  });
+
+  res.set("X-Cache-Status", cacheStatus);
+  res.json(payload);
 }
 
 function isTruthyFlag(value) {
@@ -44,107 +68,150 @@ function buildCompareReadyClause(alias = "cv", specAlias = "vs") {
 
 catalogRoutes.get("/catalog/makes", async (req, res, next) => {
   try {
-    const { CarMakes } = req.ctx.models;
-    const items = await CarMakes.findAll({ order: [["name","ASC"]] });
-    res.json({ items });
+    await respondWithCachedJson(res, {
+      cacheKey: buildCacheKey("catalog:makes"),
+      ttlSeconds: env.redis.catalogTtlSeconds,
+      producer: async () => {
+        const { CarMakes } = req.ctx.models;
+        const items = await CarMakes.findAll({ order: [["name", "ASC"]] });
+        return { items };
+      },
+    });
   } catch (e) { next(e); }
 });
 
 catalogRoutes.get("/catalog/models", async (req, res, next) => {
   try {
-    const { CarModels } = req.ctx.models;
     const { makeId } = req.query;
-    const where = makeId ? { make_id: Number(makeId) } : {};
-    const items = await CarModels.findAll({ where, order: [["name","ASC"]] });
-    res.json({ items });
+    await respondWithCachedJson(res, {
+      cacheKey: buildCacheKey("catalog:models", {
+        make_id: makeId ? Number(makeId) : "all",
+      }),
+      ttlSeconds: env.redis.catalogTtlSeconds,
+      producer: async () => {
+        const { CarModels } = req.ctx.models;
+        const where = makeId ? { make_id: Number(makeId) } : {};
+        const items = await CarModels.findAll({ where, order: [["name", "ASC"]] });
+        return { items };
+      },
+    });
   } catch (e) { next(e); }
 });
 
 catalogRoutes.get("/catalog/variants", async (req, res, next) => {
   try {
-    const { sequelize } = req.ctx;
     const { make, model, year, fuel, bodyType, q, compareReady } = req.query;
     const compareReadyOnly = isTruthyFlag(compareReady);
+    const cacheKey = buildCacheKey("catalog:variants", {
+      make,
+      model,
+      year: year ? Number(year) : null,
+      fuel,
+      body_type: bodyType,
+      q,
+      compare_ready: compareReadyOnly,
+    });
 
-    const where = [];
-    const params = {};
+    await respondWithCachedJson(res, {
+      cacheKey,
+      ttlSeconds: env.redis.catalogTtlSeconds,
+      producer: async () => {
+        const { sequelize } = req.ctx;
+        const where = [];
+        const params = {};
 
-    if (make) { where.push("mk.name = :make"); params.make = make; }
-    if (model) { where.push("cm.name = :model"); params.model = model; }
-    if (year) { where.push("cv.model_year = :year"); params.year = Number(year); }
-    if (fuel) { where.push("cv.fuel_type = :fuel"); params.fuel = fuel; }
-    if (bodyType) { where.push("cv.body_type = :bodyType"); params.bodyType = bodyType; }
-    if (q) {
-      where.push(`(
-        cm.name LIKE :q
-        OR mk.name LIKE :q
-        OR cv.trim_name LIKE :q
-        OR CONCAT_WS(' ', cv.model_year, mk.name, cm.name, cv.trim_name) LIKE :q
-        OR CONCAT_WS(' ', mk.name, cm.name, cv.trim_name) LIKE :q
-        OR CONCAT_WS(' ', cv.model_year, mk.name, cm.name) LIKE :q
-        OR CONCAT_WS(' ', mk.name, cm.name) LIKE :q
-      )`);
-      params.q = `%${q}%`;
-    }
-    if (compareReadyOnly) {
-      where.push(buildCompareReadyClause("cv", "vs"));
-    }
+        if (make) { where.push("mk.name = :make"); params.make = make; }
+        if (model) { where.push("cm.name = :model"); params.model = model; }
+        if (year) { where.push("cv.model_year = :year"); params.year = Number(year); }
+        if (fuel) { where.push("cv.fuel_type = :fuel"); params.fuel = fuel; }
+        if (bodyType) { where.push("cv.body_type = :bodyType"); params.bodyType = bodyType; }
+        if (q) {
+          where.push(`(
+            cm.name LIKE :q
+            OR mk.name LIKE :q
+            OR cv.trim_name LIKE :q
+            OR CONCAT_WS(' ', cv.model_year, mk.name, cm.name, cv.trim_name) LIKE :q
+            OR CONCAT_WS(' ', mk.name, cm.name, cv.trim_name) LIKE :q
+            OR CONCAT_WS(' ', cv.model_year, mk.name, cm.name) LIKE :q
+            OR CONCAT_WS(' ', mk.name, cm.name) LIKE :q
+          )`);
+          params.q = `%${q}%`;
+        }
+        if (compareReadyOnly) {
+          where.push(buildCompareReadyClause("cv", "vs"));
+        }
 
-    const sql = `
-      SELECT
-        cv.variant_id, cv.model_year, cv.trim_name, cv.body_type, cv.fuel_type,
-        cv.engine, cv.transmission, cv.drivetrain, cv.msrp_base,
-        cm.model_id, cm.name AS model_name,
-        mk.make_id, mk.name AS make_name,
-        ${compareReadyOnly ? "TRUE" : buildCompareReadyClause("cv", "vs")} AS compare_ready
-      FROM car_variants cv
-      JOIN car_models cm ON cm.model_id = cv.model_id
-      JOIN car_makes mk ON mk.make_id = cm.make_id
-      LEFT JOIN variant_specs vs ON vs.variant_id = cv.variant_id
-      ${where.length ? "WHERE " + where.join(" AND ") : ""}
-      ORDER BY mk.name, cm.name, cv.model_year DESC, cv.trim_name
-      LIMIT 200
-    `;
-    const [items] = await sequelize.query(sql, { replacements: params });
-    res.json({ items });
+        const sql = `
+          SELECT
+            cv.variant_id, cv.model_year, cv.trim_name, cv.body_type, cv.fuel_type,
+            cv.engine, cv.transmission, cv.drivetrain, cv.msrp_base,
+            cm.model_id, cm.name AS model_name,
+            mk.make_id, mk.name AS make_name,
+            ${compareReadyOnly ? "TRUE" : buildCompareReadyClause("cv", "vs")} AS compare_ready
+          FROM car_variants cv
+          JOIN car_models cm ON cm.model_id = cv.model_id
+          JOIN car_makes mk ON mk.make_id = cm.make_id
+          LEFT JOIN variant_specs vs ON vs.variant_id = cv.variant_id
+          ${where.length ? "WHERE " + where.join(" AND ") : ""}
+          ORDER BY mk.name, cm.name, cv.model_year DESC, cv.trim_name
+          LIMIT 200
+        `;
+        const [items] = await sequelize.query(sql, { replacements: params });
+        return { items };
+      },
+    });
   } catch (e) { next(e); }
 });
 
 catalogRoutes.get("/catalog/variants/:id", async (req, res, next) => {
   try {
-    const { sequelize, models: { VariantSpecs, VariantSpecKv, VariantImages } } = req.ctx;
     const id = Number(req.params.id);
     const compareReadyOnly = isTruthyFlag(req.query.compareReady);
+    const cacheKey = buildCacheKey("vehicle:detail", {
+      variant_id: id,
+      compare_ready: compareReadyOnly,
+    });
 
-    const sql = `
-      SELECT
-        cv.*,
-        cm.name AS model_name,
-        mk.name AS make_name,
-        ${buildCompareReadyClause("cv", "vs")} AS compare_ready
-      FROM car_variants cv
-      JOIN car_models cm ON cm.model_id = cv.model_id
-      JOIN car_makes mk ON mk.make_id = cm.make_id
-      LEFT JOIN variant_specs vs ON vs.variant_id = cv.variant_id
-      WHERE cv.variant_id = :id
-      LIMIT 1
-    `;
-    const [rows] = await sequelize.query(sql, { replacements: { id } });
-    const variant = rows[0] ?? null;
-    if (!variant) return next({ status: 404, message: "Variant not found" });
-    if (compareReadyOnly && !variant.compare_ready) {
-      return next({
-        status: 404,
-        safe: true,
-        message: "This vehicle is not available as a compare-ready catalog variant.",
-      });
-    }
+    await respondWithCachedJson(res, {
+      cacheKey,
+      ttlSeconds: env.redis.vehicleDetailTtlSeconds,
+      producer: async () => {
+        const {
+          sequelize,
+          models: { VariantSpecs, VariantSpecKv, VariantImages },
+        } = req.ctx;
 
-    const spec = await VariantSpecs.findByPk(id);
-    const kv = await VariantSpecKv.findAll({ where: { variant_id: id }, limit: 50, order: [["spec_key","ASC"]] });
-    const images = await VariantImages.findAll({ where: { variant_id: id }, order: [["sort_order","ASC"]] });
+        const sql = `
+          SELECT
+            cv.*,
+            cm.name AS model_name,
+            mk.name AS make_name,
+            ${buildCompareReadyClause("cv", "vs")} AS compare_ready
+          FROM car_variants cv
+          JOIN car_models cm ON cm.model_id = cv.model_id
+          JOIN car_makes mk ON mk.make_id = cm.make_id
+          LEFT JOIN variant_specs vs ON vs.variant_id = cv.variant_id
+          WHERE cv.variant_id = :id
+          LIMIT 1
+        `;
+        const [rows] = await sequelize.query(sql, { replacements: { id } });
+        const variant = rows[0] ?? null;
+        if (!variant) throw { status: 404, message: "Variant not found" };
+        if (compareReadyOnly && !variant.compare_ready) {
+          throw {
+            status: 404,
+            safe: true,
+            message: "This vehicle is not available as a compare-ready catalog variant.",
+          };
+        }
 
-    res.json({ variant, spec, kv, images });
+        const spec = await VariantSpecs.findByPk(id);
+        const kv = await VariantSpecKv.findAll({ where: { variant_id: id }, limit: 50, order: [["spec_key", "ASC"]] });
+        const images = await VariantImages.findAll({ where: { variant_id: id }, order: [["sort_order", "ASC"]] });
+
+        return { variant, spec, kv, images };
+      },
+    });
   } catch (e) { next(e); }
 });
 
@@ -159,6 +226,7 @@ catalogRoutes.get("/catalog/variants/:id/ai-insights", async (req, res, next) =>
     const ownershipYears = parseNumber(req.query.ownershipYears, 5);
     const kmPerYear = parseNumber(req.query.kmPerYear, null);
     const profile = parsePreferenceProfileQuery(req.query);
+    const skipSections = parseSkipSections(req.query.skipSections);
 
     const intelligence = await buildVariantPageIntelligence(req.ctx, {
       variantId,
@@ -166,6 +234,7 @@ catalogRoutes.get("/catalog/variants/:id/ai-insights", async (req, res, next) =>
       ownershipYears,
       kmPerYear,
       profile,
+      skipSections,
     });
 
     res.json(intelligence);
@@ -237,12 +306,19 @@ catalogRoutes.get("/catalog/variants/:id/ownership-summary", async (req, res, ne
       });
     }
 
-    const estimate = await calculateTco(req.ctx, {
+    let cacheStatus = "bypass";
+    const estimate = await calculateTcoWithCache(req.ctx, {
       profile_id: profile.profile_id,
       base_price: basePrice,
       ownership_years: ownershipYears,
       km_per_year: kmPerYear,
+    }, {
+      onStatus(status) {
+        cacheStatus = status;
+      },
     });
+
+    res.set("X-Cache-Status", cacheStatus);
 
     res.json({
       variant_id: variantId,

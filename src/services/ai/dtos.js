@@ -162,6 +162,10 @@ export const recommendationResultSchema = z.object({
     })
   ),
   profile_summary: z.string(),
+  recommendation_mode: z.string().optional(),
+  catalog_coverage: z.string().optional(),
+  user_message: z.string().optional(),
+  general_vehicle_suggestions_allowed: z.boolean().optional(),
   confidence: confidenceSchema,
   assumptions: z.array(assumptionSchema).default([]),
   sources: z.array(sourceSchema).default([]),

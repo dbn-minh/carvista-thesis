@@ -1,19 +1,35 @@
 // src/routes/ai.routes.js
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.js";
-import { calculateTco } from "../services/ai/tco.service.js";
-import { predictPrice } from "../services/ai/predict_price.service.js";
+import { aiLimiter } from "../middlewares/rateLimit.middleware.js";
 import { compareVariants } from "../services/ai/compare_variants.service.js";
 import { chatAdvisor } from "../services/ai/car_advisor_chat.service.js";
 import { mapAiHttpError } from "../services/ai/error_mapper.service.js";
+import {
+  calculateTcoWithCache,
+  predictPriceWithCache,
+} from "../services/cache/cached-ai.service.js";
 
 export const aiRoutes = Router();
 aiRoutes.use(requireAuth);
+aiRoutes.use(aiLimiter);
 
 aiRoutes.post("/ai/tco", async (req, res, next) => {
   try {
-    const out = await calculateTco(req.ctx, req.body);
-    res.json(out);
+    let cacheStatus = "bypass";
+    const out = await calculateTcoWithCache(req.ctx, req.body, {
+      onStatus(status) {
+        cacheStatus = status;
+      },
+    });
+    res.set("X-Cache-Status", cacheStatus);
+    res.json({
+      ...out,
+      meta: {
+        ...(out?.meta || {}),
+        cache: cacheStatus,
+      },
+    });
   } catch (e) {
     next(mapAiHttpError(e, "calculate_tco"));
   }
@@ -21,8 +37,20 @@ aiRoutes.post("/ai/tco", async (req, res, next) => {
 
 aiRoutes.post("/ai/predict-price", async (req, res, next) => {
   try {
-    const out = await predictPrice(req.ctx, req.body);
-    res.json(out);
+    let cacheStatus = "bypass";
+    const out = await predictPriceWithCache(req.ctx, req.body, {
+      onStatus(status) {
+        cacheStatus = status;
+      },
+    });
+    res.set("X-Cache-Status", cacheStatus);
+    res.json({
+      ...out,
+      meta: {
+        ...(out?.meta || {}),
+        cache: cacheStatus,
+      },
+    });
   } catch (e) {
     next(mapAiHttpError(e, "predict_vehicle_value"));
   }

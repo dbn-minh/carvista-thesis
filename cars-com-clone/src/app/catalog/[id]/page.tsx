@@ -252,8 +252,8 @@ export default function CatalogDetailPage() {
         {loading ? <p className="text-sm text-slate-300">Loading variant detail...</p> : null}
 
         {detail?.variant ? (
-          <section className="mb-8 grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)] xl:items-start">
-            <div className="section-shell p-4 sm:p-5 md:p-6">
+          <section className="mb-8 grid items-stretch gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
+            <div className="section-shell flex h-full flex-col p-4 sm:p-5 md:p-6">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <h2 className="text-xl font-apercu-bold text-cars-primary sm:text-2xl">
@@ -266,19 +266,21 @@ export default function CatalogDetailPage() {
               </div>
 
               {selectedImage ? (
-                <div className="mt-5 overflow-hidden rounded-[24px] bg-[radial-gradient(circle_at_top,rgba(143,180,255,0.16),transparent_48%),linear-gradient(180deg,rgba(16,22,32,0.96),rgba(10,14,20,0.98))] sm:rounded-[28px]">
-                  <div className="aspect-[16/10] sm:aspect-[16/9]">
-                    <img src={selectedImage} alt={heading} className="h-full w-full object-contain" />
-                  </div>
+                <div className="mt-5 flex min-h-[360px] flex-1 overflow-hidden rounded-[24px] bg-[radial-gradient(circle_at_top,rgba(143,180,255,0.16),transparent_48%),linear-gradient(180deg,rgba(16,22,32,0.96),rgba(10,14,20,0.98))] sm:min-h-[420px] sm:rounded-[28px]">
+                  <img
+                    src={selectedImage}
+                    alt={heading}
+                    className="h-full w-full object-cover object-center"
+                  />
                 </div>
               ) : (
-                <div className="mt-5 flex aspect-[16/10] items-center justify-center rounded-[24px] bg-[radial-gradient(circle_at_top,rgba(143,180,255,0.16),transparent_48%),linear-gradient(180deg,rgba(16,22,32,0.96),rgba(10,14,20,0.98))] px-6 text-center text-sm font-medium text-slate-300 sm:rounded-[28px] sm:aspect-[16/9]">
+                <div className="mt-5 flex min-h-[360px] flex-1 items-center justify-center rounded-[24px] bg-[radial-gradient(circle_at_top,rgba(143,180,255,0.16),transparent_48%),linear-gradient(180deg,rgba(16,22,32,0.96),rgba(10,14,20,0.98))] px-6 text-center text-sm font-medium text-slate-300 sm:min-h-[420px] sm:rounded-[28px]">
                   Photos coming soon.
                 </div>
               )}
 
               {gallery.length > 1 ? (
-                <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3">
+                <div className="mt-4 grid auto-rows-fr grid-cols-4 gap-2 sm:grid-cols-5 sm:gap-3">
                   {gallery.map((image) => (
                     <button
                       key={image}
@@ -286,8 +288,8 @@ export default function CatalogDetailPage() {
                       onClick={() => setSelectedImage(image)}
                       className={
                         image === selectedImage
-                          ? "overflow-hidden rounded-[18px] ring-2 ring-cars-accent"
-                          : "overflow-hidden rounded-[18px] border border-cars-gray-light/70"
+                          ? "h-full overflow-hidden rounded-[18px] ring-2 ring-cars-accent"
+                          : "h-full overflow-hidden rounded-[18px] border border-cars-gray-light/70"
                       }
                     >
                       <div className="aspect-[4/3]">
@@ -299,13 +301,13 @@ export default function CatalogDetailPage() {
               ) : null}
             </div>
 
-            <div className="section-shell self-start p-4 sm:p-5 md:p-6">
+            <div className="section-shell flex h-full flex-col self-stretch p-4 sm:p-5 md:p-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
                     Overview
                   </p>
-                  <h2 className="mt-2 text-2xl font-apercu-bold leading-tight text-cars-primary sm:text-3xl">
+                  <h2 className="mt-2 min-h-[5.5rem] text-2xl font-apercu-bold leading-tight text-cars-primary line-clamp-2 sm:min-h-[6.5rem] sm:text-3xl">
                     {heading}
                   </h2>
                 </div>
@@ -317,16 +319,16 @@ export default function CatalogDetailPage() {
                 </Link>
               </div>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+              <div className="mt-5 grid auto-rows-fr gap-3 sm:grid-cols-2">
                 {specCards.map((item) => (
                   <div
                     key={item.label}
-                    className="rounded-[20px] border border-white/8 bg-white/5 px-4 py-3 text-sm"
+                    className="flex h-full min-h-[108px] flex-col rounded-[20px] border border-white/8 bg-white/5 px-4 py-3 text-sm"
                   >
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
                       {item.label}
                     </p>
-                    <p className="mt-2 break-words font-medium leading-6 text-cars-primary">
+                    <p className="mt-3 line-clamp-2 break-words font-medium leading-6 text-cars-primary">
                       {getText(item.value)}
                     </p>
                   </div>
@@ -342,14 +344,13 @@ export default function CatalogDetailPage() {
             subjectId={id}
             marketId={Number(marketId) || 1}
             ownershipYears={Number(ownershipYears) || 5}
-            title="AI ownership and buyer-fit preview"
+            title="AI ownership preview"
             className="mb-8"
             compactLayout
             hiddenSectionKeys={["price_outlook"]}
             allowedActionPathTypes={["related_listings"]}
             showSectionCaveats={false}
             showSectionSources={false}
-            showCompactSourceSummary={false}
           />
         ) : null}
 

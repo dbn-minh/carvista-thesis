@@ -1,4 +1,5 @@
-import { buildOffTopicReply, buildSmallTalkReply } from "./conversation_orchestrator.service.js";
+import { buildSmallTalkReply } from "./conversation_orchestrator.service.js";
+import { buildAdvisorScopePolicy } from "./advisor_scope_policy.service.js";
 
 export function handleConversationPolicy(intent, message) {
   if (intent === "small_talk") {
@@ -9,13 +10,7 @@ export function handleConversationPolicy(intent, message) {
     };
   }
 
-  if (intent === "out_of_scope" || intent === "unknown") {
-    return {
-      policy: "scope_redirect",
-      final_answer: buildOffTopicReply(message),
-      follow_up: "If you want to switch back, I can help with cars, pricing, comparisons, and ownership costs.",
-    };
-  }
+  if (intent === "out_of_scope" || intent === "unknown") return buildAdvisorScopePolicy(message);
 
   return {
     policy: "in_domain",

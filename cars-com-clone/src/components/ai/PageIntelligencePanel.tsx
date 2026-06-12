@@ -28,7 +28,6 @@ type PageIntelligencePanelProps = {
   showActionPaths?: boolean;
   showSectionCaveats?: boolean;
   showSectionSources?: boolean;
-  showCompactSourceSummary?: boolean;
   allowedActionPathTypes?: string[];
 };
 
@@ -201,17 +200,17 @@ function FitScoreCard({
 
   return (
     <div
-      className={`flex h-full min-h-[220px] flex-col items-center justify-center rounded-[22px] px-6 py-6 text-center ${
+      className={`flex h-full min-h-[180px] w-full max-w-[280px] flex-col items-center justify-center rounded-[20px] px-5 py-5 text-center ${
         tone ? tone.shell : "bg-cars-off-white dark:bg-slate-900/70"
       }`}
     >
       {tone?.Icon ? (
         <span
-          className={`mb-4 flex h-12 w-12 items-center justify-center rounded-full ${
+          className={`mb-3 flex h-10 w-10 items-center justify-center rounded-full ${
             tone.iconShell
           }`}
         >
-          <tone.Icon className={`h-6 w-6 ${tone.iconColor}`} />
+          <tone.Icon className={`h-5 w-5 ${tone.iconColor}`} />
         </span>
       ) : null}
       <p
@@ -223,7 +222,7 @@ function FitScoreCard({
       </p>
       {card.value != null ? (
         <p
-          className={`mt-4 text-6xl font-apercu-bold leading-none tracking-tight ${
+          className={`mt-3 text-5xl font-apercu-bold leading-none tracking-tight ${
             tone ? tone.value : "text-cars-primary"
           }`}
         >
@@ -239,7 +238,7 @@ function FitScoreCard({
         </p>
       )}
       <p
-        className={`mt-3 text-base font-semibold ${
+        className={`mt-2 text-[15px] font-semibold ${
           tone ? tone.value : "text-cars-primary"
         }`}
       >
@@ -247,7 +246,7 @@ function FitScoreCard({
       </p>
       {hasText(supportingCopy) ? (
         <p
-          className={`mt-3 max-w-[15rem] text-sm leading-6 ${
+          className={`mt-2 max-w-[14rem] text-sm leading-6 ${
             tone ? tone.description : "text-cars-gray"
           }`}
         >
@@ -335,13 +334,23 @@ export default function PageIntelligencePanel({
   showActionPaths = true,
   showSectionCaveats = true,
   showSectionSources = true,
-  showCompactSourceSummary = true,
   allowedActionPathTypes,
 }: PageIntelligencePanelProps) {
   const [data, setData] = useState<AiPageIntelligenceResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [profile, setProfile] = useState<AdvisorProfile>({});
+  const hiddenSectionSignature = useMemo(
+    () => [...hiddenSectionKeys].sort().join("|"),
+    [hiddenSectionKeys],
+  );
+  const normalizedHiddenSectionKeys = useMemo(
+    () =>
+      hiddenSectionSignature
+        ? hiddenSectionSignature.split("|").filter(Boolean)
+        : [],
+    [hiddenSectionSignature],
+  );
 
   useEffect(() => {
     const syncProfile = () => setProfile(getStoredAdvisorProfile());
@@ -354,9 +363,9 @@ export default function PageIntelligencePanel({
   const visibleSections = useMemo(
     () =>
       (data?.sections ?? []).filter(
-        (section) => !hiddenSectionKeys.includes(section.key),
+        (section) => !normalizedHiddenSectionKeys.includes(section.key),
       ),
-    [data?.sections, hiddenSectionKeys],
+    [data?.sections, normalizedHiddenSectionKeys],
   );
   const hasProfileData = useMemo(
     () => hasStoredProfile(profile, data?.subject?.profile_snapshot),
@@ -378,39 +387,6 @@ export default function PageIntelligencePanel({
       })
       .slice(0, 3);
   }, [allowedActionPathTypes, visibleSections]);
-  const compactSourceSummary = useMemo(() => {
-    const sourceProviders = [
-      ...new Set(
-        visibleSections
-          .flatMap((section) => section.sources ?? [])
-          .map((source) => source.provider)
-          .filter(Boolean),
-      ),
-    ];
-    const pillars = [
-      visibleSections.some((section) => section.key === "price_outlook")
-        ? "market price history"
-        : null,
-      visibleSections.some((section) => section.key === "ownership_cost")
-        ? "ownership-cost modeling"
-        : null,
-      data?.subject?.profile_snapshot ? "your saved buyer profile" : null,
-    ].filter(Boolean);
-
-    if (!pillars.length && !sourceProviders.length) return null;
-
-    return {
-      title: "What this is based on",
-      description: pillars.length
-        ? `Built from ${pillars.join(", ")}${sourceProviders.length ? ` and sources like ${sourceProviders.slice(0, 2).join(", ")}` : ""}.`
-        : `Built from sources like ${sourceProviders.slice(0, 3).join(", ")}.`,
-      freshness:
-        visibleSections
-          .map((section) => section.freshness_note)
-          .find(Boolean) ?? null,
-    };
-  }, [data?.subject?.profile_snapshot, visibleSections]);
-
   useEffect(() => {
     if (!Number.isFinite(subjectId)) return;
     let cancelled = false;
@@ -425,6 +401,7 @@ export default function PageIntelligencePanel({
           ownershipYears,
           ...(kmPerYear ? { kmPerYear } : {}),
           profile,
+          skipSections: normalizedHiddenSectionKeys,
         };
 
         const response =
@@ -451,7 +428,16 @@ export default function PageIntelligencePanel({
     return () => {
       cancelled = true;
     };
-  }, [subjectType, subjectId, marketId, ownershipYears, kmPerYear, profile]);
+  }, [
+    subjectType,
+    subjectId,
+    marketId,
+    ownershipYears,
+    kmPerYear,
+    profile,
+    hiddenSectionSignature,
+    normalizedHiddenSectionKeys,
+  ]);
 
   return (
     <section
@@ -572,7 +558,7 @@ export default function PageIntelligencePanel({
                       </div>
 
                       {hasDualFitColumns ? (
-                        <div className="mt-4 grid items-stretch gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,380px)]">
+                        <div className="mt-4 grid items-stretch gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(240px,280px)]">
                           <div className="grid gap-3 md:grid-cols-2">
                             <FitSignalGroup
                               title="The good"
@@ -586,11 +572,13 @@ export default function PageIntelligencePanel({
                             />
                           </div>
                           {topCard ? (
-                            <FitScoreCard
-                              card={topCard}
-                              tone={topCardTone}
-                              fallbackCopy={section.assistant_message}
-                            />
+                            <div className="flex justify-end">
+                              <FitScoreCard
+                                card={topCard}
+                                tone={topCardTone}
+                                fallbackCopy={section.assistant_message}
+                              />
+                            </div>
                           ) : (
                             <AvailabilityNote
                               message={sectionFallbackMessage}
@@ -601,7 +589,7 @@ export default function PageIntelligencePanel({
                       ) : (
                         <div className="mt-4 space-y-4">
                           {topCard ? (
-                            <div className="mx-auto max-w-sm">
+                            <div className="flex justify-end">
                               <FitScoreCard
                                 card={topCard}
                                 tone={topCardTone}
@@ -666,7 +654,7 @@ export default function PageIntelligencePanel({
                       {section.key === "fit_for_you" ? (
                         <div className="mt-4 space-y-4">
                           {topCard ? (
-                            <div className="mx-auto max-w-sm">
+                            <div className="flex justify-end">
                               <FitScoreCard
                                 card={topCard}
                                 tone={topCardTone}
@@ -844,21 +832,6 @@ export default function PageIntelligencePanel({
             </div>
           ) : null}
 
-          {compactLayout && showCompactSourceSummary && compactSourceSummary ? (
-            <div className="mt-4 rounded-[22px] border border-cars-primary/12 bg-cars-off-white px-5 py-4 text-sm leading-6 text-cars-gray">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
-                {compactSourceSummary.title}
-              </p>
-              <p className="mt-2 text-cars-primary">
-                {compactSourceSummary.description}
-              </p>
-              {compactSourceSummary.freshness ? (
-                <p className="mt-2 text-xs text-cars-gray">
-                  {compactSourceSummary.freshness}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
         </>
       ) : null}
 

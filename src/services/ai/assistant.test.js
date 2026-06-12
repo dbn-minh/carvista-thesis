@@ -50,11 +50,321 @@ function mockFetchFactory() {
   };
 }
 
+function extractPolicyPayload(prompt) {
+  const match = String(prompt || "").match(/policy_insight_payload_json:\s*([\s\S]*?)\nemergency_fallback_text:/);
+  if (!match) return {};
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    return {};
+  }
+}
+
+function policyInsightSummary(payload, callCount = 1) {
+  const message = String(payload.userMessage || "");
+  if (/iphone/i.test(message)) {
+    return callCount > 1
+      ? "If you mean iPhone as a device choice, compare camera, battery, storage, repair cost, and how long you plan to keep it. For CarVista, the useful vehicle angle is phone integration: Apple CarPlay, infotainment responsiveness, wireless charging, and cabin connectivity. CarVista Advisor's main job is helping you choose, compare, price, and evaluate vehicles, so I can use those tech preferences when recommending cars."
+      : "For iPhone buying, start with the practical fit: budget, battery life, camera needs, storage, and whether you prefer a compact or large screen. If this connects to your car search, iPhone users usually care about Apple CarPlay, wireless charging, infotainment quality, and cabin connectivity. CarVista Advisor's main purpose is vehicle recommendations, comparison, pricing, and ownership guidance, so I can translate those tech needs into a better car shortlist.";
+  }
+  if (/ocr/i.test(message)) {
+    return "A compact OCR prototype in Python can use OpenCV for cleanup and pytesseract for text extraction: import cv2; import pytesseract; img = cv2.imread('document.jpg'); gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY); text = pytesseract.image_to_string(gray). For a real app, add preprocessing, confidence checks, and field validation. If the OCR target is vehicle-related, the same flow can read VINs, license plates, window stickers, invoices, or service records. CarVista Advisor's main purpose is helping users choose, compare, price, and evaluate vehicles, so OCR output can later support recommendations and ownership-cost analysis.";
+  }
+  if (/python|code/i.test(message)) {
+    return "Here is a tiny Python-style example: def normalize_text(value): return ' '.join(str(value).strip().split()).lower(). You can adapt that pattern before sending text into OCR, search, or classification logic. If the code is for a vehicle workflow, it can help clean VIN data, estimate payments, compare fuel costs, or prepare listing information. CarVista Advisor's main purpose is vehicle recommendations, comparison, pricing, and ownership guidance, so I can connect the script to car-shopping decisions afterward.";
+  }
+  if (/saas|crm|software|startup|b2b/i.test(message)) {
+    return "A practical B2B SaaS product idea is a lightweight CRM that captures leads, tracks follow-ups, scores prospects, and summarizes next actions for a small sales team. The MVP could include contact records, pipeline stages, reminders, email templates, and a simple dashboard. If this is automotive-adjacent, the same idea could become dealership CRM, fleet lead tracking, inventory follow-up, or auto-sales workflow software. CarVista Advisor's main purpose is helping users choose, compare, price, and evaluate vehicles, so I can connect business tooling back to vehicle recommendations or dealership workflows when needed.";
+  }
+  if (/asdf|qwer|random/i.test(message)) {
+    return "I'm not sure what you are looking for yet. Share a vehicle use case, budget, body type, fuel preference, or must-have features and I will help narrow down options. My main goal is to help you find and compare the right vehicle.";
+  }
+  return "I can help best with vehicle recommendations, comparisons, pricing, and ownership costs. What car-shopping decision should we focus on?";
+}
+
+function buildPolicyInsightOllama() {
+  const calls = [];
+  return {
+    provider: "fpt",
+    apiKey: "test-key",
+    model: "Qwen3:32B",
+    calls,
+    async generate(request) {
+      calls.push(request);
+      const payload = extractPolicyPayload(request.prompt);
+      return {
+        text: JSON.stringify({
+          summary: policyInsightSummary(payload, calls.length),
+          reasons: [],
+          caveats: [],
+          advice: "",
+        }),
+      };
+    },
+  };
+}
+
 test("conversation router distinguishes vehicle advice from off-topic chat", () => {
   assert.equal(classifyConversationRoute("How reliable is this car on long trips?", { focus_variant_id: 7 }), "vehicle_question");
   assert.equal(classifyConversationRoute("What is the weather today?"), "off_topic");
   assert.equal(classifyConversationRoute("Who won the World Cup?"), "off_topic");
+  assert.equal(classifyConversationRoute("Give me a PRoduct B2B SaaS"), "off_topic");
+  assert.equal(classifyConversationRoute("Recommend a CRM for my startup"), "off_topic");
+  assert.equal(classifyConversationRoute("I need software for my dealership"), "ambiguous_automotive_business");
+  assert.equal(classifyConversationRoute("asdf qwer random"), "low_signal");
   assert.equal(classifyConversationRoute("Compare these two cars for me"), "compare");
+});
+
+test("advisor delegates off-topic policy wording to Qwen insight", async () => {
+  const ollama = buildPolicyInsightOllama();
+  const ctx = { services: { ollama } };
+  const product = await orchestrateChatRequest(ctx, { message: "Give me a PRoduct B2B SaaS" });
+  assert.equal(product.intent, "out_of_scope");
+  assert.equal(product.needs_clarification, true);
+  assert.equal(product.meta.aiUsed, true);
+  assert.equal(product.structured_result?.classification?.intent, "OFF_TOPIC_BRIDGEABLE");
+  assert.equal(product.structured_result?.classification?.topicCategory, "saas/software/business_tools");
+  assert.equal(product.result_confidence?.label, "Needs clarification");
+  assert.match(product.final_answer, /B2B SaaS|CRM|MVP|pipeline/i);
+  assert.match(product.final_answer, /dealership|fleet|auto-sales|vehicle/i);
+  assert.match(product.final_answer, /CarVista Advisor's main purpose|choose, compare, price, and evaluate vehicles/i);
+
+  const crm = await orchestrateChatRequest(ctx, { message: "Recommend a CRM for my startup" });
+  assert.equal(crm.intent, "out_of_scope");
+  assert.equal(crm.result_confidence?.label, "Needs clarification");
+  assert.match(crm.final_answer, /CRM|pipeline|follow-ups|sales team/i);
+  assert.match(crm.final_answer, /dealership|fleet|auto-sales|vehicle/i);
+});
+
+test("advisor lets Qwen answer common off-topic prompts before bridging back", async () => {
+  const ollama = buildPolicyInsightOllama();
+  const ctx = { services: { ollama } };
+
+  const phone = await orchestrateChatRequest(ctx, { message: "iphone" });
+  assert.equal(phone.intent, "out_of_scope");
+  assert.equal(phone.result_confidence?.label, "Needs clarification");
+  assert.match(phone.final_answer, /iPhone/i);
+  assert.match(phone.final_answer, /battery|camera|storage|screen/i);
+  assert.match(phone.final_answer, /CarPlay|infotainment|wireless charging|phone integration|connectivity/i);
+
+  const code = await orchestrateChatRequest(ctx, { message: "give me python code" });
+  assert.equal(code.intent, "out_of_scope");
+  assert.match(code.final_answer, /def normalize_text|Python-style|code/i);
+  assert.match(code.final_answer, /VIN|payment|fuel|vehicle data/i);
+
+  const python = await orchestrateChatRequest(ctx, { message: "Python" });
+  assert.equal(python.intent, "out_of_scope");
+  assert.equal(python.meta.aiUsed, true);
+  assert.doesNotMatch(python.final_answer, /I can help best with car recommendations/i);
+  assert.match(python.final_answer, /def normalize_text|Python-style|code/i);
+
+  const ocr = await orchestrateChatRequest(ctx, { message: "\u0110ua toi mot doan python code de OCR" });
+  assert.equal(ocr.intent, "out_of_scope");
+  assert.match(ocr.final_answer, /OCR/i);
+  assert.match(ocr.final_answer, /pytesseract|cv2|image_to_string/i);
+  assert.match(ocr.final_answer, /VIN|license plates|window stickers|invoices|service records/i);
+});
+
+test("advisor answers automotive-business prompts and clarifies low-signal prompts", async () => {
+  const ollama = buildPolicyInsightOllama();
+  const ctx = { services: { ollama } };
+  const dealership = await orchestrateChatRequest(ctx, { message: "I need software for my dealership" });
+  assert.equal(dealership.intent, "out_of_scope");
+  assert.equal(dealership.needs_clarification, true);
+  assert.equal(dealership.meta.aiUsed, true);
+  assert.equal(dealership.structured_result?.classification?.intent, "AUTOMOTIVE_ADJACENT");
+  assert.match(dealership.final_answer, /dealership|fleet|auto-sales|vehicle/i);
+  assert.match(dealership.final_answer, /CRM|MVP|dashboard|pipeline/i);
+  assert.match(dealership.final_answer, /CarVista Advisor's main purpose|choose, compare, price, and evaluate vehicles/i);
+  assert.equal(dealership.result_confidence?.label, "Needs clarification");
+
+  const nonsense = await orchestrateChatRequest(ctx, { message: "asdf qwer random" });
+  assert.equal(nonsense.intent, "unknown");
+  assert.equal(nonsense.needs_clarification, true);
+  assert.equal(nonsense.structured_result?.classification?.intent, "LOW_SIGNAL_OR_NONSENSE");
+  assert.match(nonsense.final_answer, /not sure|unclear/i);
+  assert.match(nonsense.final_answer, /use case|budget|body type|fuel/i);
+  assert.equal(nonsense.result_confidence?.label, "Needs clarification");
+
+  const carRequest = classifyIntent("Need an SUV for family use under 40k", {});
+  assert.equal(carRequest.intent, "recommend_car");
+  assert.equal(carRequest.needs_clarification, false);
+
+  const lowMaintenanceRequest = classifyIntent("Need an SUV for family use under 40k, low maintenance", {});
+  assert.equal(lowMaintenanceRequest.intent, "recommend_car");
+  assert.equal(lowMaintenanceRequest.needs_clarification, false);
+});
+
+test("repeated off-topic prompts can vary when Qwen insight is available", async () => {
+  const ollama = buildPolicyInsightOllama();
+  const ctx = { services: { ollama } };
+
+  const first = await orchestrateChatRequest(ctx, { message: "iphone" });
+  const second = await orchestrateChatRequest(ctx, { message: "iphone" });
+
+  assert.equal(first.meta.aiUsed, true);
+  assert.equal(second.meta.aiUsed, true);
+  assert.notEqual(first.final_answer, second.final_answer);
+});
+
+test("conversation turn routes car-shopping requests away from off-topic state", () => {
+  const message = "de xuat xe cho toi";
+  const preview = classifyIntent(message, { market_id: 1, advisor_profile: {} });
+  const turn = classifyConversationTurn({
+    message,
+    pendingFlow: { intent: "out_of_scope", missing_fields: [] },
+    previewIntent: preview.intent,
+    previewEntities: preview.entities,
+    activeTopic: { intent: "out_of_scope" },
+    conversationState: { active_intent: "out_of_scope" },
+  });
+
+  assert.equal(preview.intent, "recommend_car");
+  assert.equal(turn.turn_type, "new_topic");
+  assert.equal(turn.effective_intent, "recommend_car");
+  assert.equal(turn.should_preserve_topic, false);
+  assert.equal(turn.should_clear_stale_result, true);
+  assert.deepEqual(turn.notes, ["policy_to_vehicle_task_handoff"]);
+});
+
+test("chat advisor returns to catalog recommendations with listing links after an off-topic detour", async () => {
+  const sessions = [];
+  const messages = [];
+  let sessionIdCounter = 700;
+  const ollama = buildPolicyInsightOllama();
+  const ctx = {
+    services: { ollama },
+    sequelize: {
+      async query(sql) {
+        if (sql.includes("FROM car_variants cv")) {
+          return [[
+            {
+              variant_id: 7,
+              model_year: 2024,
+              trim_name: "Hybrid Premium",
+              body_type: "suv",
+              fuel_type: "hybrid",
+              engine: "2.0L",
+              transmission: "AT",
+              drivetrain: "FWD",
+              seats: 5,
+              msrp_base: 35000,
+              model_name: "Corolla Cross",
+              make_name: "Toyota",
+              latest_price: 34000,
+              active_listing_count: 2,
+            },
+            {
+              variant_id: 9,
+              model_year: 2024,
+              trim_name: "Touring",
+              body_type: "sedan",
+              fuel_type: "gasoline",
+              engine: "1.5T",
+              transmission: "CVT",
+              drivetrain: "FWD",
+              seats: 5,
+              msrp_base: 33000,
+              model_name: "Civic",
+              make_name: "Honda",
+              latest_price: 33000,
+              active_listing_count: 1,
+            },
+          ]];
+        }
+
+        if (sql.includes("FROM car_reviews")) {
+          return [[
+            { variant_id: 7, avg_rating: 4.6, review_count: 12 },
+            { variant_id: 9, avg_rating: 4.1, review_count: 7 },
+          ]];
+        }
+
+        if (sql.includes("FROM vehicle_market_signals")) {
+          return [[
+            {
+              variant_id: 7,
+              active_listing_count: 2,
+              avg_asking_price: 34000,
+              price_spread_pct: 0.07,
+              scarcity_score: 0.62,
+              data_confidence: 0.83,
+            },
+          ]];
+        }
+
+        throw new Error(`Unexpected SQL in off-topic handoff test: ${sql}`);
+      },
+    },
+    models: {
+      AiChatSessions: {
+        async create(payload) {
+          const row = {
+            session_id: ++sessionIdCounter,
+            ...payload,
+            async update(next) {
+              Object.assign(this, next);
+            },
+          };
+          sessions.push(row);
+          return row;
+        },
+        async findByPk(id) {
+          return sessions.find((item) => item.session_id === id) ?? null;
+        },
+      },
+      AiChatMessages: {
+        async create(payload) {
+          messages.push(payload);
+          return payload;
+        },
+      },
+      Listings: {
+        async findAll() {
+          return [
+            { listing_id: 101, variant_id: 7 },
+            { listing_id: 102, variant_id: 7 },
+            { listing_id: 205, variant_id: 9 },
+          ];
+        },
+      },
+      VariantImages: {
+        async findAll() {
+          return [
+            { variant_id: 7, url: "/images/corolla-cross.jpg", sort_order: 0 },
+            { variant_id: 9, url: "/images/civic.jpg", sort_order: 0 },
+          ];
+        },
+      },
+    },
+  };
+
+  const detour = await chatAdvisor(ctx, {
+    user_id: 42,
+    message: "iphone",
+    context: { market_id: 1 },
+  });
+  assert.equal(detour.intent, "out_of_scope");
+  assert.equal(detour.needs_clarification, true);
+
+  const recommendation = await chatAdvisor(ctx, {
+    session_id: detour.session_id,
+    user_id: 42,
+    message: "Need an SUV for family use under 40k, low maintenance",
+    context: { market_id: 1 },
+  });
+
+  assert.equal(recommendation.intent, "recommend_car");
+  assert.equal(recommendation.needs_clarification, false);
+  assert.equal(recommendation.meta?.turn_type, "new_topic");
+  assert.equal(recommendation.meta?.context_transition?.preserve_topic, false);
+  assert.equal(recommendation.structured_result?.recommendation_mode, "backend_catalog_ranked");
+  assert.equal(recommendation.cards[0]?.href, "/catalog/7");
+  assert.ok(recommendation.cards[0]?.action?.payload?.url?.includes("/catalog/7"));
+  assert.ok(recommendation.structured_result?.ranked_vehicles?.[0]?.links?.related_listings_url?.includes("variantId=7"));
+  assert.deepEqual(recommendation.structured_result?.ranked_vehicles?.[0]?.links?.related_listing_ids, [101, 102]);
+  assert.equal(sessions[0].context_json.conversation_state.active_intent, "recommend_car");
+  assert.deepEqual(sessions[0].context_json.conversation_state.referenced_listing_ids, [101, 102, 205]);
 });
 
 test("intent classifier reuses stored advisor profile budget for recommendation routing", () => {
@@ -539,7 +849,10 @@ test("chat orchestrator returns policy envelope for out-of-scope chat", async ()
   assert.equal(result.intent, "out_of_scope");
   assert.equal(result.needs_clarification, false);
   assert.equal(result.meta.route_service, "ConversationPolicyService");
-  assert.match(result.final_answer, /cars|vehicle/i);
+  assert.equal(result.meta.aiFallbackUsed, true);
+  assert.equal(result.result_confidence?.label, "Out of scope");
+  assert.match(result.final_answer, /AI model is unavailable/i);
+  assert.doesNotMatch(result.final_answer, /I can help best with car recommendations/i);
 });
 
 test("recommendation service returns deep links into vehicle detail and related listings", async () => {
@@ -1208,14 +1521,25 @@ test("chat advisor answers an interruption and repeats the pending buyer-profile
               }),
             };
           }
+          if (prompt.includes("policy_insight_payload_json")) {
+            const payload = extractPolicyPayload(prompt);
+            return {
+              text: JSON.stringify({
+                summary: policyInsightSummary(payload),
+                reasons: [],
+                caveats: [],
+                advice: "",
+              }),
+            };
+          }
           if (prompt.includes("pending_advisor_question")) {
             if (/iphone 17/i.test(prompt)) {
               const asksUseCase = /what will you mainly use/i.test(prompt);
               return {
                 text: JSON.stringify({
                   answer: asksUseCase
-                    ? "The iPhone 17 sounds like a tech detour, not a vehicle-use answer yet. Bringing this back to your car search, what will you mainly use the vehicle for?"
-                    : "The iPhone 17 sounds like a tech detour, not a car preference yet. Bringing this back to your car search, what type of vehicle do you prefer?",
+                    ? "For iPhone 17, I would look at battery, camera, storage, and how well it fits your daily workflow. For your car search, that tech preference can map to Apple CarPlay, infotainment quality, wireless charging, and cabin connectivity. CarVista Advisor focuses on vehicle recommendations, comparisons, pricing, and ownership costs, so what will you mainly use the vehicle for?"
+                    : "For iPhone 17, I would look at battery, camera, storage, and how well it fits your daily workflow. For your car search, that tech preference can map to Apple CarPlay, infotainment quality, wireless charging, and cabin connectivity. CarVista Advisor focuses on vehicle recommendations, comparisons, pricing, and ownership costs, so what type of vehicle do you prefer?",
                 }),
               };
             }
@@ -1223,7 +1547,7 @@ test("chat advisor answers an interruption and repeats the pending buyer-profile
               return {
                 text: JSON.stringify({
                   answer:
-                    "Argentina won the 2022 World Cup, and it was a memorable final. Bringing this back to your car search, what type of vehicle do you prefer?",
+                    "Argentina won the 2022 World Cup after a 3-3 final against France and a penalty shootout. CarVista Advisor is best for vehicle recommendations, comparisons, pricing, and ownership costs, so I can bring us back to your search now: what type of vehicle do you prefer?",
                 }),
               };
             }
@@ -1282,8 +1606,10 @@ test("chat advisor answers an interruption and repeats the pending buyer-profile
 
   assert.equal(phoneDetour.intent, "out_of_scope");
   assert.equal(phoneDetour.needs_clarification, true);
-  assert.match(phoneDetour.answer, /iPhone 17/i);
+  assert.match(phoneDetour.answer, /CarVista Advisor/i);
+  assert.match(phoneDetour.answer, /iPhone 17|battery|camera|storage|infotainment/i);
   assert.match(phoneDetour.answer, /what will you mainly use the vehicle for\?/i);
+  assert.equal(phoneDetour.confidence?.label, "Needs clarification");
   assert.equal(sessions[0].context_json.pending_question_key, "primary_use_cases");
   assert.deepEqual(sessions[0].context_json.advisor_profile.primary_use_cases, []);
 
@@ -1327,6 +1653,7 @@ test("chat advisor answers an interruption and repeats the pending buyer-profile
   assert.equal(third.needs_clarification, true);
   assert.match(third.answer, /Argentina won the 2022 World Cup/i);
   assert.match(third.answer, /what type of vehicle do you prefer\?/i);
+  assert.equal(third.confidence?.label, "Out of scope");
   assert.equal(sessions[0].context_json.pending_question_key, "passenger_setup");
 });
 
@@ -2083,6 +2410,74 @@ test("chat orchestrator uses backend structured result before the final advisor 
   assert.match(seenPrompt, /Corolla Cross/);
   assert.equal(result.meta.aiUsed, true);
   assert.equal(result.structured_result.aiInsight.reasons[0], "Backend ranking placed Corolla Cross first for the saved family profile.");
+});
+
+test("chat orchestrator lets Qwen suggest vehicles when local catalog has no matches", async () => {
+  let seenPrompt = "";
+  const buyerProfile = {
+    primary_use_cases: ["family"],
+    budget_max: 40000,
+    preferred_body_types: ["suv"],
+  };
+  const ctx = {
+    services: {
+      ollama: {
+        provider: "fpt",
+        model: "Qwen3-32B",
+        apiKey: "test-key",
+        async generate(request) {
+          seenPrompt = request.prompt;
+          return {
+            text: JSON.stringify({
+              answer:
+                "I do not see matching local catalog candidates in the backend result, so as general market suggestions I would look at the Toyota RAV4, Honda CR-V, Mazda CX-5, and Subaru Forester for a family SUV under about 40k. These are not confirmed CarVista inventory, but they are sensible outside-catalog options to compare for space, reliability, fuel economy, and safety.",
+              reasons: ["The backend explicitly allowed general vehicle suggestions because catalog coverage was empty."],
+              caveats: ["General suggestions are not confirmed local inventory."],
+              advice: "Check availability and local pricing before deciding.",
+            }),
+          };
+        },
+      },
+    },
+    sequelize: {
+      async query(sql) {
+        if (
+          sql.includes("FROM car_variants cv") ||
+          sql.includes("FROM car_reviews") ||
+          sql.includes("FROM vehicle_market_signals")
+        ) {
+          return [[]];
+        }
+        throw new Error(`Unexpected SQL in empty catalog recommendation test: ${sql}`);
+      },
+    },
+    models: {
+      Listings: { async findAll() { return []; } },
+      VariantSpecs: { async findAll() { return []; } },
+      VariantSpecKv: { async findAll() { return []; } },
+      VariantImages: { async findAll() { return []; } },
+    },
+  };
+
+  const result = await orchestrateChatRequest(ctx, {
+    message: "Need an SUV for family use under 40k, maybe a RAV4",
+    context: {
+      market_id: 1,
+      advisor_profile: buyerProfile,
+      budget: buyerProfile.budget_max,
+    },
+    advisor_profile: buyerProfile,
+  });
+
+  assert.equal(result.intent, "recommend_car");
+  assert.equal(result.needs_clarification, false);
+  assert.equal(result.structured_result.catalog_coverage, "no_catalog_matches");
+  assert.equal(result.structured_result.general_vehicle_suggestions_allowed, true);
+  assert.equal(result.meta.aiUsed, true);
+  assert.match(seenPrompt, /general_vehicle_suggestions_allowed/);
+  assert.match(seenPrompt, /Need an SUV for family use under 40k/);
+  assert.match(result.final_answer, /RAV4|CR-V|CX-5|Forester/i);
+  assert.match(result.final_answer, /not confirmed CarVista inventory|outside-catalog/i);
 });
 
 test("chat advisor binds short clarification replies to the pending compare flow", async () => {
