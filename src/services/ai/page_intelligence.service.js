@@ -5,6 +5,7 @@ import {
   calculateTcoWithCache,
   predictPriceWithCache,
 } from "../cache/cached-ai.service.js";
+import { evaluateVariantFit } from "./recommendation.service.js";
 import { summarizePreferenceProfile } from "./user_preference_profile.service.js";
 
 function hasProfile(profile) {
@@ -215,10 +216,18 @@ export async function buildVariantPageIntelligence(ctx, {
   }
 
   const actionPaths = await buildVariantActionPaths(ctx, variantContext);
+  const shouldIncludeFit = hasProfile(profile) && !hiddenSections.has("fit_for_you");
   const shouldIncludeOwnership = !hiddenSections.has("ownership_cost");
   const shouldIncludePriceOutlook = !hiddenSections.has("price_outlook");
 
-  const [tcoResult, predictionResult] = await Promise.all([
+  const [fitAssessment, tcoResult, predictionResult] = await Promise.all([
+    shouldIncludeFit
+      ? evaluateVariantFit(ctx, {
+          variant_id: variantId,
+          market_id: marketId,
+          profile,
+        }).catch(() => null)
+      : Promise.resolve(null),
     shouldIncludeOwnership
       ? calculateTcoWithCache(ctx, {
           variant_id: variantId,
@@ -245,6 +254,7 @@ export async function buildVariantPageIntelligence(ctx, {
       profile_snapshot: summarizePreferenceProfile(profile) || null,
     },
     sections: [
+      buildFitSection(fitAssessment, actionPaths),
       buildNarrativeSection("ownership_cost", "Ownership Cost Snapshot", tcoResult, actionPaths),
       buildNarrativeSection("price_outlook", "AI Price Outlook", predictionResult, actionPaths),
     ].filter(Boolean),

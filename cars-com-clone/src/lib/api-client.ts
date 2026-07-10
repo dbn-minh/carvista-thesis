@@ -93,7 +93,18 @@ export async function apiFetch<T>(
 export function toCurrency(value: unknown): string {
   const num = Number(value);
   if (!Number.isFinite(num)) return "-";
-  return new Intl.NumberFormat("vi-VN").format(num);
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(num);
+}
+
+export function toNumberDisplay(value: unknown): string {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "-";
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 2,
+  }).format(num);
 }
 
 export function toDateTime(value: unknown): string {

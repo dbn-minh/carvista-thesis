@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">CarVista market intelligence vehicle</title>
+  <desc id="desc">A modern vehicle with pricing and market signal graphics.</desc>
+  <defs>
+    <linearGradient id="panel" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.92"/>
+      <stop offset="1" stop-color="#dce9fb" stop-opacity="0.72"/>
+    </linearGradient>
+    <linearGradient id="car" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#244f96"/>
+      <stop offset="0.55" stop-color="#376ed0"/>
+      <stop offset="1" stop-color="#8fb4ff"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#eaf4ff"/>
+      <stop offset="1" stop-color="#9cc5ff"/>
+    </linearGradient>
+    <linearGradient id="signal" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#6c96ee" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#6c96ee" stop-opacity="0.04"/>
+    </linearGradient>
+    <filter id="soft-shadow" x="-20%" y="-24%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="34" stdDeviation="30" flood-color="#0f2d62" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="800" fill="none"/>
+  <ellipse cx="604" cy="650" rx="390" ry="54" fill="#0f2d62" opacity="0.12"/>
+
+  <g opacity="0.88">
+    <rect x="142" y="90" width="280" height="150" rx="34" fill="url(#panel)" stroke="#bfd1eb"/>
+    <path d="M184 191h44l35-46 45 27 52-65" fill="none" stroke="#497ee5" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="184" cy="191" r="9" fill="#497ee5"/>
+    <circle cx="228" cy="191" r="9" fill="#497ee5"/>
+    <circle cx="263" cy="145" r="9" fill="#497ee5"/>
+    <circle cx="308" cy="172" r="9" fill="#497ee5"/>
+    <circle cx="360" cy="107" r="9" fill="#497ee5"/>
+  </g>
+
+  <g opacity="0.84">
+    <rect x="814" y="112" width="236" height="128" rx="32" fill="url(#panel)" stroke="#bfd1eb"/>
+    <rect x="860" y="174" width="24" height="34" rx="12" fill="#315fae" opacity="0.55"/>
+    <rect x="902" y="144" width="24" height="64" rx="12" fill="#497ee5" opacity="0.62"/>
+    <rect x="944" y="160" width="24" height="48" rx="12" fill="#6f9aff" opacity="0.7"/>
+    <rect x="986" y="128" width="24" height="80" rx="12" fill="#1d4380" opacity="0.58"/>
+  </g>
+
+  <g filter="url(#soft-shadow)">
+    <path d="M170 522c2-48 37-89 85-98l94-18 95-114c29-35 72-55 117-55h142c52 0 101 24 132 66l79 107 95 21c52 12 89 58 89 112v39H953c-15-67-74-117-145-117s-130 50-145 117H454c-15-67-74-117-145-117s-130 50-145 117H116v-38c0-12 10-22 22-22h32z" fill="url(#car)"/>
+    <path d="M438 406l73-88c18-22 45-35 74-35h100c31 0 60 15 78 40l63 83H438z" fill="#102b56" opacity="0.28"/>
+    <path d="M477 386l55-66c14-17 34-26 56-26h30v92H477z" fill="url(#glass)"/>
+    <path d="M647 294h36c23 0 44 11 58 29l47 63H647v-92z" fill="url(#glass)"/>
+    <path d="M186 508h208c35 0 68-17 89-45l23-31h369l39 54c10 14 26 22 43 22h124" fill="none" stroke="#d9e8ff" stroke-width="16" stroke-linecap="round" opacity="0.72"/>
+    <circle cx="309" cy="586" r="82" fill="#0d2344"/>
+    <circle cx="309" cy="586" r="45" fill="#eff6ff"/>
+    <circle cx="309" cy="586" r="18" fill="#497ee5"/>
+    <circle cx="808" cy="586" r="82" fill="#0d2344"/>
+    <circle cx="808" cy="586" r="45" fill="#eff6ff"/>
+    <circle cx="808" cy="586" r="18" fill="#497ee5"/>
+  </g>
+
+  <g opacity="0.78">
+    <path d="M744 386c52-82 130-130 224-144 42-6 80-4 113 4v236H744z" fill="url(#signal)"/>
+    <path d="M744 386c52-82 130-130 224-144 42-6 80-4 113 4" fill="none" stroke="#6c96ee" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="832" cy="301" r="11" fill="#6c96ee"/>
+    <circle cx="928" cy="249" r="11" fill="#6c96ee"/>
+    <circle cx="1042" cy="241" r="11" fill="#6c96ee"/>
+  </g>
+</svg>

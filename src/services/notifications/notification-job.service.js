@@ -43,9 +43,14 @@ async function loadViewingRequestBundle(ctx, requestId) {
     ],
   });
 
+  const buyer = await Users.findByPk(viewingRequest.buyer_id, {
+    attributes: ["user_id", "name", "email", "phone"],
+  });
+
   return {
     viewingRequest,
     listing,
+    buyer,
   };
 }
 
@@ -87,11 +92,20 @@ export async function processViewingRequestCreatedNotification(ctx, { requestId 
     message: `You received a new request for ${listingTitle}.`,
   });
 
+  await notificationService.createInAppNotification({
+    userId: viewingRequest.buyer_id,
+    entityType: "viewing_request",
+    entityId: viewingRequest.request_id,
+    title: "Viewing request sent",
+    message: `Your viewing request for ${listingTitle} was sent successfully.`,
+  });
+
   let sellerNotified = false;
+  let buyerNotified = false;
   let notificationProvider = null;
 
   try {
-    const emailResult = await notificationService.sendSellerViewingRequestEmail({
+    const sellerEmailResult = await notificationService.sendSellerViewingRequestEmail({
       seller: listing.owner,
       listingTitle,
       listingId: listing.listing_id,
@@ -102,13 +116,37 @@ export async function processViewingRequestCreatedNotification(ctx, { requestId 
       message: viewingRequest.message,
     });
 
-    if (emailResult.delivered) {
+    if (sellerEmailResult.delivered) {
       await viewingRequest.update({ notified_at: new Date() });
       sellerNotified = true;
-      notificationProvider = emailResult.provider || null;
+      notificationProvider = sellerEmailResult.provider || null;
     }
   } catch (error) {
-    console.error("[notification-job] viewingRequestCreated email failed", {
+    console.error("[notification-job] viewingRequestCreated seller email failed", {
+      requestId: viewingRequest.request_id,
+      message: error?.message || String(error),
+    });
+  }
+
+  try {
+    const buyerEmailResult = await notificationService.sendBuyerViewingRequestEmail({
+      buyer: {
+        name: bundle.buyer?.name ?? viewingRequest.contact_name,
+        email: viewingRequest.contact_email ?? bundle.buyer?.email,
+      },
+      listingTitle,
+      listingId: listing.listing_id,
+      sellerName: listing.owner?.name,
+      preferredViewingTime: viewingRequest.preferred_viewing_time,
+      message: viewingRequest.message,
+    });
+
+    if (buyerEmailResult.delivered) {
+      buyerNotified = true;
+      notificationProvider = notificationProvider || buyerEmailResult.provider || null;
+    }
+  } catch (error) {
+    console.error("[notification-job] viewingRequestCreated buyer email failed", {
       requestId: viewingRequest.request_id,
       message: error?.message || String(error),
     });
@@ -117,6 +155,7 @@ export async function processViewingRequestCreatedNotification(ctx, { requestId 
   return {
     ok: true,
     sellerNotified,
+    buyerNotified,
     notificationProvider,
   };
 }

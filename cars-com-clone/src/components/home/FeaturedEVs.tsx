@@ -214,10 +214,6 @@ export default function FeaturedEVs() {
               <h2 className="editorial-heading mt-2 text-2xl sm:text-3xl">
                 Curated standout cars
               </h2>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-                A fixed lineup of halo cars, supercars, and premium performance models currently
-                backed by the CarVista catalog.
-              </p>
             </div>
 
             <Link

@@ -577,13 +577,6 @@ export default function MyListingsPage() {
                       title={buildListingMetaTitle(item)}
                       image={getListingImages(item)[0] || null}
                       imageCount={item.image_count || getListingImages(item).length}
-                      photoSourceLabel={
-                        item.photo_source === "listing"
-                          ? "Seller photos"
-                          : item.photo_source === "catalog"
-                            ? "Catalog photos"
-                            : null
-                      }
                     />
                   </div>
 

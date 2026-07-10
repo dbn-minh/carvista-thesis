@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import { randomBytes } from "crypto";
 import { env } from "../../config/env.js";
+import { normalizePhoneNumber } from "../shared/phone-normalization.service.js";
 import { ensureAuthSchema } from "./auth-schema.service.js";
 
 const PLACEHOLDER_EMAIL_DOMAIN = "users.carvista.local";
@@ -122,7 +123,7 @@ function normalizeDestination(destinationType, destinationValue) {
   if (destinationType === "email") {
     return value.toLowerCase();
   }
-  return value.replace(/\s+/g, "");
+  return normalizePhoneNumber(value);
 }
 
 async function createUnusablePasswordHash() {

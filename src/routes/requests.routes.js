@@ -45,6 +45,7 @@ requestsRoutes.post(
         request_id: result.viewingRequest.request_id,
         request: result.viewingRequest,
         seller_notified: result.sellerNotified,
+        buyer_notified: result.buyerNotified,
         notification_provider: result.notificationProvider,
         notification_queued: result.notificationQueued ?? false,
       });

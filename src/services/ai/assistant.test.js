@@ -104,6 +104,27 @@ function buildPolicyInsightOllama() {
   };
 }
 
+function buildAdvisorResponseOllama(answer) {
+  const calls = [];
+  return {
+    provider: "fpt",
+    apiKey: "test-key",
+    model: "Qwen3:32B",
+    calls,
+    async generate(request) {
+      calls.push(request);
+      return {
+        text: JSON.stringify({
+          answer,
+          reasons: ["Qwen generated the guided clarification wording."],
+          caveats: [],
+          advice: "",
+        }),
+      };
+    },
+  };
+}
+
 test("conversation router distinguishes vehicle advice from off-topic chat", () => {
   assert.equal(classifyConversationRoute("How reliable is this car on long trips?", { focus_variant_id: 7 }), "vehicle_question");
   assert.equal(classifyConversationRoute("What is the weather today?"), "off_topic");
@@ -113,6 +134,41 @@ test("conversation router distinguishes vehicle advice from off-topic chat", () 
   assert.equal(classifyConversationRoute("I need software for my dealership"), "ambiguous_automotive_business");
   assert.equal(classifyConversationRoute("asdf qwer random"), "low_signal");
   assert.equal(classifyConversationRoute("Compare these two cars for me"), "compare");
+  assert.equal(classifyConversationRoute("anyways which car suit me better?", { focus_variant_id: 180 }), "advisor");
+});
+
+test("advisor asks for buyer needs before saying which car suits the user", async () => {
+  const message = "anyways which car suit me better?";
+  const classified = classifyIntent(message, {
+    focus_variant_id: 180,
+    focus_variant_label: "2013 BMW X5 xDrive35i",
+    market_id: 1,
+    advisor_profile: {},
+  });
+
+  assert.equal(classified.intent, "recommend_car");
+  assert.equal(classified.needs_clarification, true);
+  assert.ok(classified.missing_fields.includes("vehicle_need"));
+
+  const response = await orchestrateChatRequest(
+    {},
+    {
+      message,
+      context: {
+        focus_variant_id: 180,
+        focus_variant_label: "2013 BMW X5 xDrive35i",
+        market_id: 1,
+      },
+      advisor_profile: {},
+    },
+  );
+
+  assert.equal(response.intent, "recommend_car");
+  assert.equal(response.needs_clarification, true);
+  assert.equal(response.structured_result, null);
+  assert.deepEqual(response.meta.missing_fields, ["vehicle_need", "budget"]);
+  assert.match(response.final_answer, /use case|passenger|body type|fuel|budget/i);
+  assert.doesNotMatch(response.final_answer, /BMW X5|credible option|appears to be/i);
 });
 
 test("advisor delegates off-topic policy wording to Qwen insight", async () => {
@@ -146,6 +202,21 @@ test("advisor lets Qwen answer common off-topic prompts before bridging back", a
   assert.match(phone.final_answer, /iPhone/i);
   assert.match(phone.final_answer, /battery|camera|storage|screen/i);
   assert.match(phone.final_answer, /CarPlay|infotainment|wireless charging|phone integration|connectivity/i);
+
+  const comparePhone = await orchestrateChatRequest(ctx, {
+    message: "iphone 17",
+    context: {
+      market_id: 1,
+      focus_variant_id: 101,
+      focus_variant_label: "2013 Ford F-150 XLT",
+      compare_variant_ids: [101, 202],
+      compare_variant_labels: ["2013 Ford F-150 XLT", "2012 GMC Acadia Denali"],
+    },
+  });
+  assert.equal(comparePhone.intent, "out_of_scope");
+  assert.equal(comparePhone.meta?.route_service, "ConversationPolicyService");
+  assert.notEqual(comparePhone.meta?.route_service, "ComparisonService");
+  assert.match(comparePhone.final_answer, /iPhone 17|battery|camera|storage|CarPlay|infotainment/i);
 
   const code = await orchestrateChatRequest(ctx, { message: "give me python code" });
   assert.equal(code.intent, "out_of_scope");
@@ -2410,6 +2481,66 @@ test("chat orchestrator uses backend structured result before the final advisor 
   assert.match(seenPrompt, /Corolla Cross/);
   assert.equal(result.meta.aiUsed, true);
   assert.equal(result.structured_result.aiInsight.reasons[0], "Backend ranking placed Corolla Cross first for the saved family profile.");
+});
+
+test("guided advisor suggestions delegate clarification wording to Qwen", async () => {
+  const ollama = buildAdvisorResponseOllama(
+    "Ownership cost is a good next step. Tell me the exact BMW model and year, plus your market and yearly mileage, and I will turn it into a useful estimate."
+  );
+  const guidedContext = {
+    market_id: 1,
+    prompt_source: "advisor_suggestion",
+    suggestion_label: "Estimate ownership cost",
+    suggestion_intent: "ownership_cost",
+    response_mode: "model_guided",
+  };
+
+  const starter = await orchestrateChatRequest(
+    { services: { ollama } },
+    {
+      message:
+        "I want to understand ownership cost for a car I might buy. Ask for the vehicle, driving use, budget, and yearly mileage if needed.",
+      context: guidedContext,
+    }
+  );
+
+  assert.equal(starter.needs_clarification, true);
+  assert.equal(starter.meta.aiUsed, true);
+  assert.equal(starter.structured_result?.advisor_suggestion?.label, "Estimate ownership cost");
+  assert.equal(starter.structured_result?.advisor_suggestion?.response_mode, "model_guided");
+  assert.match(starter.final_answer, /Ownership cost is a good next step/i);
+  assert.notEqual(
+    starter.final_answer,
+    "To estimate ownership cost properly, I still need a country/market and either a vehicle or a base price."
+  );
+  assert.match(ollama.calls[0]?.prompt || "", /model_guided/);
+  assert.match(ollama.calls[0]?.prompt || "", /missing_fields/);
+
+  const followUp = await orchestrateChatRequest(
+    {
+      services: { ollama },
+      sequelize: {
+        async query() {
+          return [[]];
+        },
+      },
+    },
+    {
+      message: "BMW",
+      context: guidedContext,
+      forced_intent: "calculate_tco",
+    }
+  );
+
+  assert.equal(followUp.intent, "calculate_tco");
+  assert.equal(followUp.needs_clarification, true);
+  assert.equal(followUp.meta.aiUsed, true);
+  assert.equal(followUp.meta.validation_status, "validation_guided_suggestion_clarification");
+  assert.match(followUp.final_answer, /exact BMW model and year|yearly mileage/i);
+  assert.notEqual(
+    followUp.final_answer,
+    "Which vehicle should I calculate ownership cost for? Tell me the make, model, and year, or open the vehicle detail page first."
+  );
 });
 
 test("chat orchestrator lets Qwen suggest vehicles when local catalog has no matches", async () => {

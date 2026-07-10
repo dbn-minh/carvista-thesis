@@ -12,7 +12,7 @@ type PriceHistoryPoint = {
   source: string;
 };
 
-const PRICE_HISTORY_TIMEFRAME_MONTHS = 12;
+const PRICE_HISTORY_TIMEFRAME_MONTHS = 24;
 
 function getMonthKey(value: string) {
   const parsed = Date.parse(value);
@@ -115,9 +115,9 @@ export default function PriceHistoryChart({ rows }: { rows: PriceHistoryRow[] })
   const chart = useMemo(() => {
     if (visiblePoints.length === 0) return null;
 
-    const width = 480;
-    const height = 260;
-    const padding = { top: 18, right: 16, bottom: 38, left: 74 };
+    const width = 980;
+    const height = 270;
+    const padding = { top: 18, right: 22, bottom: 38, left: 128 };
     const plotWidth = width - padding.left - padding.right;
     const plotHeight = height - padding.top - padding.bottom;
 
@@ -156,16 +156,14 @@ export default function PriceHistoryChart({ rows }: { rows: PriceHistoryRow[] })
       };
     });
 
+    const tickCount = Math.min(6, visiblePoints.length);
     const xTickIndexes = Array.from(
       new Set(
-        visiblePoints.length <= 4
-          ? visiblePoints.map((_, index) => index)
-          : [
-              0,
-              Math.floor((visiblePoints.length - 1) / 3),
-              Math.floor(((visiblePoints.length - 1) * 2) / 3),
-              visiblePoints.length - 1,
-            ]
+        Array.from({ length: tickCount }, (_, index) =>
+          tickCount === 1
+            ? 0
+            : Math.round(((visiblePoints.length - 1) * index) / (tickCount - 1))
+        )
       )
     );
     const xTicks = xTickIndexes.map((index) => ({
@@ -199,9 +197,9 @@ export default function PriceHistoryChart({ rows }: { rows: PriceHistoryRow[] })
   }
 
   return (
-    <div className="mt-5 space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <article className="rounded-[22px] border border-cars-primary/10 bg-white px-4 py-4 shadow-[0_12px_28px_rgba(15,45,98,0.05)] dark:border-white/10 dark:bg-white/5 dark:shadow-none">
+    <div className="mt-5 grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
+      <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+        <article className="rounded-[18px] border border-cars-primary/10 bg-white/90 px-4 py-4 shadow-[0_12px_28px_rgba(15,45,98,0.04)] dark:border-white/10 dark:bg-white/5 dark:shadow-none">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8fb4ff]">
             Latest market price
           </p>
@@ -213,7 +211,7 @@ export default function PriceHistoryChart({ rows }: { rows: PriceHistoryRow[] })
           </p>
         </article>
 
-        <article className="rounded-[22px] border border-cars-primary/10 bg-white px-4 py-4 shadow-[0_12px_28px_rgba(15,45,98,0.05)] dark:border-white/10 dark:bg-white/5 dark:shadow-none">
+        <article className="rounded-[18px] border border-cars-primary/10 bg-white/90 px-4 py-4 shadow-[0_12px_28px_rgba(15,45,98,0.04)] dark:border-white/10 dark:bg-white/5 dark:shadow-none">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8fb4ff]">
             Trend
           </p>
@@ -221,31 +219,34 @@ export default function PriceHistoryChart({ rows }: { rows: PriceHistoryRow[] })
           <p className="mt-2 text-sm text-cars-gray dark:text-slate-300">{trend.detail}</p>
         </article>
 
-        <article className="rounded-[22px] border border-cars-primary/10 bg-white px-4 py-4 shadow-[0_12px_28px_rgba(15,45,98,0.05)] dark:border-white/10 dark:bg-white/5 dark:shadow-none">
+        <article className="rounded-[18px] border border-cars-primary/10 bg-white/90 px-4 py-4 shadow-[0_12px_28px_rgba(15,45,98,0.04)] dark:border-white/10 dark:bg-white/5 dark:shadow-none">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8fb4ff]">
             Data points
           </p>
           <p className="mt-2 text-lg font-apercu-bold text-cars-primary dark:text-slate-50">{points.length}</p>
           <p className="mt-2 text-sm text-cars-gray dark:text-slate-300">
-            Condensed into one monthly snapshot across the latest year.
+            {visiblePoints.length} months shown.
           </p>
         </article>
       </div>
 
-      <div className="overflow-hidden rounded-[26px] border border-cars-primary/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,245,252,0.98))] p-4 shadow-[0_16px_36px_rgba(15,45,98,0.08)] dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(18,24,35,0.98),rgba(11,15,22,0.98))] dark:shadow-none md:p-5">
+      <div className="min-w-0 overflow-hidden rounded-[22px] border border-cars-primary/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,245,252,0.98))] p-4 shadow-[0_16px_36px_rgba(15,45,98,0.07)] dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(18,24,35,0.98),rgba(11,15,22,0.98))] dark:shadow-none md:p-5">
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold text-cars-primary dark:text-slate-50">Market price trend</p>
             <p className="text-xs text-cars-gray dark:text-slate-400">
-              Showing the latest 12 months with one price point per month.
+              Latest {visiblePoints.length} monthly points.
             </p>
           </div>
+          <span className="w-fit rounded-full bg-cars-primary/5 px-3 py-1 text-xs font-semibold text-cars-primary dark:bg-white/10 dark:text-slate-200">
+            {PRICE_HISTORY_TIMEFRAME_MONTHS}-month view
+          </span>
         </div>
 
-        <div className="pb-1">
+        <div className="overflow-x-auto pb-1">
           <svg
             viewBox={`0 0 ${chart.width} ${chart.height}`}
-            className="h-[220px] w-full sm:h-[260px]"
+            className="h-[230px] min-w-[760px] w-full sm:h-[270px]"
             role="img"
             aria-label="Vehicle price history chart"
           >

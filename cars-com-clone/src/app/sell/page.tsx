@@ -437,6 +437,22 @@ export default function SellPage() {
         }
         if (!form.customVehicle.bodyType) errors.customBodyType = "Choose a body type.";
         if (!form.customVehicle.fuelType) errors.customFuelType = "Choose a fuel type.";
+        if (
+          !form.customVehicle.seats.trim() ||
+          !Number.isInteger(Number(form.customVehicle.seats)) ||
+          Number(form.customVehicle.seats) < 1 ||
+          Number(form.customVehicle.seats) > 12
+        ) {
+          errors.customSeats = "Enter a valid seat count between 1 and 12.";
+        }
+        if (
+          !form.customVehicle.doors.trim() ||
+          !Number.isInteger(Number(form.customVehicle.doors)) ||
+          Number(form.customVehicle.doors) < 1 ||
+          Number(form.customVehicle.doors) > 6
+        ) {
+          errors.customDoors = "Enter a valid door count between 1 and 6.";
+        }
       }
     }
 
@@ -551,6 +567,8 @@ export default function SellPage() {
       if (form.vehicleMode === "catalog") {
         formData.set("variant_id", form.selectedVariantId);
       } else {
+        const customSeats = Number(form.customVehicle.seats);
+        const customDoors = Number(form.customVehicle.doors);
         formData.set(
           "custom_vehicle",
           JSON.stringify({
@@ -563,6 +581,14 @@ export default function SellPage() {
             fuel_type: form.customVehicle.fuelType || undefined,
             drivetrain: form.customVehicle.drivetrain.trim() || undefined,
             engine: form.customVehicle.engine.trim() || undefined,
+            seats:
+              Number.isInteger(customSeats) && customSeats >= 1 && customSeats <= 12
+                ? customSeats
+                : undefined,
+            doors:
+              Number.isInteger(customDoors) && customDoors >= 1 && customDoors <= 6
+                ? customDoors
+                : undefined,
             vin: form.customVehicle.vin.trim() || undefined,
           })
         );

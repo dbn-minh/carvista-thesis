@@ -1,4 +1,4 @@
-import { toCurrency } from "@/lib/api-client";
+import { toCurrency, toNumberDisplay } from "@/lib/api-client";
 import type { Listing } from "@/lib/types";
 
 export type ListingSortOption =
@@ -82,7 +82,7 @@ export function formatListingPrice(value: unknown): string {
 
 export function formatMileage(value: number | null | undefined): string {
   if (!Number.isFinite(Number(value))) return "Mileage not listed";
-  return `${toCurrency(Number(value))} km`;
+  return `${toNumberDisplay(Number(value))} km`;
 }
 
 export function formatTransmission(value: string | null | undefined): string {
@@ -142,7 +142,7 @@ export function buildActiveListingFilters(filters: ListingFilterState): string[]
     summary.push(`Price: ${min} - ${max}`);
   }
   if (filters.maxMileage) {
-    summary.push(`Mileage under ${toCurrency(Number(filters.maxMileage))} km`);
+    summary.push(`Mileage under ${toNumberDisplay(Number(filters.maxMileage))} km`);
   }
 
   return summary;

@@ -352,6 +352,22 @@
     color: rgb(var(--theme-muted-rgb) / 0.76) !important;
   }
 
+  .saved-cars-shortlist-card {
+    color: rgb(255 255 255 / 1) !important;
+  }
+
+  .saved-cars-shortlist-eyebrow {
+    color: rgb(255 255 255 / 0.72) !important;
+  }
+
+  .saved-cars-shortlist-count {
+    color: rgb(255 255 255 / 1) !important;
+  }
+
+  .saved-cars-shortlist-meta {
+    color: rgb(255 255 255 / 0.84) !important;
+  }
+
   html:not(.dark) .bg-red-500,
   html:not(.dark) .bg-red-500.text-white {
     color: rgb(255 255 255 / 1) !important;

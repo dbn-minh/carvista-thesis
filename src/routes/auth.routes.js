@@ -11,9 +11,17 @@ export const authRoutes = Router();
 const RegisterSchema = z.object({
   body: z.object({
     name: z.string().min(1),
-    email: z.string().email(),
-    phone: z.string().optional(),
-    password: z.string().min(6),
+    email: z.string().email().optional(),
+    phone: z.string().min(6).max(30).optional(),
+    password: z.string().min(1),
+    registration_token: z.string().min(10).optional(),
+    otp_challenge_id: z.preprocess(
+      (value) => (value === undefined || value === null || value === "" ? undefined : Number(value)),
+      z.number().int().positive().optional()
+    ),
+    otp_destination_type: z.enum(["email", "phone"]).optional(),
+    otp_destination_value: z.string().min(3).optional(),
+    otp_code: z.string().min(4).max(10).optional(),
   }),
   query: z.any(),
   params: z.any(),
@@ -50,6 +58,46 @@ const OtpVerifySchema = z.object({
   params: z.any(),
 });
 
+const RegistrationOtpVerifySchema = z.object({
+  body: z.object({
+    challenge_id: z.preprocess((value) => Number(value), z.number().int().positive()),
+    destination_type: z.enum(["email", "phone"]),
+    destination_value: z.string().min(3),
+    code: z.string().min(4).max(10),
+  }),
+  query: z.any(),
+  params: z.any(),
+});
+
+const PasswordResetRequestSchema = z.object({
+  body: z.object({
+    destination_type: z.enum(["email", "phone"]),
+    destination_value: z.string().min(3),
+  }),
+  query: z.any(),
+  params: z.any(),
+});
+
+const PasswordResetVerifySchema = z.object({
+  body: z.object({
+    challenge_id: z.preprocess((value) => Number(value), z.number().int().positive()),
+    destination_type: z.enum(["email", "phone"]),
+    destination_value: z.string().min(3),
+    code: z.string().min(4).max(10),
+  }),
+  query: z.any(),
+  params: z.any(),
+});
+
+const PasswordResetSchema = z.object({
+  body: z.object({
+    reset_token: z.string().min(10),
+    new_password: z.string().min(6),
+  }),
+  query: z.any(),
+  params: z.any(),
+});
+
 const SocialProviderParamsSchema = z.object({
   body: z.any(),
   query: z.object({
@@ -80,9 +128,22 @@ authRoutes.post(
   async (req, res, next) => {
     try {
       const authService = createAuthService(req.ctx);
-      const result = await authService.registerWithPassword(req.validated.body, {
-        ipAddress: req.ip,
-      });
+      const result = await authService.registerWithPassword(
+        {
+          name: req.validated.body.name,
+          email: req.validated.body.email,
+          phone: req.validated.body.phone,
+          password: req.validated.body.password,
+          registrationToken: req.validated.body.registration_token,
+          otpChallengeId: req.validated.body.otp_challenge_id,
+          otpDestinationType: req.validated.body.otp_destination_type,
+          otpDestinationValue: req.validated.body.otp_destination_value,
+          otpCode: req.validated.body.otp_code,
+        },
+        {
+          ipAddress: req.ip,
+        }
+      );
 
       res.status(201).json({
         user_id: result.user.user_id,
@@ -120,15 +181,22 @@ authRoutes.post(
 authRoutes.post("/auth/otp/request", authLimiter, validate(OtpRequestSchema), async (req, res, next) => {
   try {
     const authService = createAuthService(req.ctx);
+    const purpose = req.validated.body.purpose || "login";
     const result = await authService.requestOtp({
       destinationType: req.validated.body.destination_type,
       destinationValue: req.validated.body.destination_value,
-      purpose: req.validated.body.purpose || "login",
+      purpose,
       ipAddress: req.ip,
       userAgent: req.get("user-agent") || null,
     });
 
-    res.status(202).json(result);
+    res.status(202).json({
+      ...result,
+      message:
+        purpose === "register"
+          ? "A verification code has been sent."
+          : "If the account exists, an OTP has been sent.",
+    });
   } catch (e) {
     next(e);
   }
@@ -155,6 +223,116 @@ authRoutes.post("/auth/otp/verify", authLimiter, validate(OtpVerifySchema), asyn
     next(e);
   }
 });
+
+authRoutes.post(
+  "/auth/password/forgot/request",
+  authLimiter,
+  validate(PasswordResetRequestSchema),
+  async (req, res, next) => {
+    try {
+      const authService = createAuthService(req.ctx);
+      const result = await authService.requestPasswordResetOtp({
+        destinationType: req.validated.body.destination_type,
+        destinationValue: req.validated.body.destination_value,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent") || null,
+      });
+
+      res.status(202).json({
+        ...result,
+        message: "If the account exists, an OTP has been sent.",
+      });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+authRoutes.post(
+  "/auth/register/otp/verify",
+  authLimiter,
+  validate(RegistrationOtpVerifySchema),
+  async (req, res, next) => {
+    try {
+      const authService = createAuthService(req.ctx);
+      const result = await authService.verifyRegistrationOtp(
+        {
+          challengeId: req.validated.body.challenge_id,
+          destinationType: req.validated.body.destination_type,
+          destinationValue: req.validated.body.destination_value,
+          code: req.validated.body.code,
+        },
+        {
+          ipAddress: req.ip,
+        }
+      );
+
+      res.json({
+        registration_token: result.registrationToken,
+        destination_type: result.destinationType,
+        destination_value: result.destinationValue,
+        masked_destination: result.maskedDestination,
+      });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+authRoutes.post(
+  "/auth/password/forgot/verify",
+  authLimiter,
+  validate(PasswordResetVerifySchema),
+  async (req, res, next) => {
+    try {
+      const authService = createAuthService(req.ctx);
+      const result = await authService.verifyPasswordResetOtp(
+        {
+          challengeId: req.validated.body.challenge_id,
+          destinationType: req.validated.body.destination_type,
+          destinationValue: req.validated.body.destination_value,
+          code: req.validated.body.code,
+        },
+        {
+          ipAddress: req.ip,
+        }
+      );
+
+      res.json({
+        reset_token: result.resetToken,
+      });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+authRoutes.post(
+  "/auth/password/forgot/reset",
+  authLimiter,
+  validate(PasswordResetSchema),
+  async (req, res, next) => {
+    try {
+      const authService = createAuthService(req.ctx);
+      const result = await authService.resetPasswordWithToken(
+        {
+          resetToken: req.validated.body.reset_token,
+          newPassword: req.validated.body.new_password,
+        },
+        {
+          ipAddress: req.ip,
+        }
+      );
+
+      res.json({
+        token: result.token,
+        user: sanitizeUser(result.user),
+      });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
 
 authRoutes.get("/auth/providers", (_req, res) => {
   res.json({

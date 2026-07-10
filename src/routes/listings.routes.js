@@ -8,6 +8,7 @@ import { actionLimiter } from "../middlewares/rateLimit.middleware.js";
 import { validate } from "../middlewares/validate.js";
 import { buildListingPageIntelligence } from "../services/ai/page_intelligence.service.js";
 import { parsePreferenceProfileQuery } from "../services/ai/user_preference_profile.service.js";
+import { calculateTcoWithCache } from "../services/cache/cached-ai.service.js";
 import {
   invalidateListingReadCaches,
 } from "../services/cache/cache-invalidation.service.js";
@@ -130,6 +131,8 @@ const CustomVehicleSchema = z.object({
   ),
   drivetrain: OptionalTrimmedString,
   engine: OptionalTrimmedString,
+  seats: z.preprocess((value) => coerceNumber(value), z.number().int().min(1).max(12).optional()),
+  doors: z.preprocess((value) => coerceNumber(value), z.number().int().min(1).max(6).optional()),
   vin: OptionalTrimmedString,
 });
 
@@ -286,6 +289,8 @@ async function resolveVariantForListing(models, payload) {
       transmission: normalizeText(custom.transmission) || null,
       drivetrain: normalizeText(custom.drivetrain) || null,
       fuel_type: custom.fuel_type ?? "other",
+      seats: parseNumber(custom.seats),
+      doors: parseNumber(custom.doors),
       is_placeholder: true,
     },
   });
@@ -305,6 +310,12 @@ async function resolveVariantForListing(models, payload) {
       updates.drivetrain = normalizeText(custom.drivetrain);
     }
     if (!variant.engine && custom.engine) updates.engine = normalizeText(custom.engine);
+    if (variant.seats == null && custom.seats != null) {
+      updates.seats = parseNumber(custom.seats);
+    }
+    if (variant.doors == null && custom.doors != null) {
+      updates.doors = parseNumber(custom.doors);
+    }
     if (Object.keys(updates).length > 0) {
       await variant.update(updates);
     }
@@ -712,6 +723,71 @@ listingsRoutes.get("/listings/:id/ai-insights", async (req, res, next) => {
     });
 
     res.json(intelligence);
+  } catch (e) { next(e); }
+});
+
+listingsRoutes.get("/listings/:id/ownership-summary", async (req, res, next) => {
+  try {
+    const { Listings, TcoProfiles } = req.ctx.models;
+    const listingId = Number(req.params.id);
+    if (!Number.isFinite(listingId)) {
+      return next({ status: 400, safe: true, message: "Invalid listing id." });
+    }
+
+    const marketId = parseNumber(req.query.marketId, 1);
+    const ownershipYears = parseNumber(req.query.ownershipYears, 5);
+    const kmPerYear = parseNumber(req.query.kmPerYear, null);
+
+    const listing = await Listings.findByPk(listingId);
+    if (!listing) return next({ status: 404, message: "Listing not found" });
+
+    const basePrice = toFinitePrice(listing.asking_price);
+    if (!basePrice) {
+      return res.status(400).json({
+        status: "error",
+        code: "BASE_PRICE_UNAVAILABLE",
+        message: "No usable listing asking price is available for this listing.",
+      });
+    }
+
+    const profile = await TcoProfiles.findOne({
+      where: { market_id: marketId },
+      order: [["profile_id", "ASC"]],
+    });
+
+    if (!profile) {
+      return res.status(404).json({
+        status: "error",
+        code: "PROFILE_NOT_FOUND",
+        message: `No TCO profile exists for market ${marketId}.`,
+      });
+    }
+
+    let cacheStatus = "bypass";
+    const estimate = await calculateTcoWithCache(req.ctx, {
+      profile_id: profile.profile_id,
+      variant_id: listing.variant_id ?? undefined,
+      market_id: marketId,
+      base_price: basePrice,
+      ownership_years: ownershipYears,
+      km_per_year: kmPerYear,
+    }, {
+      onStatus(status) {
+        cacheStatus = status;
+      },
+    });
+
+    res.set("X-Cache-Status", cacheStatus);
+    res.json({
+      listing_id: listingId,
+      variant_id: listing.variant_id ?? null,
+      market_id: marketId,
+      ownership_years: ownershipYears,
+      listing_status: listing.status,
+      asking_price: basePrice,
+      base_price_source: listing.status === "sold" ? "sold_listing_price" : "listing_asking_price",
+      estimate,
+    });
   } catch (e) { next(e); }
 });
 

@@ -84,6 +84,71 @@ function extractVehicleMentions(message, context = {}) {
   return [...mentions].slice(0, 4);
 }
 
+function hasText(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function hasArrayValue(value) {
+  return Array.isArray(value) && value.some((entry) => hasText(String(entry)));
+}
+
+function hasAnyProfileValue(profile, keys) {
+  return keys.some((key) => {
+    const value = profile?.[key];
+    if (Array.isArray(value)) return hasArrayValue(value);
+    if (typeof value === "number") return Number.isFinite(value);
+    if (typeof value === "boolean") return true;
+    return hasText(value);
+  });
+}
+
+function hasRecommendationNeedSignal(message, context = {}) {
+  const normalized = normalizeConversationText(message);
+  const profile = context.advisor_profile ?? {};
+  const messageHasNeed =
+    /\b(family|kids?|children|commute|daily|city|highway|road trip|long trip|business|fleet|taxi|ride share|cargo|school|weekend)\b/i.test(normalized) ||
+    /\b(suv|sedan|mpv|pickup|truck|crossover|hatchback|coupe|wagon|ev|hybrid|gas|gasoline|diesel)\b/i.test(normalized) ||
+    /\b(reliable|reliability|low maintenance|maintenance|fuel efficient|fuel economy|safe|safety|comfort|comfortable|performance|sporty|luxury|cheap to own)\b/i.test(normalized) ||
+    /\b\d+\s*(seat|seats|passenger|passengers|people|nguoi|cho)\b/i.test(normalized) ||
+    /\b(gia dinh|di lam|di pho|duong dai|tiet kiem|ben bi|an toan|rong rai|phu hop)\b/i.test(normalized);
+
+  if (messageHasNeed) return true;
+
+  return hasAnyProfileValue(profile, [
+    "primary_use_cases",
+    "use_case",
+    "vehicle_type",
+    "preferred_body_type",
+    "preferred_body_types",
+    "preferred_fuel_type",
+    "preferred_fuel_types",
+    "passenger_count",
+    "regular_passenger_count",
+    "family_size",
+    "needs_7_seats",
+    "environment",
+    "city_vs_highway_ratio",
+    "long_trip_habit",
+    "maintenance_sensitivity",
+    "tradeoff_preferences",
+    "ownership_preference",
+    "personality",
+  ]);
+}
+
+function hasRecommendationBudgetSignal(entities, context = {}) {
+  const profile = context.advisor_profile ?? {};
+  return (
+    entities.budget != null ||
+    context.budget != null ||
+    Number.isFinite(Number(profile.budget_max)) ||
+    Number.isFinite(Number(profile.budget_ceiling)) ||
+    Number.isFinite(Number(profile.budget_target)) ||
+    hasText(profile.budget_flexibility) ||
+    String(profile.budget_mode || "").toLowerCase() === "open"
+  );
+}
+
 function mapRouteToIntent(route, message, context) {
   const normalized = normalizeConversationText(message);
   const compareContextActive = hasCompareContext(context);
@@ -110,7 +175,7 @@ function mapRouteToIntent(route, message, context) {
   return "recommend_car";
 }
 
-function buildMissingFields(intent, entities, context, route = null) {
+function buildMissingFields(intent, entities, context, route = null, message = "") {
   const missing = [];
   if (route === "ambiguous_automotive_business") missing.push("automotive_business_context");
   if (route === "low_signal") missing.push("vehicle_need");
@@ -121,7 +186,10 @@ function buildMissingFields(intent, entities, context, route = null) {
     if (entities.country == null && context.market_id == null) missing.push("country");
     if (entities.vehicles.length < 1 && !context.focus_variant_id && entities.budget == null) missing.push("vehicle_or_price");
   }
-  if (intent === "recommend_car" && entities.budget == null && !context.advisor_profile?.budget_flexibility) missing.push("budget");
+  if (intent === "recommend_car") {
+    if (!hasRecommendationNeedSignal(message, context)) missing.push("vehicle_need");
+    if (!hasRecommendationBudgetSignal(entities, context)) missing.push("budget");
+  }
   return missing;
 }
 
@@ -138,7 +206,7 @@ export function classifyIntent(message, context = {}) {
     focus_variant_id: context.focus_variant_id ?? null,
   };
 
-  const missing_fields = buildMissingFields(intent, entities, context, route);
+  const missing_fields = buildMissingFields(intent, entities, context, route, message);
   const confidence =
     route === "low_signal"
       ? 0.22

@@ -120,7 +120,7 @@ export const env = {
     bcryptRounds: toInt(process.env.BCRYPT_ROUNDS, 10),
     otpSecret: process.env.OTP_SECRET || process.env.JWT_SECRET || "change_me",
     otpCodeLength: toInt(process.env.OTP_CODE_LENGTH, 6),
-    otpExpiresInMinutes: toInt(process.env.OTP_EXPIRES_IN_MINUTES, 10),
+    otpExpiresInMinutes: toInt(process.env.OTP_EXPIRES_IN_MINUTES, 1),
     otpResendCooldownSeconds: toInt(process.env.OTP_RESEND_COOLDOWN_SECONDS, 60),
     otpMaxAttempts: toInt(process.env.OTP_MAX_ATTEMPTS, 5),
     otpMaxResends: toInt(process.env.OTP_MAX_RESENDS, 3),
@@ -145,12 +145,23 @@ export const env = {
       from: process.env.EMAIL_FROM || "noreply@carvista.local",
       resendApiKey: process.env.RESEND_API_KEY || "",
       resendApiUrl: process.env.RESEND_API_URL || "https://api.resend.com/emails",
+      smtpHost: process.env.SMTP_HOST || "",
+      smtpPort: toInt(process.env.SMTP_PORT, 465),
+      smtpSecure: toBool(process.env.SMTP_SECURE, toInt(process.env.SMTP_PORT, 465) === 465),
+      smtpUser: process.env.SMTP_USER || "",
+      smtpPass: process.env.SMTP_PASS || "",
     },
     sms: {
       provider: process.env.SMS_PROVIDER || "console",
       twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || "",
       twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || "",
       twilioFromNumber: process.env.TWILIO_FROM_NUMBER || "",
+      speedSmsAccessToken: process.env.SPEEDSMS_ACCESS_TOKEN || "",
+      speedSmsSmsType: toInt(process.env.SPEEDSMS_SMS_TYPE, 4),
+      speedSmsSender: process.env.SPEEDSMS_SENDER || "Verify",
+      speedSmsApiBaseUrl:
+        trimSlash(process.env.SPEEDSMS_API_BASE_URL) ||
+        "https://api.speedsms.vn/index.php",
     },
   },
   media: {

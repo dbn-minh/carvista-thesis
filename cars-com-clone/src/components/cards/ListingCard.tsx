@@ -10,16 +10,15 @@ import {
   formatListingPrice,
   formatLocation,
   formatMileage,
-  formatPhotoSource,
   formatTransmission,
   getListingImages,
 } from "@/components/listings/listing-utils";
-import { getMarketplaceSellerType } from "@/lib/seller-profile";
 import type { Listing } from "@/lib/types";
 
 type Props = {
   item: Listing;
   saved?: boolean;
+  showStatusBadge?: boolean;
   onToggleSave?: (listingId: number) => void;
 };
 
@@ -56,6 +55,7 @@ function buildSpecChips(item: Listing) {
 export default function ListingCard({
   item,
   saved = false,
+  showStatusBadge = false,
   onToggleSave,
 }: Props) {
   const href = `/listings/${item.listing_id}`;
@@ -64,13 +64,6 @@ export default function ListingCard({
   const title = buildListingTitle(item);
   const eyebrow = buildListingEyebrow(item);
   const specChips = buildSpecChips(item);
-  const photoSourceLabel = formatPhotoSource(item.photo_source);
-  const sellerType = getMarketplaceSellerType(item);
-  const trustSignals = [
-    sellerType,
-    formatBodyType(item.body_type),
-    item.status,
-  ].filter(Boolean);
 
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,26,36,0.98),rgba(10,14,20,0.99))] shadow-[0_24px_54px_rgba(0,0,0,0.28)] transition-all duration-300 hover:-translate-y-1 hover:border-[#8fb4ff]/30 hover:shadow-[0_28px_70px_rgba(0,0,0,0.38)] sm:rounded-[30px]">
@@ -80,7 +73,6 @@ export default function ListingCard({
           title={buildListingMetaTitle(item)}
           image={coverImage}
           imageCount={item.image_count || images.length}
-          photoSourceLabel={photoSourceLabel}
         />
 
         {onToggleSave ? (
@@ -89,8 +81,8 @@ export default function ListingCard({
             onClick={() => onToggleSave(item.listing_id)}
             className={
               saved
-                ? "absolute right-4 top-4 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full border border-red-400/25 bg-red-500/15 text-rose-200 shadow-[0_14px_30px_rgba(0,0,0,0.28)] transition hover:scale-105"
-                : "absolute right-4 top-4 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-[#0b111a]/88 text-slate-200 shadow-[0_14px_30px_rgba(0,0,0,0.28)] transition hover:scale-105 hover:text-rose-300"
+                ? "absolute right-4 top-4 z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white bg-white text-rose-600 shadow-[0_16px_36px_rgba(0,0,0,0.3)] ring-2 ring-cars-primary/12 transition hover:scale-105"
+                : "absolute right-4 top-4 z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white bg-white text-cars-primary shadow-[0_16px_36px_rgba(0,0,0,0.28)] ring-2 ring-cars-primary/12 transition hover:scale-105 hover:text-rose-600"
             }
             aria-label={saved ? "Remove from saved cars" : "Save car"}
           >
@@ -109,9 +101,11 @@ export default function ListingCard({
               {formatListingPrice(item.asking_price)}
             </h2>
           </div>
-          <span className="self-start rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-[#c5f6ff]">
-            {item.status}
-          </span>
+          {showStatusBadge && item.status ? (
+            <span className="self-start rounded-full border border-cars-primary/10 bg-white/90 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-cars-primary shadow-sm dark:border-white/10 dark:bg-white/10 dark:text-[#c5f6ff]">
+              {item.status}
+            </span>
+          ) : null}
         </div>
 
         <Link href={href} className="mt-4 block min-w-0 transition hover:text-[#7de2ff]">
@@ -132,17 +126,6 @@ export default function ListingCard({
             >
               <chip.icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#8fb4ff]" />
               <span className="min-w-0 break-words leading-5">{chip.label}</span>
-            </span>
-          ))}
-        </div>
-
-        <div className="mt-5 flex flex-wrap gap-2">
-          {trustSignals.map((signal) => (
-            <span
-              key={`${item.listing_id}-${signal}`}
-              className="max-w-full rounded-full border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400"
-            >
-              <span className="block max-w-full break-words leading-5">{signal}</span>
             </span>
           ))}
         </div>

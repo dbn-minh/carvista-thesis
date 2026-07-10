@@ -36,6 +36,8 @@ const AUTOMOTIVE_SIGNAL_PATTERNS = [
 const RECOMMENDATION_PATTERNS = [
   /\b(recommend|suggest|find me|looking for|need a car|want a car|buy a car|which car should i buy)\b/i,
   /\b(need|want|looking for|find|recommend|suggest)\b[\w\s'-]{0,50}\b(car|vehicle|suv|sedan|mpv|pickup|truck|crossover|hatchback|ev|hybrid)\b/i,
+  /\b(which|what)\b[\w\s'-]{0,45}\b(car|vehicle|suv|sedan|mpv|pickup|truck|ev|hybrid)\b[\w\s'-]{0,45}\b(suit|fits?|right|better|best)\b[\w\s'-]{0,25}\b(me|my needs|for me)\b/i,
+  /\b(suit|fits?|right|better|best)\b[\w\s'-]{0,35}\b(me|my needs|for me)\b/i,
   /\b(tu van|chon xe|mua xe|can mua xe|muon mua xe|nen mua xe|xe nao phu hop|phu hop voi toi|goi y xe|tim xe)\b/i,
   /\b([d\u0111]e xuat|goi y|tu van|chon|tim|can|muon)\b[\w\s'-]{0,50}\b(xe|oto|o to|suv|sedan|mpv|pickup)\b/i,
 ];

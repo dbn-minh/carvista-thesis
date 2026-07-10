@@ -16,8 +16,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
-import PageIntelligencePanel from "@/components/ai/PageIntelligencePanel";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
+import EstimatedTcoPanel from "@/components/catalog/EstimatedTcoPanel";
 import PriceHistoryChart from "@/components/catalog/PriceHistoryChart";
 import StatusBanner from "@/components/common/StatusBanner";
 import Header from "@/components/layout/Header";
@@ -42,7 +42,18 @@ import {
   watchlistApi,
 } from "@/lib/carvista-api";
 import { ApiError, hasToken, toDateTime } from "@/lib/api-client";
-import type { ListingDetail, SellerReview, User, ViewingRequest } from "@/lib/types";
+import {
+  hasVietnamPhoneSubscriberDigits,
+  normalizeVietnamPhoneInput,
+  VIETNAM_PHONE_PREFIX,
+} from "@/lib/phone";
+import type {
+  CatalogOwnershipSummary,
+  ListingDetail,
+  SellerReview,
+  User,
+  ViewingRequest,
+} from "@/lib/types";
 import { buildMarketplaceSellerProfile } from "@/lib/seller-profile";
 import {
   DEFAULT_VIEWING_REQUEST_MESSAGE,
@@ -78,6 +89,9 @@ export default function ListingDetailPage() {
   const thumbnailStripRef = useRef<HTMLDivElement | null>(null);
   const [priceHistoryRows, setPriceHistoryRows] = useState<Array<Record<string, unknown>>>([]);
   const [priceHistoryLoading, setPriceHistoryLoading] = useState(false);
+  const [ownershipYears, setOwnershipYears] = useState("5");
+  const [ownershipSummary, setOwnershipSummary] = useState<CatalogOwnershipSummary | null>(null);
+  const [ownershipError, setOwnershipError] = useState("");
   const [canScrollThumbsLeft, setCanScrollThumbsLeft] = useState(false);
   const [canScrollThumbsRight, setCanScrollThumbsRight] = useState(false);
 
@@ -92,7 +106,7 @@ export default function ListingDetailPage() {
   const [requestMessage, setRequestMessage] = useState(DEFAULT_VIEWING_REQUEST_MESSAGE);
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
+  const [contactPhone, setContactPhone] = useState(VIETNAM_PHONE_PREFIX);
   const [preferredContactMethod, setPreferredContactMethod] =
     useState<PreferredContactMethod>("phone_or_email");
 
@@ -156,36 +170,77 @@ export default function ListingDetailPage() {
   useEffect(() => {
     const rawVariantId = detail?.listing?.variant_id;
     const variantId = Number(rawVariantId);
-    if (!Number.isFinite(variantId) || variantId <= 0) {
+    const hasVariant = Number.isFinite(variantId) && variantId > 0;
+
+    if (!detail?.listing) {
       setPriceHistoryRows([]);
       setPriceHistoryLoading(false);
+      setOwnershipSummary(null);
+      setOwnershipError("");
       return;
     }
 
     let cancelled = false;
-    async function loadPriceHistory() {
-      setPriceHistoryLoading(true);
+    async function loadMarketSignals() {
+      setPriceHistoryLoading(hasVariant);
+      setOwnershipError("");
       try {
-        const priceResponse = await catalogApi.variantPriceHistory(variantId, 1, 60);
-        if (!cancelled) setPriceHistoryRows(priceResponse.items ?? []);
+        const [priceResponse, ownershipResponse] = await Promise.allSettled([
+          hasVariant
+            ? catalogApi.variantPriceHistory(variantId, 1, 72)
+            : Promise.resolve({ items: [] }),
+          listingsApi.ownershipSummary(id, {
+            marketId: 1,
+            ownershipYears: Number(ownershipYears) || 5,
+          }),
+        ]);
+
+        if (cancelled) return;
+
+        setPriceHistoryRows(
+          priceResponse.status === "fulfilled" ? priceResponse.value.items ?? [] : [],
+        );
+        setOwnershipSummary(
+          ownershipResponse.status === "fulfilled" ? ownershipResponse.value : null,
+        );
+        setOwnershipError(
+          ownershipResponse.status === "rejected"
+            ? ownershipResponse.reason instanceof Error
+              ? ownershipResponse.reason.message
+              : "Ownership estimate is unavailable for this market."
+            : "",
+        );
       } catch {
-        if (!cancelled) setPriceHistoryRows([]);
+        if (!cancelled) {
+          setPriceHistoryRows([]);
+          setOwnershipSummary(null);
+          setOwnershipError("Ownership estimate is unavailable for this market.");
+        }
       } finally {
         if (!cancelled) setPriceHistoryLoading(false);
       }
     }
 
-    void loadPriceHistory();
+    void loadMarketSignals();
     return () => {
       cancelled = true;
     };
-  }, [detail?.listing?.variant_id]);
+  }, [
+    detail?.listing,
+    detail?.listing?.asking_price,
+    detail?.listing?.status,
+    detail?.listing?.variant_id,
+    id,
+    ownershipYears,
+  ]);
 
   useEffect(() => {
     if (!profile) return;
     setContactName((current) => current || profile.name || "");
     setContactEmail((current) => current || profile.email || "");
-    setContactPhone((current) => current || profile.phone || "");
+    setContactPhone((current) =>
+      normalizeVietnamPhoneInput(current) ? current : profile.phone || VIETNAM_PHONE_PREFIX
+    );
     setPreferredContactMethod(
       ((profile.preferred_contact_method as PreferredContactMethod | null) ||
         "phone_or_email") as PreferredContactMethod
@@ -193,16 +248,31 @@ export default function ListingDetailPage() {
   }, [profile]);
 
   const listingTitle = detail?.listing ? buildListingTitle(detail.listing) : "Listing details";
+  const sellerForProfile = useMemo(() => {
+    if (!detail?.listing || !profile) return detail?.seller ?? null;
+    if (Number(profile.user_id) !== Number(detail.listing.owner_id)) {
+      return detail.seller ?? null;
+    }
+
+    return {
+      ...(detail.seller ?? { user_id: profile.user_id }),
+      user_id: profile.user_id,
+      name: profile.name,
+      email: profile.email,
+      phone: profile.phone ?? null,
+      preferred_contact_method: profile.preferred_contact_method ?? null,
+    };
+  }, [detail, profile]);
   const sellerProfile = useMemo(
     () =>
       detail?.listing
         ? buildMarketplaceSellerProfile({
             listing: detail.listing,
-            seller: detail.seller,
+            seller: sellerForProfile,
             reviews,
           })
         : null,
-    [detail, reviews]
+    [detail?.listing, sellerForProfile, reviews]
   );
   const formControlClass =
     "w-full border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-slate-950/60 dark:text-white dark:placeholder:text-slate-400";
@@ -272,6 +342,28 @@ export default function ListingDetailPage() {
     });
   }
 
+  const syncCurrentUserAsListingSeller = useCallback((user: User | null) => {
+    if (!user) return;
+
+    setDetail((current) => {
+      if (!current || Number(current.listing.owner_id) !== Number(user.user_id)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        seller: {
+          ...(current.seller ?? { user_id: user.user_id }),
+          user_id: user.user_id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone ?? null,
+          preferred_contact_method: user.preferred_contact_method ?? null,
+        },
+      };
+    });
+  }, []);
+
   const sendRequest = useCallback(
     async (event: FormEvent) => {
       event.preventDefault();
@@ -280,15 +372,25 @@ export default function ListingDetailPage() {
         return;
       }
 
+      const normalizedContactPhone =
+        normalizeVietnamPhoneInput(contactPhone) ||
+        normalizeVietnamPhoneInput(profile?.phone || "");
+
       const contactDraft = {
         name: contactName.trim() || profile?.name || "",
         email: contactEmail.trim() || profile?.email || "",
-        phone: contactPhone.trim() || profile?.phone || "",
+        phone: normalizedContactPhone,
         preferred_contact_method: preferredContactMethod,
       };
 
       if (!contactDraft.email || !contactDraft.phone) {
         setProfileDialogOpen(true);
+        return;
+      }
+
+      if (!hasVietnamPhoneSubscriberDigits(contactDraft.phone)) {
+        setRequestPanelTone("error");
+        setRequestPanelMessage("Enter a valid Vietnam phone number, for example +84901234567.");
         return;
       }
 
@@ -312,6 +414,7 @@ export default function ListingDetailPage() {
           });
           activeProfile = updated.user;
           setProfile(updated.user);
+          syncCurrentUserAsListingSeller(updated.user);
         }
 
         const response = await requestsApi.createRequest(id, {
@@ -350,7 +453,7 @@ export default function ListingDetailPage() {
             buyer_id: profile?.user_id || 0,
             contact_name: contactName.trim() || profile?.name || "",
             contact_email: contactEmail.trim() || profile?.email || "",
-            contact_phone: contactPhone.trim() || profile?.phone || "",
+            contact_phone: normalizedContactPhone,
             preferred_contact_method: preferredContactMethod,
             status:
               typeof (error.details as { status?: unknown } | undefined)?.status === "string"
@@ -375,6 +478,7 @@ export default function ListingDetailPage() {
       preferredContactMethod,
       profile,
       requestMessage,
+      syncCurrentUserAsListingSeller,
     ]
   );
 
@@ -432,14 +536,18 @@ export default function ListingDetailPage() {
           ...profile,
           name: contactName || profile?.name || "",
           email: contactEmail || profile?.email || "",
-          phone: contactPhone || profile?.phone || "",
+          phone:
+            normalizeVietnamPhoneInput(contactPhone) ||
+            profile?.phone ||
+            VIETNAM_PHONE_PREFIX,
           preferred_contact_method: preferredContactMethod,
         }}
         onSaved={(user) => {
           setProfile(user);
+          syncCurrentUserAsListingSeller(user);
           setContactName(user.name || "");
           setContactEmail(user.email || "");
-          setContactPhone(user.phone || "");
+          setContactPhone(user.phone || VIETNAM_PHONE_PREFIX);
           setPreferredContactMethod(
             ((user.preferred_contact_method as PreferredContactMethod | null) ||
               "phone_or_email") as PreferredContactMethod
@@ -789,38 +897,33 @@ export default function ListingDetailPage() {
         ) : null}
 
         {detail?.listing ? (
-          <PageIntelligencePanel
-            subjectType="listing"
-            subjectId={id}
-            marketId={1}
-            title="AI price and ownership snapshot"
-            className="mb-8"
-            compactLayout
-            hiddenSectionKeys={["listing_value_position"]}
-            showActionPaths={false}
-            showSectionCaveats={false}
-            showSectionSources={false}
-          />
-        ) : null}
+          <section className="mb-8 space-y-6">
+            {detail.listing.variant_id ? (
+              <div className="section-shell p-4 sm:p-5 md:p-6">
+                <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <h2 className="text-xl font-apercu-bold text-cars-primary sm:text-2xl">
+                      Price history
+                    </h2>
+                    <p className="mt-3 text-sm leading-6 text-cars-gray">
+                      Latest monthly snapshots for this exact variant.
+                    </p>
+                  </div>
+                  {priceHistoryLoading ? (
+                    <p className="text-sm text-cars-gray">Loading history...</p>
+                  ) : null}
+                </div>
 
-        {detail?.listing?.variant_id ? (
-          <section className="mb-8 section-shell p-4 sm:p-5 md:p-6">
-            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-              <div>
-                <h2 className="text-xl font-apercu-bold text-cars-primary sm:text-2xl">
-                  Price history
-                </h2>
-                <p className="mt-3 text-sm leading-6 text-cars-gray">
-                  Review the recent market trail for this exact vehicle before you decide whether
-                  the asking price feels fair.
-                </p>
+                <PriceHistoryChart rows={priceHistoryRows} />
               </div>
-              {priceHistoryLoading ? (
-                <p className="text-sm text-cars-gray">Loading history...</p>
-              ) : null}
-            </div>
+            ) : null}
 
-            <PriceHistoryChart rows={priceHistoryRows} />
+            <EstimatedTcoPanel
+              ownershipSummary={ownershipSummary}
+              ownershipError={ownershipError}
+              ownershipYears={ownershipYears}
+              onOwnershipYearsChange={setOwnershipYears}
+            />
           </section>
         ) : null}
 
@@ -896,8 +999,14 @@ export default function ListingDetailPage() {
                   <input
                     className={`h-11 rounded-full ${formControlClass}`}
                     value={contactPhone}
+                    onBlur={() =>
+                      setContactPhone(
+                        normalizeVietnamPhoneInput(contactPhone) || VIETNAM_PHONE_PREFIX,
+                      )
+                    }
                     onChange={(event) => setContactPhone(event.target.value)}
-                    placeholder="Phone number"
+                    placeholder="+84..."
+                    type="tel"
                   />
                   <select
                     className={`h-11 rounded-full ${formControlClass}`}

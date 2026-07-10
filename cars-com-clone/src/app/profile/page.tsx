@@ -5,6 +5,11 @@ import Header from "@/components/layout/Header";
 import StatusBanner from "@/components/common/StatusBanner";
 import { authApi } from "@/lib/carvista-api";
 import { useRequireLogin } from "@/lib/auth-guard";
+import {
+  hasVietnamPhoneSubscriberDigits,
+  normalizeVietnamPhoneInput,
+  VIETNAM_PHONE_PREFIX,
+} from "@/lib/phone";
 import type { User } from "@/lib/types";
 import { preferredContactOptions, type PreferredContactMethod } from "@/lib/viewing-requests";
 
@@ -18,7 +23,7 @@ export default function ProfilePage() {
   const [form, setForm] = useState({
     name: "",
     email: "",
-    phone: "",
+    phone: VIETNAM_PHONE_PREFIX,
     preferred_contact_method: "phone_or_email" as PreferredContactMethod,
   });
 
@@ -33,7 +38,7 @@ export default function ProfilePage() {
         setForm({
           name: response.user?.name || "",
           email: response.user?.email || "",
-          phone: response.user?.phone || "",
+          phone: response.user?.phone || VIETNAM_PHONE_PREFIX,
           preferred_contact_method:
             (response.user?.preferred_contact_method as PreferredContactMethod | null) ||
             "phone_or_email",
@@ -52,9 +57,17 @@ export default function ProfilePage() {
   if (!ready) return null;
 
   async function saveProfile() {
-    if (!form.name.trim() || !form.email.trim() || !form.phone.trim()) {
+    const normalizedPhone = normalizeVietnamPhoneInput(form.phone);
+
+    if (!form.name.trim() || !form.email.trim() || !normalizedPhone) {
       setTone("error");
       setMessage("Full name, email, and phone number are required so sellers can contact you.");
+      return;
+    }
+
+    if (!hasVietnamPhoneSubscriberDigits(normalizedPhone)) {
+      setTone("error");
+      setMessage("Enter a valid Vietnam phone number, for example +84901234567.");
       return;
     }
 
@@ -65,10 +78,14 @@ export default function ProfilePage() {
       const response = await authApi.updateMe({
         name: form.name.trim(),
         email: form.email.trim(),
-        phone: form.phone.trim(),
+        phone: normalizedPhone,
         preferred_contact_method: form.preferred_contact_method,
       });
       setProfile(response.user);
+      setForm((current) => ({
+        ...current,
+        phone: response.user?.phone || normalizedPhone,
+      }));
       setTone("success");
       setMessage("Profile updated. CarVista will use these details to prefill your viewing requests.");
     } catch (error) {
@@ -147,10 +164,19 @@ export default function ProfilePage() {
                     <input
                       className="h-12 w-full rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-background"
                       value={form.phone}
+                      onBlur={() =>
+                        setForm((current) => ({
+                          ...current,
+                          phone:
+                            normalizeVietnamPhoneInput(current.phone) ||
+                            VIETNAM_PHONE_PREFIX,
+                        }))
+                      }
                       onChange={(event) =>
                         setForm((current) => ({ ...current, phone: event.target.value }))
                       }
-                      placeholder="Phone number"
+                      placeholder="+84..."
+                      type="tel"
                     />
                   </label>
 

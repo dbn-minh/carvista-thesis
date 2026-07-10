@@ -118,12 +118,12 @@ export default function GaragePage() {
               </p>
             </div>
 
-            <div className="rounded-[28px] bg-cars-primary p-5 text-white shadow-[0_18px_44px_rgba(15,45,98,0.18)] sm:min-w-[220px]">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/70">
+            <div className="saved-cars-shortlist-card rounded-[28px] bg-cars-primary p-5 shadow-[0_18px_44px_rgba(15,45,98,0.18)] sm:min-w-[220px]">
+              <p className="saved-cars-shortlist-eyebrow text-xs font-semibold uppercase tracking-[0.16em]">
                 Your shortlist
               </p>
-              <p className="mt-2 text-3xl font-apercu-bold">{items.length}</p>
-              <p className="mt-1 text-sm text-white/80">
+              <p className="saved-cars-shortlist-count mt-2 text-3xl font-apercu-bold">{items.length}</p>
+              <p className="saved-cars-shortlist-meta mt-1 text-sm">
                 {items.length === 1 ? "Saved car" : "Saved cars"}
               </p>
             </div>
@@ -193,7 +193,13 @@ export default function GaragePage() {
         {!loading && sortedItems.length > 0 ? (
           <div className="mt-6 grid gap-5 sm:grid-cols-2 2xl:grid-cols-3">
             {sortedItems.map((item) => (
-              <ListingCard key={item.listing_id} item={item} saved onToggleSave={removeSaved} />
+              <ListingCard
+                key={item.listing_id}
+                item={item}
+                saved
+                showStatusBadge
+                onToggleSave={removeSaved}
+              />
             ))}
           </div>
         ) : null}

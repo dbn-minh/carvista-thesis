@@ -198,7 +198,7 @@ export function buildMarketplaceSellerProfile({
     displayName: override?.displayName || buildFallbackName(listing, seller),
     sellerType,
     about: override?.about || buildFallbackAbout(listing, sellerType),
-    phone: override?.phone || seller?.phone || null,
+    phone: seller?.phone || override?.phone || null,
     email: seller?.email || null,
     website: override?.website || null,
     addressLine: buildAddressLine(listing, override),

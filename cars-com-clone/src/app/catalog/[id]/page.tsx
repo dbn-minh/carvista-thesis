@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useParams } from "next/navigation";
-import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import PageIntelligencePanel from "@/components/ai/PageIntelligencePanel";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
+import EstimatedTcoPanel from "@/components/catalog/EstimatedTcoPanel";
 import PriceHistoryChart from "@/components/catalog/PriceHistoryChart";
 import Header from "@/components/layout/Header";
 import StarRating from "@/components/reviews/StarRating";
@@ -35,7 +35,6 @@ const reviewControlClass =
 
 export default function CatalogDetailPage() {
   const params = useParams<{ id: string }>();
-  const { openAssistant } = useAiAssistant();
   const { openAuth } = useAuthModal();
   const id = Number(params.id);
 
@@ -62,7 +61,7 @@ export default function CatalogDetailPage() {
       try {
         const [detailRes, historyRes, reviewsRes, ownershipRes] = await Promise.allSettled([
           catalogApi.variantDetail(id),
-          catalogApi.variantPriceHistory(id, activeMarketId),
+          catalogApi.variantPriceHistory(id, activeMarketId, 72),
           reviewsApi.carReviews(id),
           catalogApi.variantOwnershipSummary(id, {
             marketId: activeMarketId,
@@ -344,17 +343,18 @@ export default function CatalogDetailPage() {
             subjectId={id}
             marketId={Number(marketId) || 1}
             ownershipYears={Number(ownershipYears) || 5}
-            title="AI ownership preview"
+            title="AI fit preview"
             className="mb-8"
             compactLayout
-            hiddenSectionKeys={["price_outlook"]}
+            hiddenSectionKeys={["ownership_cost", "price_outlook"]}
+            requirePersonalizedContext
             allowedActionPathTypes={["related_listings"]}
             showSectionCaveats={false}
             showSectionSources={false}
           />
         ) : null}
 
-        <section className="mb-8 grid gap-6 xl:grid-cols-2">
+        <section className="mb-8 space-y-6">
           <div className="section-shell p-4 sm:p-5 md:p-6">
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
@@ -362,97 +362,19 @@ export default function CatalogDetailPage() {
                   Price history
                 </h2>
                 <p className="mt-3 text-sm leading-6 text-cars-gray">
-                  Review the recent market trail for this exact vehicle before judging the current
-                  market position.
+                  Latest monthly snapshots for this exact variant.
                 </p>
               </div>
             </div>
             <PriceHistoryChart rows={priceHistory} />
           </div>
 
-          <div className="section-shell p-4 sm:p-5 md:p-6">
-            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-              <div>
-                <h2 className="text-xl font-apercu-bold text-cars-primary sm:text-2xl">
-                  Estimated TCO
-                </h2>
-                <p className="mt-3 text-sm leading-6 text-cars-gray">
-                  Ownership estimate is now part of the detail view, so buyers can see a practical
-                  drive-away and long-term cost snapshot before deciding.
-                </p>
-              </div>
-
-              <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap">
-                <select
-                  value={ownershipYears}
-                  onChange={(event) => void changeOwnershipYears(event.target.value)}
-                  className="h-10 rounded-full border border-cars-primary/10 bg-white px-3 text-sm text-cars-primary shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
-                >
-                  <option value="3">3 years</option>
-                  <option value="5">5 years</option>
-                  <option value="7">7 years</option>
-                </select>
-                <button
-                  type="button"
-                  onClick={() =>
-                    openAssistant({
-                      prompt: `Explain the ownership-cost estimate for ${heading}. Use the loaded catalog variant context. Keep it short and buyer-friendly. Explain the simple formula: drive-away estimate plus recurring ownership costs over ${ownershipYears} years. Mention only the biggest assumptions and avoid raw source names, dates, or technical audit details.`,
-                      marketId: Number(marketId) || 1,
-                      variantId: id,
-                      variantLabel: heading,
-                    })
-                  }
-                  className="inline-flex h-10 items-center justify-center rounded-full border border-cars-primary/10 bg-white px-4 text-xs font-semibold text-cars-primary transition-colors hover:bg-cars-off-white dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10"
-                >
-                  Discuss estimate
-                </button>
-              </div>
-            </div>
-
-            {ownershipSummary?.estimate ? (
-              <div className="mt-5 space-y-4">
-                <div className="rounded-[22px] border border-white/10 bg-white/5 px-4 py-4 text-sm leading-7 text-slate-200">
-                  {ownershipSummary.estimate.assistant_message}
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
-                  {ownershipSummary.estimate.insight_cards.map((card) => (
-                    <article
-                      key={card.title}
-                      className="rounded-[22px] border border-white/10 bg-white/5 px-4 py-4"
-                    >
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
-                        {card.title}
-                      </p>
-                      {card.value != null ? (
-                        <p className="mt-2 break-words text-lg font-apercu-bold text-cars-primary">
-                          {typeof card.value === "number" ? toCurrency(card.value) : card.value}
-                        </p>
-                      ) : null}
-                      <p className="mt-2 text-sm leading-6 text-cars-gray">{card.description}</p>
-                    </article>
-                  ))}
-                </div>
-
-                {ownershipSummary.estimate.highlights.length ? (
-                  <div className="space-y-2">
-                    {ownershipSummary.estimate.highlights.map((highlight) => (
-                      <div
-                        key={highlight}
-                        className="rounded-[18px] border border-white/8 bg-white/5 px-4 py-3 text-sm leading-6 text-slate-200 shadow-sm"
-                      >
-                        {highlight}
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <div className="mt-5 rounded-[22px] border border-dashed border-white/10 bg-white/5 px-4 py-4 text-sm leading-7 text-slate-300">
-                {ownershipError || "Ownership estimate is not available for this market yet."}
-              </div>
-            )}
-          </div>
+          <EstimatedTcoPanel
+            ownershipSummary={ownershipSummary}
+            ownershipError={ownershipError}
+            ownershipYears={ownershipYears}
+            onOwnershipYearsChange={changeOwnershipYears}
+          />
         </section>
 
         <section className="section-shell mb-8 p-4 sm:p-5 md:p-6">

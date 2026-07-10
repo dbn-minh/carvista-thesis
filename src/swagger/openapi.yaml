@@ -173,6 +173,21 @@ paths:
                 location_city: { type: string }
                 location_country_code: { type: string }
                 description: { type: string }
+                custom_vehicle:
+                  type: object
+                  properties:
+                    make: { type: string }
+                    model: { type: string }
+                    year: { type: integer }
+                    trim_name: { type: string }
+                    body_type: { type: string }
+                    transmission: { type: string }
+                    fuel_type: { type: string }
+                    drivetrain: { type: string }
+                    engine: { type: string }
+                    seats: { type: integer, minimum: 1, maximum: 12 }
+                    doors: { type: integer, minimum: 1, maximum: 6 }
+                    vin: { type: string }
                 image_urls:
                   type: array
                   items: { type: string }
@@ -190,7 +205,7 @@ paths:
                 status: { type: string }
                 custom_vehicle:
                   type: string
-                  description: JSON string containing custom vehicle fields
+                  description: JSON string containing custom vehicle fields including make, model, year, seats, and doors when the catalog vehicle is missing
                 images:
                   type: array
                   items:

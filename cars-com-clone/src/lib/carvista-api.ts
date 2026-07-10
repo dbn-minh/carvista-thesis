@@ -26,7 +26,10 @@ import type {
   WatchVariantItem,
 } from "./types";
 
-function appendAdvisorProfileParams(qs: URLSearchParams, profile?: AdvisorProfile) {
+function appendAdvisorProfileParams(
+  qs: URLSearchParams,
+  profile?: AdvisorProfile,
+) {
   if (!profile) return;
 
   const entries: Array<[string, string | number | null | undefined]> = [
@@ -65,14 +68,22 @@ function appendMultiValueParams(
 export const authApi = {
   register(payload: {
     name: string;
-    email: string;
+    email?: string;
     phone?: string;
     password: string;
+    registration_token?: string;
+    otp_challenge_id?: number;
+    otp_destination_type?: "email" | "phone";
+    otp_destination_value?: string;
+    otp_code?: string;
   }) {
-    return apiFetch<AuthResponse & { user_id: number; email: string }>("/auth/register", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    return apiFetch<AuthResponse & { user_id: number; email: string }>(
+      "/auth/register",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
   },
 
   login(payload: { email: string; password: string }) {
@@ -84,6 +95,95 @@ export const authApi = {
 
   providers() {
     return apiFetch<AuthProvidersResponse>("/auth/providers");
+  },
+
+  requestOtp(payload: {
+    destination_type: "email" | "phone";
+    destination_value: string;
+    purpose?: "login" | "register" | "verify_contact" | "passwordless_signin";
+  }) {
+    return apiFetch<{
+      challenge_id: number;
+      destination_type: "email" | "phone";
+      destination_value: string;
+      masked_destination?: string;
+      expires_at: string;
+      resend_available_at: string;
+      message?: string;
+    }>("/auth/otp/request", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  verifyOtp(payload: {
+    challenge_id: number;
+    destination_type: "email" | "phone";
+    destination_value: string;
+    code: string;
+    profile_name?: string;
+  }) {
+    return apiFetch<AuthResponse>("/auth/otp/verify", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  verifyRegistrationOtp(payload: {
+    challenge_id: number;
+    destination_type: "email" | "phone";
+    destination_value: string;
+    code: string;
+  }) {
+    return apiFetch<{
+      registration_token: string;
+      destination_type: "email" | "phone";
+      destination_value: string;
+      masked_destination?: string;
+    }>("/auth/register/otp/verify", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  requestPasswordResetOtp(payload: {
+    destination_type: "email" | "phone";
+    destination_value: string;
+  }) {
+    return apiFetch<{
+      challenge_id: number;
+      destination_type: "email" | "phone";
+      destination_value: string;
+      masked_destination?: string;
+      expires_at: string;
+      resend_available_at: string;
+      message?: string;
+    }>("/auth/password/forgot/request", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  verifyPasswordResetOtp(payload: {
+    challenge_id: number;
+    destination_type: "email" | "phone";
+    destination_value: string;
+    code: string;
+  }) {
+    return apiFetch<{ reset_token: string }>("/auth/password/forgot/verify", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  resetPasswordWithOtp(payload: {
+    reset_token: string;
+    new_password: string;
+  }) {
+    return apiFetch<AuthResponse>("/auth/password/forgot/reset", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 
   socialStartUrl(provider: "google" | "facebook", next?: string) {
@@ -146,7 +246,7 @@ export const catalogApi = {
 
   variantPriceHistory(id: number, marketId: number, limit = 50) {
     return apiFetch<{ items: Array<Record<string, unknown>> }>(
-      `/catalog/variants/${id}/price-history?marketId=${marketId}&limit=${limit}`
+      `/catalog/variants/${id}/price-history?marketId=${marketId}&limit=${limit}`,
     );
   },
 
@@ -156,14 +256,17 @@ export const catalogApi = {
       marketId?: number;
       ownershipYears?: number;
       kmPerYear?: number;
-    }
+    },
   ) {
     const qs = new URLSearchParams();
     if (params?.marketId) qs.set("marketId", String(params.marketId));
-    if (params?.ownershipYears) qs.set("ownershipYears", String(params.ownershipYears));
+    if (params?.ownershipYears)
+      qs.set("ownershipYears", String(params.ownershipYears));
     if (params?.kmPerYear) qs.set("kmPerYear", String(params.kmPerYear));
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    return apiFetch<CatalogOwnershipSummary>(`/catalog/variants/${id}/ownership-summary${suffix}`);
+    return apiFetch<CatalogOwnershipSummary>(
+      `/catalog/variants/${id}/ownership-summary${suffix}`,
+    );
   },
 
   variantInsights(
@@ -174,16 +277,19 @@ export const catalogApi = {
       kmPerYear?: number;
       profile?: AdvisorProfile;
       skipSections?: string[];
-    }
+    },
   ) {
     const qs = new URLSearchParams();
     if (params?.marketId) qs.set("marketId", String(params.marketId));
-    if (params?.ownershipYears) qs.set("ownershipYears", String(params.ownershipYears));
+    if (params?.ownershipYears)
+      qs.set("ownershipYears", String(params.ownershipYears));
     if (params?.kmPerYear) qs.set("kmPerYear", String(params.kmPerYear));
     appendAdvisorProfileParams(qs, params?.profile);
     appendMultiValueParams(qs, "skipSections", params?.skipSections);
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    return apiFetch<AiPageIntelligenceResponse>(`/catalog/variants/${id}/ai-insights${suffix}`);
+    return apiFetch<AiPageIntelligenceResponse>(
+      `/catalog/variants/${id}/ai-insights${suffix}`,
+    );
   },
 };
 
@@ -205,6 +311,25 @@ export const listingsApi = {
     return apiFetch<ListingDetail>(`/listings/${id}`);
   },
 
+  ownershipSummary(
+    id: number,
+    params?: {
+      marketId?: number;
+      ownershipYears?: number;
+      kmPerYear?: number;
+    },
+  ) {
+    const qs = new URLSearchParams();
+    if (params?.marketId) qs.set("marketId", String(params.marketId));
+    if (params?.ownershipYears)
+      qs.set("ownershipYears", String(params.ownershipYears));
+    if (params?.kmPerYear) qs.set("kmPerYear", String(params.kmPerYear));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return apiFetch<CatalogOwnershipSummary>(
+      `/listings/${id}/ownership-summary${suffix}`,
+    );
+  },
+
   insights(
     id: number,
     params?: {
@@ -213,43 +338,48 @@ export const listingsApi = {
       kmPerYear?: number;
       profile?: AdvisorProfile;
       skipSections?: string[];
-    }
+    },
   ) {
     const qs = new URLSearchParams();
     if (params?.marketId) qs.set("marketId", String(params.marketId));
-    if (params?.ownershipYears) qs.set("ownershipYears", String(params.ownershipYears));
+    if (params?.ownershipYears)
+      qs.set("ownershipYears", String(params.ownershipYears));
     if (params?.kmPerYear) qs.set("kmPerYear", String(params.kmPerYear));
     appendAdvisorProfileParams(qs, params?.profile);
     appendMultiValueParams(qs, "skipSections", params?.skipSections);
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    return apiFetch<AiPageIntelligenceResponse>(`/listings/${id}/ai-insights${suffix}`);
+    return apiFetch<AiPageIntelligenceResponse>(
+      `/listings/${id}/ai-insights${suffix}`,
+    );
   },
 
   create(
     payload:
       | FormData
       | {
-        variant_id?: number;
-        asking_price: number;
-        mileage_km?: number;
-        location_city: string;
-        location_country_code: string;
-        description?: string;
-        status?: "active" | "reserved" | "sold" | "hidden";
-        image_urls?: string[];
-        custom_vehicle?: {
-          make: string;
-          model: string;
-          year: number;
-          trim_name?: string;
-          body_type?: string;
-          transmission?: string;
-          fuel_type?: string;
-          drivetrain?: string;
-          engine?: string;
-          vin?: string;
-        };
-      }
+          variant_id?: number;
+          asking_price: number;
+          mileage_km?: number;
+          location_city: string;
+          location_country_code: string;
+          description?: string;
+          status?: "active" | "reserved" | "sold" | "hidden";
+          image_urls?: string[];
+          custom_vehicle?: {
+            make: string;
+            model: string;
+            year: number;
+            trim_name?: string;
+            body_type?: string;
+            transmission?: string;
+            fuel_type?: string;
+            drivetrain?: string;
+            engine?: string;
+            seats?: number;
+            doors?: number;
+            vin?: string;
+          };
+        },
   ) {
     return apiFetch<{
       listing_id: number;
@@ -273,7 +403,7 @@ export const listingsApi = {
       location_country_code: string;
       description: string;
       status: "active" | "reserved" | "sold" | "hidden";
-    }>
+    }>,
   ) {
     return apiFetch<{ ok: true }>(`/listings/${id}`, {
       method: "PUT",
@@ -318,7 +448,7 @@ export const listingsApi = {
       `/listings/${id}/images/${imageId}`,
       {
         method: "DELETE",
-      }
+      },
     );
   },
 
@@ -328,7 +458,7 @@ export const listingsApi = {
       {
         method: "PATCH",
         body: JSON.stringify({ image_ids: imageIds }),
-      }
+      },
     );
   },
 };
@@ -377,13 +507,15 @@ export const requestsApi = {
       contact_phone?: string;
       preferred_contact_method?: "phone" | "email" | "phone_or_email";
       preferred_viewing_time?: string;
-    }
+    },
   ) {
     return apiFetch<{
       request_id: number;
       request?: ViewingRequest;
       seller_notified: boolean;
+      buyer_notified?: boolean;
       notification_provider?: string | null;
+      notification_queued?: boolean;
     }>(`/listings/${listingId}/requests`, {
       method: "POST",
       body: JSON.stringify(payload),
@@ -408,7 +540,7 @@ export const requestsApi = {
       | "scheduled"
       | "completed"
       | "closed"
-      | "cancelled"
+      | "cancelled",
   ) {
     return apiFetch<{ ok: true }>(`/requests/${requestId}/status`, {
       method: "PATCH",
@@ -431,7 +563,9 @@ export const notificationsApi = {
 
 export const reviewsApi = {
   carReviews(variantId: number) {
-    return apiFetch<{ items: CarReview[] }>(`/reviews/cars?variantId=${variantId}`);
+    return apiFetch<{ items: CarReview[] }>(
+      `/reviews/cars?variantId=${variantId}`,
+    );
   },
 
   createCarReview(payload: {
@@ -448,7 +582,7 @@ export const reviewsApi = {
 
   sellerReviews(sellerId: number) {
     return apiFetch<{ items: SellerReview[] }>(
-      `/reviews/sellers?sellerId=${sellerId}`
+      `/reviews/sellers?sellerId=${sellerId}`,
     );
   },
 

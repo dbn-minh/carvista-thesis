@@ -35,6 +35,9 @@ function extractVariantIds(message) {
 
 function buildClarificationMessage(intentResult) {
   const missing = intentResult.missing_fields;
+  if (intentResult.intent === "recommend_car" && missing.includes("vehicle_need")) {
+    return "I can recommend the right cars once I understand your needs. Tell me your use case, passenger count or body type, fuel preference, and rough budget.";
+  }
   if (intentResult.intent === "recommend_car" && missing.includes("budget")) {
     return "I can recommend the right cars once I know your target budget. A quick answer like 'around 1 billion VND' is enough.";
   }
@@ -78,6 +81,129 @@ function buildPolicyStatusConfidence(policyResponse) {
     ]);
   }
   return null;
+}
+
+function isGuidedSuggestionContext(context = {}) {
+  const promptSource = String(context?.prompt_source || "").trim().toLowerCase();
+  const responseMode = String(context?.response_mode || "").trim().toLowerCase();
+  return promptSource === "advisor_suggestion" || responseMode === "model_guided";
+}
+
+function buildGuidedSuggestionClarificationResult({
+  intent,
+  message,
+  context = {},
+  missingFields = [],
+  fallbackAnswer = "",
+  validationStatus = "guided_suggestion_clarification",
+}) {
+  return {
+    intent,
+    needs_clarification: true,
+    user_message: String(message || ""),
+    missing_fields: missingFields,
+    advisor_suggestion: {
+      source: context?.prompt_source ?? null,
+      label: context?.suggestion_label ?? null,
+      intent: context?.suggestion_intent ?? null,
+      response_mode: context?.response_mode ?? null,
+    },
+    guidance: {
+      objective:
+        "The user entered through an advisor suggestion chip, so write like a flexible AI advisor instead of a validation form.",
+      allowed_behavior: [
+        "Acknowledge the user's goal in natural language.",
+        "Use the suggestion label and user message as conversation context.",
+        "Ask one useful next question or request the smallest set of missing details.",
+        "Keep the answer helpful, conversational, and specific to the user's goal.",
+      ],
+      avoid: [
+        "Do not simply repeat fallback_backend_answer.",
+        "Do not sound like a fixed rule-based error message.",
+        "Do not invent calculations or vehicle data that the backend did not provide.",
+      ],
+    },
+    backend_fallback_answer: fallbackAnswer,
+    validation_status: validationStatus,
+  };
+}
+
+async function buildGuidedSuggestionClarificationEnvelope(
+  ctx,
+  {
+    flow_id,
+    intentResult,
+    message,
+    context = {},
+    route,
+    startedAt,
+    fallbackAnswer,
+    missingFields = [],
+    contextUpdates = {},
+    resultConfidence = null,
+    validationStatus = "guided_suggestion_clarification",
+  }
+) {
+  const structuredResult = buildGuidedSuggestionClarificationResult({
+    intent: intentResult.intent,
+    message,
+    context,
+    missingFields,
+    fallbackAnswer,
+    validationStatus,
+  });
+  const advisorResponse = await generateAdvisorFinalResponse({
+    intent: intentResult.intent,
+    userMessage: message,
+    structuredResult,
+    rawPayload: { clarification: structuredResult },
+    fallbackAnswer,
+    turnContext: {
+      prompt_source: context?.prompt_source ?? null,
+      suggestion_label: context?.suggestion_label ?? null,
+      suggestion_intent: context?.suggestion_intent ?? null,
+      response_mode: context?.response_mode ?? null,
+      validation_status: validationStatus,
+    },
+  }, {
+    ollama: ctx.services?.ollama ?? ctx.ai?.ollama,
+  });
+
+  return chatEnvelopeSchema.parse({
+    flow_id,
+    intent: intentResult.intent,
+    confidence: intentResult.confidence,
+    needs_clarification: true,
+    structured_result: {
+      ...structuredResult,
+      aiInsight: advisorResponse.aiInsight,
+    },
+    final_answer: advisorResponse.final_answer || fallbackAnswer,
+    context_updates: contextUpdates,
+    result_confidence: resultConfidence,
+    evidence: null,
+    sources: [],
+    caveats: [],
+    freshness_note: null,
+    meta: {
+      services_used: [
+        "IntentClassifier",
+        "RequestRouter",
+        "ValidationGate",
+        advisorResponse.meta?.aiUsed ? "Qwen3AdvisorInsight" : "AiInsightFallback",
+      ],
+      sources_used: [],
+      fallback_used: Boolean(advisorResponse.meta?.fallbackUsed),
+      aiProvider: advisorResponse.meta?.aiProvider ?? null,
+      aiModel: advisorResponse.meta?.aiModel ?? null,
+      aiUsed: Boolean(advisorResponse.meta?.aiUsed),
+      aiFallbackUsed: Boolean(advisorResponse.meta?.fallbackUsed),
+      latency_ms: Date.now() - startedAt,
+      route_service: route.service,
+      missing_fields: missingFields,
+      validation_status: validationStatus,
+    },
+  });
 }
 
 function shouldRouteClarificationToPolicyInsight(intentResult) {
@@ -307,6 +433,10 @@ export async function orchestrateChatRequest(
   const startedAt = Date.now();
   const classifiedIntent = classifyIntent(message, {
     ...context,
+    advisor_profile:
+      Object.keys(advisor_profile ?? {}).length > 0
+        ? advisor_profile
+        : context.advisor_profile ?? {},
     market_id: context.market_id ?? null,
     focus_variant_id: context.focus_variant_id ?? null,
   });
@@ -348,13 +478,29 @@ export async function orchestrateChatRequest(
   }
 
   if (intentResult.needs_clarification && intentResult.intent !== "vehicle_general_qa" && forced_intent == null) {
+    const fallbackAnswer = buildClarificationMessage(intentResult);
+    if (isGuidedSuggestionContext(context)) {
+      return buildGuidedSuggestionClarificationEnvelope(ctx, {
+        flow_id,
+        intentResult,
+        message,
+        context,
+        route,
+        startedAt,
+        fallbackAnswer,
+        missingFields: intentResult.missing_fields ?? [],
+        resultConfidence: buildClarificationStatusConfidence(intentResult),
+        validationStatus: "classifier_guided_suggestion_clarification",
+      });
+    }
+
     return chatEnvelopeSchema.parse({
       flow_id,
       intent: intentResult.intent,
       confidence: intentResult.confidence,
       needs_clarification: true,
       structured_result: null,
-      final_answer: buildClarificationMessage(intentResult),
+      final_answer: fallbackAnswer,
       context_updates: {},
       result_confidence: buildClarificationStatusConfidence(intentResult),
       evidence: null,
@@ -398,6 +544,25 @@ export async function orchestrateChatRequest(
   });
 
   if (!validation.ok) {
+    const validationIntentResult = {
+      ...intentResult,
+      intent: validation.clarification.intent,
+    };
+    if (isGuidedSuggestionContext(context)) {
+      return buildGuidedSuggestionClarificationEnvelope(ctx, {
+        flow_id,
+        intentResult: validationIntentResult,
+        message,
+        context,
+        route,
+        startedAt,
+        fallbackAnswer: validation.clarification.message,
+        missingFields: validation.clarification.missing_fields ?? [],
+        contextUpdates: validation.clarification.context_updates ?? {},
+        validationStatus: "validation_guided_suggestion_clarification",
+      });
+    }
+
     return chatEnvelopeSchema.parse({
       flow_id,
       intent: validation.clarification.intent,

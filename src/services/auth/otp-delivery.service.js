@@ -2,6 +2,7 @@ import { env } from "../../config/env.js";
 import { buildOtpEmailTemplate } from "../notifications/email-template.service.js";
 import { createEmailProvider } from "../notifications/notification.service.js";
 import { ConsoleSmsProvider } from "./providers/console-sms.provider.js";
+import { SpeedSmsProvider } from "./providers/speedsms-sms.provider.js";
 import { TwilioSmsProvider } from "./providers/twilio-sms.provider.js";
 
 export class OtpDeliveryService {
@@ -26,7 +27,8 @@ export class OtpDeliveryService {
       });
     }
 
-    const message = `Your CarVista verification code is ${code}. It expires in ${env.auth.otpExpiresInMinutes} minutes.`;
+    const expiryUnit = env.auth.otpExpiresInMinutes === 1 ? "minute" : "minutes";
+    const message = `Ma OTP CarVista cua ban la ${code}. Hieu luc trong ${env.auth.otpExpiresInMinutes} ${expiryUnit}.`;
     return this.smsProvider.sendOtp({
       destination: destinationValue,
       message,
@@ -35,8 +37,14 @@ export class OtpDeliveryService {
 }
 
 function createSmsProvider() {
-  if (env.notifications.sms.provider === "twilio") {
+  const provider = String(env.notifications.sms.provider || "console").toLowerCase();
+
+  if (provider === "twilio") {
     return new TwilioSmsProvider();
+  }
+
+  if (provider === "speedsms") {
+    return new SpeedSmsProvider();
   }
 
   return new ConsoleSmsProvider();

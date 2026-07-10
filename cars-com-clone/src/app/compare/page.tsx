@@ -1,20 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import {
-  ArrowLeftRight,
-  Bot,
-  CarFront,
-  CircleDollarSign,
-  Loader2,
-  Shield,
-  Sparkles,
-  Users,
-  Wrench,
-} from "lucide-react";
-import EmptyState from "@/components/common/EmptyState";
+import { ArrowLeftRight, BarChart3, RotateCcw } from "lucide-react";
+import { useAiAssistant } from "@/components/ai/AiAssistantProvider";
 import StatusBanner from "@/components/common/StatusBanner";
 import Header from "@/components/layout/Header";
 import {
@@ -22,8 +12,6 @@ import {
   formatBodyType,
   formatFuelType,
   formatListingPrice,
-  formatLocation,
-  formatMileage,
   formatTransmission,
   getListingImages,
 } from "@/components/listings/listing-utils";
@@ -31,17 +19,10 @@ import { getStoredAdvisorProfile } from "@/lib/advisor-profile";
 import { aiApi, catalogApi, listingsApi } from "@/lib/carvista-api";
 import { apiFetch, toCurrency } from "@/lib/api-client";
 import { useRequireLogin } from "@/lib/auth-guard";
-import {
-  buildCompareHref,
-  buildComparePairLabel,
-  enrichCompareFollowUpMessage,
-} from "@/lib/compare";
+import { buildComparePairLabel } from "@/lib/compare";
 import type {
   AiCompareItem,
   AiCompareResponse,
-  AiConfidence,
-  AiInsightCard,
-  ChatResponse,
   ListingDetail,
   VariantDetail,
   VariantListItem,
@@ -73,28 +54,23 @@ type ResolutionResult = {
   searchQuery?: string;
 };
 
-type FollowUpMessage = {
-  id: string;
-  role: "assistant" | "user";
-  content: string;
-  cards?: AiInsightCard[];
-  confidence?: AiConfidence | null;
-  caveats?: string[];
-  followUps?: string[];
+type PriceHistoryPoint = {
+  captured_at: string;
+  price: number;
+  source?: string | null;
+  price_type?: string | null;
 };
 
-type VerdictCard = {
-  key: string;
-  title: string;
-  winner: string;
-  description: string;
-  icon: typeof Users;
+type PriceHistorySeries = {
+  label: string;
+  history: PriceHistoryPoint[];
+  color: string;
 };
 
-type WinnerHighlight = {
-  key: string;
-  title: string;
-  score: number;
+type PriceHistoryState = {
+  loading: boolean;
+  error: string;
+  byVariantId: Record<number, PriceHistoryPoint[]>;
 };
 
 const emptySearchState: SearchState = {
@@ -103,41 +79,11 @@ const emptySearchState: SearchState = {
   options: [],
 };
 
-const followUpSuggestions = [
-  "Which is better for a family of 5?",
-  "Which one is cheaper to own over 5 years?",
-  "Which one is better for resale?",
-  "Give me the pros and cons only.",
-];
-
-const compareTableLabels: Record<string, string> = {
-  latest_price: "Market price",
-  engine: "Engine",
-  fuel_type: "Fuel type",
-  transmission: "Transmission",
-  drivetrain: "Drivetrain",
-  seats: "Seats",
-  avg_rating: "Owner rating",
-  "0_100_kmh": "0-100 km/h",
-  top_speed_kmh: "Top speed",
-  fuel_consumption_l_100km: "Fuel use",
-  energy_consumption_kwh_100km: "Energy use",
-  ground_clearance_mm: "Ground clearance",
-  cargo_capacity_l: "Cargo space",
-  towing_capacity_kg: "Towing capacity",
-  wheel_size_inch: "Wheel size",
-  safety_rating: "Safety rating",
-  airbags_count: "Airbags",
-  adas_level: "ADAS level",
-  lane_keep_assist: "Lane keep assist",
-  adaptive_cruise_control: "Adaptive cruise",
-  blind_spot_monitor: "Blind-spot monitor",
-  charging_dc_kw: "DC fast charging",
+const emptyPriceHistoryState: PriceHistoryState = {
+  loading: false,
+  error: "",
+  byVariantId: {},
 };
-
-function buildId(prefix: string) {
-  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
-}
 
 function toPositiveInteger(value: string | null) {
   const numeric = Number(value);
@@ -429,6 +375,14 @@ async function resolveSelectionFromParams({
   };
 }
 
+function findCompareItem(
+  result: AiCompareResponse | null,
+  selection: SelectedVehicle | null
+) {
+  if (!result || !selection?.variantId) return null;
+  return result.items.find((item) => item.variant_id === selection.variantId) ?? null;
+}
+
 function getSelectionImage(selection: SelectedVehicle | null) {
   if (!selection) return null;
   if (selection.listing) {
@@ -442,168 +396,453 @@ function getListingStatus(selection: SelectedVehicle | null) {
   return selection?.listing?.listing.status ?? null;
 }
 
-function findCompareItem(
-  result: AiCompareResponse | null,
-  selection: SelectedVehicle | null
-) {
-  if (!result || !selection?.variantId) return null;
-  return result.items.find((item) => item.variant_id === selection.variantId) ?? null;
+function getVehicleHref(selection: SelectedVehicle | null) {
+  if (selection?.listingId) return `/listings/${selection.listingId}`;
+  if (selection?.variantId) return `/catalog/${selection.variantId}`;
+  return null;
 }
 
-function scoreFamilyUse(item: AiCompareItem) {
-  return (
-    item.scores.practicality_score +
-    item.scores.comfort_score +
-    (Number(item.seats) >= 7 ? 2.5 : Number(item.seats) >= 5 ? 1 : 0)
-  );
+const compareTableLabels: Record<string, string> = {
+  year: "Model year",
+  body_type: "Body style",
+  engine: "Engine",
+  fuel_type: "Fuel / powertrain",
+  transmission: "Transmission",
+  drivetrain: "Drivetrain",
+  seats: "Seats",
+  doors: "Doors",
+  latest_price: "Market price",
+  msrp_base: "Original MSRP",
+  avg_rating: "Owner rating",
+  review_count: "Review count",
+  "0_100_kmh": "0-100 km/h",
+  top_speed_kmh: "Top speed",
+  fuel_consumption_l_100km: "Fuel use",
+  energy_consumption_kwh_100km: "Energy use",
+  ground_clearance_mm: "Ground clearance",
+  cargo_capacity_l: "Cargo space",
+  towing_capacity_kg: "Towing capacity",
+  wheel_size_inch: "Wheel size",
+  safety_rating: "Safety rating",
+  airbags_count: "Airbags",
+  adas_level: "ADAS level",
+  lane_keep_assist: "Lane keep assist",
+  adaptive_cruise_control: "Adaptive cruise",
+  blind_spot_monitor: "Blind-spot monitor",
+  charging_dc_kw: "DC fast charging",
+};
+
+function hasMeaningfulValue(value: unknown) {
+  if (value == null) return false;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return normalized.length > 0 && normalized !== "not available" && normalized !== "-";
+  }
+  return Number.isFinite(Number(value)) || typeof value === "boolean";
 }
 
-function scoreCityUse(item: AiCompareItem) {
-  const bodyBonus = ["sedan", "hatchback", "cuv"].includes((item.body_type || "").toLowerCase())
-    ? 1.5
-    : 0;
-  const fuelBonus = ["hybrid", "ev"].includes((item.fuel_type || "").toLowerCase()) ? 1.25 : 0;
-  return item.scores.efficiency_score + item.scores.maintenance_score + bodyBonus + fuelBonus;
+function formatFullVnd(value: unknown) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "Not available";
+  return `${toCurrency(Math.round(numeric))} VND`;
 }
 
-function scoreValue(item: AiCompareItem) {
-  return item.scores.price_score + item.scores.resale_score * 0.45;
+function formatShortVnd(value: unknown) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "Not available";
+  const abs = Math.abs(numeric);
+  if (abs >= 1_000_000_000) {
+    return `~${(numeric / 1_000_000_000).toFixed(2).replace(/\.?0+$/, "")}B VND`;
+  }
+  if (abs >= 1_000_000) {
+    return `~${Math.round(numeric / 1_000_000).toLocaleString("en-US")}M VND`;
+  }
+  return formatFullVnd(numeric);
 }
 
-function scoreOwnershipCost(item: AiCompareItem) {
-  return item.scores.efficiency_score + item.scores.maintenance_score + item.scores.price_score * 0.35;
-}
-
-function createVerdictCard(
-  items: AiCompareItem[],
-  key: string,
-  title: string,
-  scorer: (item: AiCompareItem) => number,
-  description: (winner: AiCompareItem) => string,
-  icon: typeof Users
-): VerdictCard {
-  const sorted = [...items].sort((left, right) => scorer(right) - scorer(left));
-  const winner = sorted[0];
-
-  return {
-    key,
-    title,
-    winner: buildCompareItemLabel(winner),
-    description: description(winner),
-    icon,
-  };
-}
-
-function buildVerdictCards(items: AiCompareItem[]): VerdictCard[] {
-  if (items.length < 2) return [];
-
-  return [
-    createVerdictCard(items, "overall", "Best overall", (item) => item.scores.final_score, () => "Leads on the broadest mix of value, practicality, and day-to-day fit.", Sparkles),
-    createVerdictCard(items, "family", "Best for family use", scoreFamilyUse, (winner) => `${Number(winner.seats) || 0} seats, a ${winner.body_type || "versatile"} layout, and the stronger practicality case.`, Users),
-    createVerdictCard(items, "city", "Best for city driving", scoreCityUse, () => "Makes the better running-cost and city-use case from the current data.", CarFront),
-    createVerdictCard(items, "cost", "Best for lower ownership cost", scoreOwnershipCost, () => "Edges ahead on efficiency, maintenance comfort, and price positioning.", Wrench),
-    createVerdictCard(items, "resale", "Best resale outlook", (item) => item.scores.resale_score, () => "Looks more resilient on resale and local market stability right now.", Shield),
-    createVerdictCard(items, "value", "Best value for money", scoreValue, () => "Brings the cleaner value story once price and resale are weighed together.", CircleDollarSign),
-  ];
-}
-
-function buildVehicleStrengths(item: AiCompareItem) {
-  return [
-    { label: "family practicality", score: scoreFamilyUse(item) },
-    { label: "city commuting", score: scoreCityUse(item) },
-    { label: "ownership cost", score: scoreOwnershipCost(item) },
-    { label: "premium comfort", score: item.scores.comfort_score + item.scores.technology_score * 0.6 },
-    { label: "resale confidence", score: item.scores.resale_score },
-    { label: "overall value", score: scoreValue(item) },
-  ]
-    .sort((left, right) => right.score - left.score)
-    .slice(0, 2)
-    .map((item) => item.label);
-}
-
-function buildWinnerHighlights(
-  winner: AiCompareItem | null,
-  runnerUp: AiCompareItem | null
-): WinnerHighlight[] {
-  if (!winner || !runnerUp) return [];
-
-  const comfortTechWinner = winner.scores.comfort_score + winner.scores.technology_score * 0.6;
-  const comfortTechRunnerUp = runnerUp.scores.comfort_score + runnerUp.scores.technology_score * 0.6;
-  const ownershipWinner = scoreOwnershipCost(winner);
-  const ownershipRunnerUp = scoreOwnershipCost(runnerUp);
-  const valueWinner = scoreValue(winner);
-  const valueRunnerUp = scoreValue(runnerUp);
-
-  return [
-    {
-      key: "value",
-      title: "Better value overall",
-      score: valueWinner - valueRunnerUp,
-    },
-    {
-      key: "ownership",
-      title: "Easier daily ownership",
-      score: ownershipWinner - ownershipRunnerUp,
-    },
-    {
-      key: "fit",
-      title: "Closer profile match",
-      score: winner.scores.use_case_fit_score - runnerUp.scores.use_case_fit_score,
-    },
-    {
-      key: "comfort",
-      title: "More polished cabin",
-      score: comfortTechWinner - comfortTechRunnerUp,
-    },
-    {
-      key: "safety",
-      title: "Stronger safety case",
-      score: winner.scores.safety_score - runnerUp.scores.safety_score,
-    },
-    {
-      key: "overall",
-      title: "Stronger all-round balance",
-      score: winner.scores.final_score - runnerUp.scores.final_score,
-    },
-  ].sort((left, right) => right.score - left.score).slice(0, 3);
-}
-
-function formatCompareValue(key: string, value: unknown) {
-  if (value == null) return "Not available";
+function formatComparisonCell(key: string, value: unknown) {
+  if (!hasMeaningfulValue(value)) return { text: "Not available", title: undefined };
 
   if (typeof value === "object" && value !== null && "value" in value) {
     const candidate = value as { value?: unknown; unit?: string | null };
-    if (candidate.value == null) return "Not available";
-    return `${candidate.value}${candidate.unit ? ` ${candidate.unit}` : ""}`;
+    if (!hasMeaningfulValue(candidate.value)) return { text: "Not available", title: undefined };
+    return {
+      text: `${candidate.value}${candidate.unit ? ` ${candidate.unit}` : ""}`,
+      title: undefined,
+    };
   }
 
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (key === "latest_price") return formatListingPrice(value);
-  if (key === "avg_rating" && Number.isFinite(Number(value))) return `${Number(value).toFixed(1)} / 5`;
-  if (key === "fuel_consumption_l_100km" && Number.isFinite(Number(value))) return `${Number(value)} L/100 km`;
-  if (key === "energy_consumption_kwh_100km" && Number.isFinite(Number(value))) return `${Number(value)} kWh/100 km`;
-  if (key === "cargo_capacity_l" && Number.isFinite(Number(value))) return `${toCurrency(value)} L`;
-  if (key === "ground_clearance_mm" && Number.isFinite(Number(value))) return `${toCurrency(value)} mm`;
-  if (key === "towing_capacity_kg" && Number.isFinite(Number(value))) return `${toCurrency(value)} kg`;
-  if (key === "wheel_size_inch" && Number.isFinite(Number(value))) return `${value}"`;
-  if (key === "0_100_kmh" && Number.isFinite(Number(value))) return `${Number(value)} sec`;
-  if (key === "top_speed_kmh" && Number.isFinite(Number(value))) return `${toCurrency(value)} km/h`;
+  if (key === "body_type") return { text: formatBodyType(String(value)), title: undefined };
+  if (key === "fuel_type") return { text: formatFuelType(String(value)), title: undefined };
+  if (key === "transmission") return { text: formatTransmission(String(value)), title: undefined };
+  if (key === "seats") return { text: `${Number(value)} seats`, title: undefined };
+  if (key === "doors") return { text: `${Number(value)} doors`, title: undefined };
+  if (key === "latest_price" || key === "msrp_base") return { text: formatShortVnd(value), title: formatFullVnd(value) };
+  if (key === "avg_rating" && Number.isFinite(Number(value))) return { text: `${Number(value).toFixed(1)} / 5`, title: undefined };
+  if (key === "fuel_consumption_l_100km" && Number.isFinite(Number(value))) return { text: `${Number(value)} L/100 km`, title: undefined };
+  if (key === "energy_consumption_kwh_100km" && Number.isFinite(Number(value))) return { text: `${Number(value)} kWh/100 km`, title: undefined };
+  if (key === "cargo_capacity_l" && Number.isFinite(Number(value))) return { text: `${Number(value).toLocaleString("en-US")} L`, title: undefined };
+  if (key === "ground_clearance_mm" && Number.isFinite(Number(value))) return { text: `${Number(value).toLocaleString("en-US")} mm`, title: undefined };
+  if (key === "towing_capacity_kg" && Number.isFinite(Number(value))) return { text: `${Number(value).toLocaleString("en-US")} kg`, title: undefined };
+  if (key === "wheel_size_inch" && Number.isFinite(Number(value))) return { text: `${value}"`, title: undefined };
+  if (key === "0_100_kmh" && Number.isFinite(Number(value))) return { text: `${Number(value)} sec`, title: undefined };
+  if (key === "top_speed_kmh" && Number.isFinite(Number(value))) return { text: `${Number(value).toLocaleString("en-US")} km/h`, title: undefined };
 
-  return String(value);
+  return { text: String(value), title: undefined };
 }
 
-function buildListingMarketPosition(selection: SelectedVehicle | null, item: AiCompareItem | null) {
-  const askingPrice = selection?.listing?.listing.asking_price;
-  const marketPrice = item?.latest_price;
+function toTitleLabel(key: string) {
+  return compareTableLabels[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 
-  if (!Number.isFinite(Number(askingPrice)) || !Number.isFinite(Number(marketPrice))) return null;
+function parsePriceHistoryPoint(row: Record<string, unknown>): PriceHistoryPoint | null {
+  const capturedAt = typeof row.captured_at === "string" ? row.captured_at : null;
+  const price = Number(row.price);
+  if (!capturedAt || !Number.isFinite(price)) return null;
 
-  const delta = Number(askingPrice) - Number(marketPrice);
-  const ratio = Math.abs(delta) / Math.max(Number(marketPrice), 1);
+  return {
+    captured_at: capturedAt,
+    price,
+    source: typeof row.source === "string" ? row.source : null,
+    price_type: typeof row.price_type === "string" ? row.price_type : null,
+  };
+}
 
-  if (ratio <= 0.05) return "Asking price is close to the current market signal.";
-  if (delta > 0) return `Asking price sits about ${Math.round(ratio * 100)}% above the latest market signal.`;
-  return `Asking price sits about ${Math.round(ratio * 100)}% below the latest market signal.`;
+function formatChartDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+}
+
+function getSortedPriceHistory(history: PriceHistoryPoint[]) {
+  return history
+    .map((point) => ({
+      ...point,
+      timestamp: new Date(point.captured_at).getTime(),
+    }))
+    .filter((point) => Number.isFinite(point.price) && Number.isFinite(point.timestamp))
+    .sort((left, right) => left.timestamp - right.timestamp);
+}
+
+function getExpandedPriceDomain(points: ReturnType<typeof getSortedPriceHistory>) {
+  const prices = points.map((point) => point.price);
+  if (prices.length === 0) return { min: 0, max: 1 };
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const rawRange = Math.max(max - min, Math.max(max * 0.04, 1));
+  const padding = rawRange * 0.12;
+  return {
+    min: Math.max(0, min - padding),
+    max: max + padding,
+  };
+}
+
+function getNearestPricePoint(
+  points: ReturnType<typeof getSortedPriceHistory>,
+  timestamp: number
+) {
+  return points.reduce<(typeof points)[number] | null>((closest, point) => {
+    if (!closest) return point;
+    return Math.abs(point.timestamp - timestamp) < Math.abs(closest.timestamp - timestamp)
+      ? point
+      : closest;
+  }, null);
+}
+
+function getPriceTrendLabel(points: ReturnType<typeof getSortedPriceHistory>) {
+  const first = points[0] ?? null;
+  const latest = points.at(-1) ?? null;
+  if (!first || !latest) return "Limited data";
+
+  const delta = latest.price - first.price;
+  if (Math.abs(delta) < 1) return "Flat";
+  return delta > 0 ? "Rising" : "Softening";
+}
+
+function CombinedPriceHistoryChart({
+  series,
+  hoverTimestamp,
+  onHoverTimestampChange,
+}: {
+  series: PriceHistorySeries[];
+  hoverTimestamp: number | null;
+  onHoverTimestampChange: (timestamp: number | null) => void;
+}) {
+  const normalizedSeries = series.map((item) => ({
+    ...item,
+    points: getSortedPriceHistory(item.history),
+  }));
+  const allPoints = normalizedSeries.flatMap((item) => item.points);
+  const drawableSeries = normalizedSeries.filter((item) => item.points.length >= 2);
+  const chartSeries = normalizedSeries.map((item) => {
+    const domain = getExpandedPriceDomain(item.points);
+    return {
+      ...item,
+      domain,
+      latest: item.points.at(-1) ?? null,
+    };
+  });
+  const width = 980;
+  const height = 340;
+  const paddingLeft = 96;
+  const paddingRight = 96;
+  const paddingTop = 34;
+  const paddingBottom = 48;
+  const times = allPoints.map((point) => point.timestamp);
+  const minTime = times.length ? Math.min(...times) : 0;
+  const maxTime = times.length ? Math.max(...times) : 0;
+  const timeRange = Math.max(maxTime - minTime, 1);
+  const plotWidth = width - paddingLeft - paddingRight;
+  const plotHeight = height - paddingTop - paddingBottom;
+  const xForPoint = (timestamp: number) =>
+    paddingLeft + ((timestamp - minTime) / timeRange) * plotWidth;
+  const yForPoint = (price: number, domain: { min: number; max: number }) =>
+    height - paddingBottom - ((price - domain.min) / Math.max(domain.max - domain.min, 1)) * plotHeight;
+  const activeTimestamp = hoverTimestamp ?? maxTime;
+  const activeRows = chartSeries.map((item) => ({
+    ...item,
+    activePoint: getNearestPricePoint(item.points, activeTimestamp),
+  }));
+  const activeX = allPoints.length ? xForPoint(activeTimestamp) : null;
+  const hoverRows = hoverTimestamp == null ? [] : activeRows.filter((item) => item.activePoint);
+  const hoverDate = hoverRows[0]?.activePoint?.captured_at ?? null;
+  const hoverXPercent =
+    activeX == null ? 50 : Math.min(92, Math.max(8, (activeX / width) * 100));
+  const hoverTooltipTransform =
+    hoverXPercent > 72 ? "translateX(-100%)" : hoverXPercent < 28 ? "translateX(0)" : "translateX(-50%)";
+  const yTicks = [0, 0.25, 0.5, 0.75, 1];
+  const xTicks = [0, 0.5, 1];
+
+  function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
+    if (!allPoints.length) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const rawX = ((event.clientX - rect.left) / rect.width) * width;
+    const clampedX = Math.min(width - paddingRight, Math.max(paddingLeft, rawX));
+    onHoverTimestampChange(minTime + ((clampedX - paddingLeft) / plotWidth) * timeRange);
+  }
+
+  return (
+    <article className="rounded-[26px] border border-cars-gray-light/70 bg-white p-4 shadow-[0_16px_34px_rgba(15,45,98,0.06)]">
+      <div className="grid gap-3 md:grid-cols-2">
+        {chartSeries.map((item, index) => {
+          return (
+            <div key={item.label} className="rounded-[20px] bg-cars-off-white px-4 py-3">
+              <div className="flex items-start gap-3">
+                <span
+                  className="mt-1 h-3 w-3 shrink-0 rounded-full"
+                  style={{ backgroundColor: item.color }}
+                />
+                <div className="min-w-0">
+                  <p className="break-words text-sm font-semibold leading-5 text-cars-primary">
+                    {item.label}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-cars-accent">
+                    {index === 0 ? "Left scale" : "Right scale"} - Latest{" "}
+                    {item.latest ? formatShortVnd(item.latest.price) : "No data"} - {getPriceTrendLabel(item.points)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="relative mt-4 overflow-hidden rounded-[22px] bg-cars-off-white">
+        {drawableSeries.length > 0 ? (
+          <>
+            {hoverRows.length > 0 ? (
+              <div
+                className="pointer-events-none absolute top-5 z-20 w-[min(320px,calc(100%-2rem))] rounded-[20px] border border-cars-gray-light/80 bg-white/95 px-4 py-3 text-xs shadow-[0_18px_45px_rgba(15,45,98,0.16)] backdrop-blur-md"
+                style={{
+                  left: `${hoverXPercent}%`,
+                  transform: hoverTooltipTransform,
+                }}
+              >
+                <p className="font-apercu-bold uppercase tracking-[0.14em] text-cars-accent">
+                  {hoverDate ? formatChartDate(hoverDate) : "Selected point"}
+                </p>
+                <div className="mt-2 space-y-2">
+                  {hoverRows.map((item) => {
+                    const point = item.activePoint;
+                    if (!point) return null;
+                    return (
+                      <div key={`hover-${item.label}`} className="flex items-start justify-between gap-3">
+                        <span className="flex min-w-0 items-start gap-2 text-cars-gray">
+                          <span
+                            className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          <span className="line-clamp-2 leading-5">{item.label}</span>
+                        </span>
+                        <span className="shrink-0 whitespace-nowrap font-semibold text-cars-primary">
+                          {formatFullVnd(point.price)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            <svg
+              viewBox={`0 0 ${width} ${height}`}
+              role="img"
+              aria-label="Compared vehicle price history"
+              className="h-[340px] w-full cursor-crosshair touch-none"
+              onPointerMove={handlePointerMove}
+              onPointerLeave={() => onHoverTimestampChange(null)}
+            >
+            {yTicks.map((tick) => {
+              const y = paddingTop + tick * plotHeight;
+              return (
+                <line
+                  key={tick}
+                  x1={paddingLeft}
+                  x2={width - paddingRight}
+                  y1={y}
+                  y2={y}
+                  stroke="#d7e0ef"
+                  strokeDasharray="5 7"
+                />
+              );
+            })}
+            {chartSeries.slice(0, 2).map((item, index) => {
+              const tickDomain = item.domain;
+              const textX = index === 0 ? paddingLeft - 12 : width - paddingRight + 12;
+              const anchor = index === 0 ? "end" : "start";
+              return yTicks.map((tick) => {
+                const y = paddingTop + tick * plotHeight;
+                const price = tickDomain.max - tick * (tickDomain.max - tickDomain.min);
+                return (
+                  <text
+                    key={`${item.label}-${tick}`}
+                    x={textX}
+                    y={y + 4}
+                    fill={item.color}
+                    fontSize="12"
+                    fontWeight="600"
+                    textAnchor={anchor}
+                  >
+                    {formatShortVnd(price)}
+                  </text>
+                );
+              });
+            })}
+            {xTicks.map((tick) => {
+              const timestamp = minTime + tick * timeRange;
+              const x = paddingLeft + tick * plotWidth;
+              return (
+                <g key={tick}>
+                  <line
+                    x1={x}
+                    x2={x}
+                    y1={paddingTop}
+                    y2={height - paddingBottom}
+                    stroke="#e3e9f4"
+                    strokeDasharray="3 8"
+                  />
+                  <text x={x} y={height - 16} fill="#62708a" fontSize="12" textAnchor="middle">
+                    {allPoints[0] ? formatChartDate(new Date(timestamp).toISOString()) : ""}
+                  </text>
+                </g>
+              );
+            })}
+            {drawableSeries.map((item) => {
+              const domain = getExpandedPriceDomain(item.points);
+              const path = item.points
+                .map((point, index) => {
+                  const x = xForPoint(point.timestamp);
+                  const y = yForPoint(point.price, domain);
+                  return `${index === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+                })
+                .join(" ");
+              return (
+                <g key={item.label}>
+                  <path
+                    d={path}
+                    fill="none"
+                    stroke={item.color}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="4"
+                  />
+                  {item.points.map((point, index) => {
+                    const showPoint = index === 0 || index === item.points.length - 1 || item.points.length <= 8;
+                    if (!showPoint) return null;
+                    const y = yForPoint(point.price, domain);
+                    return (
+                      <circle
+                        key={`${item.label}-${point.captured_at}-${index}`}
+                        cx={xForPoint(point.timestamp)}
+                        cy={y}
+                        r="4.5"
+                        fill="#ffffff"
+                        stroke={item.color}
+                        strokeWidth="3"
+                      >
+                        <title>{`${item.label} - ${formatChartDate(point.captured_at)}: ${formatFullVnd(point.price)}`}</title>
+                      </circle>
+                    );
+                  })}
+                </g>
+              );
+            })}
+            {activeX != null ? (
+              <line
+                x1={activeX}
+                x2={activeX}
+                y1={paddingTop}
+                y2={height - paddingBottom}
+                stroke="#17213a"
+                strokeOpacity="0.35"
+                strokeWidth="2"
+              />
+            ) : null}
+            {activeRows.map((item) => {
+              if (!item.activePoint) return null;
+              return (
+                <circle
+                  key={`active-${item.label}`}
+                  cx={xForPoint(item.activePoint.timestamp)}
+                  cy={yForPoint(item.activePoint.price, item.domain)}
+                  r="6"
+                  fill="#ffffff"
+                  stroke={item.color}
+                  strokeWidth="3"
+                />
+              );
+            })}
+            </svg>
+          </>
+        ) : (
+          <div className="flex h-[340px] items-center justify-center px-6 text-center text-sm leading-6 text-cars-gray">
+            Not enough local price-history points are available for a two-line chart yet.
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 grid gap-3 text-sm text-cars-gray sm:grid-cols-3">
+        {chartSeries.slice(0, 2).map((item, index) => (
+          <div key={item.label}>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-cars-accent">
+              {index === 0 ? "Left scale range" : "Right scale range"}
+            </p>
+            <p className="mt-1 text-cars-primary">
+              {item.points.length ? `${formatShortVnd(item.domain.min)} - ${formatShortVnd(item.domain.max)}` : "Not available"}
+            </p>
+          </div>
+        ))}
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-cars-accent">Time window</p>
+          <p className="mt-1 text-cars-primary">
+            {allPoints.length
+              ? `${formatChartDate(new Date(minTime).toISOString())} - ${formatChartDate(new Date(maxTime).toISOString())}`
+              : "Not available"}
+          </p>
+        </div>
+      </div>
+    </article>
+  );
 }
 
 function CompareSearchPanel({
@@ -708,66 +947,9 @@ function CompareSearchPanel({
                 {buildVariantLabel(item)}
               </span>
               <span className="mt-1 text-xs text-white/58">
-                {formatBodyType(item.body_type)} · {formatFuelType(item.fuel_type)} · {formatTransmission(item.transmission)}
+                {formatBodyType(item.body_type)} / {formatFuelType(item.fuel_type)} / {formatTransmission(item.transmission)}
               </span>
             </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function CompareFollowUpAnswer({
-  message,
-}: {
-  message: FollowUpMessage;
-}) {
-  return (
-    <div
-      className={
-        message.role === "user"
-          ? "ml-auto w-full max-w-full rounded-[24px] rounded-br-md bg-[linear-gradient(135deg,rgba(0,230,255,0.18),rgba(101,23,179,0.28))] px-4 py-3 text-sm leading-6 text-white sm:max-w-[85%]"
-          : "w-full max-w-full rounded-[24px] rounded-bl-md border border-white/8 bg-white/5 px-4 py-3 text-sm leading-6 text-white/86 shadow-[0_16px_40px_rgba(0,0,0,0.24)] sm:max-w-[92%]"
-      }
-    >
-      <p>{message.content}</p>
-      {message.confidence ? (
-        <div className="mt-3 inline-flex rounded-full bg-cars-accent/12 px-3 py-1 text-xs font-semibold text-cars-accent">
-          {message.confidence.label}
-        </div>
-      ) : null}
-      {message.cards?.length ? (
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {message.cards.slice(0, 4).map((card, index) => (
-            <div key={`${card.title}-${index}`} className="rounded-[18px] border border-white/8 bg-black/18 px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cars-accent">
-                {card.title}
-              </p>
-              {card.value != null ? (
-                <p className="mt-2 text-base font-apercu-bold text-white">
-                  {typeof card.value === "number" ? toCurrency(card.value) : String(card.value)}
-                </p>
-              ) : null}
-              <p className="mt-2 text-sm leading-6 text-white/62">{card.description}</p>
-            </div>
-          ))}
-        </div>
-      ) : null}
-      {message.caveats?.length ? (
-        <div className="mt-3 rounded-[18px] border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-xs leading-5 text-amber-100">
-          {message.caveats[0]}
-        </div>
-      ) : null}
-      {message.followUps?.length ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {message.followUps.slice(0, 3).map((followUp) => (
-            <span
-              key={followUp}
-              className="rounded-full border border-white/8 bg-white/6 px-3 py-2 text-xs font-medium text-white/80"
-            >
-              {followUp}
-            </span>
           ))}
         </div>
       ) : null}
@@ -778,6 +960,7 @@ function CompareFollowUpAnswer({
 function ComparePageContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { openAssistant } = useAiAssistant();
   const nextPath = useMemo(() => {
     const suffix = searchParams.toString();
     return suffix ? `${pathname}?${suffix}` : pathname || "/compare";
@@ -800,11 +983,10 @@ function ComparePageContent() {
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState<"success" | "error" | "info">("info");
   const [result, setResult] = useState<AiCompareResponse | null>(null);
-  const [followUpInput, setFollowUpInput] = useState("");
-  const [sendingFollowUp, setSendingFollowUp] = useState(false);
-  const [followUpSessionId, setFollowUpSessionId] = useState<number | null>(null);
-  const [followUpMessages, setFollowUpMessages] = useState<FollowUpMessage[]>([]);
+  const [priceHistory, setPriceHistory] = useState<PriceHistoryState>(emptyPriceHistoryState);
+  const [priceHoverTimestamp, setPriceHoverTimestamp] = useState<number | null>(null);
   const autoRunKeyRef = useRef("");
+  const autoOpenedAssistantKeyRef = useRef("");
   const leftHasInitialInput = Boolean(
     searchParams.get("leftListingId") ||
       searchParams.get("leftVariantId") ||
@@ -828,11 +1010,12 @@ function ComparePageContent() {
       setTone("info");
       setMessage("");
       setResult(null);
-      setFollowUpMessages([]);
-      setFollowUpSessionId(null);
+      setPriceHistory(emptyPriceHistoryState);
+      setPriceHoverTimestamp(null);
       setLeftHelperNote(null);
       setRightHelperNote(null);
       autoRunKeyRef.current = "";
+      autoOpenedAssistantKeyRef.current = "";
 
       try {
         const [resolvedLeft, resolvedRight] = await Promise.all([
@@ -917,9 +1100,17 @@ function ComparePageContent() {
 
   function resetResults() {
     setResult(null);
-    setFollowUpMessages([]);
-    setFollowUpSessionId(null);
+    setPriceHistory(emptyPriceHistoryState);
+    setPriceHoverTimestamp(null);
     autoRunKeyRef.current = "";
+    autoOpenedAssistantKeyRef.current = "";
+  }
+
+  function showVehiclePicker() {
+    setResult(null);
+    setMessage("");
+    setPriceHistory(emptyPriceHistoryState);
+    setPriceHoverTimestamp(null);
   }
 
   function updateSide(side: "left" | "right", selection: SelectedVehicle | null, query: string) {
@@ -1085,7 +1276,7 @@ function ComparePageContent() {
 
         setResult(response);
         setTone("success");
-        setMessage("Comparison ready. Review the verdict, trade-offs, and next actions below.");
+        setMessage("");
       } catch (error) {
         setTone("error");
         setMessage(error instanceof Error ? error.message : "Compare failed.");
@@ -1119,155 +1310,127 @@ function ComparePageContent() {
     ],
     [leftSelection?.label, rightSelection?.label, leftItem, rightItem]
   );
-
-  const verdictCards = useMemo(() => (result ? buildVerdictCards(result.items) : []), [result]);
-  const compareTitle = buildComparePairLabel(vehicleLabels);
-  const compareBlocked =
-    Boolean(leftHasInitialInput || leftSelection) &&
-    Boolean(rightHasInitialInput || rightSelection) &&
-    (!leftSelection?.variantId || !rightSelection?.variantId);
-  const recommendedItem = useMemo(
-    () =>
-      result?.recommended_variant_id
-        ? result.items.find((item) => item.variant_id === result.recommended_variant_id) ?? null
-        : null,
-    [result]
-  );
-  const runnerUpItem = useMemo(
-    () =>
-      recommendedItem && result
-        ? result.items.find((item) => item.variant_id !== recommendedItem.variant_id) ?? null
-        : null,
-    [recommendedItem, result]
-  );
-  const winnerHighlights = useMemo(
-    () => buildWinnerHighlights(recommendedItem, runnerUpItem),
-    [recommendedItem, runnerUpItem]
+  const comparePairLabel = useMemo(() => buildComparePairLabel(vehicleLabels), [vehicleLabels]);
+  const priceHistorySeries = useMemo<PriceHistorySeries[]>(
+    () => [
+      {
+        label: vehicleLabels[0] || "Vehicle A",
+        history: leftItem?.variant_id ? priceHistory.byVariantId[leftItem.variant_id] ?? [] : [],
+        color: "#2f6ff2",
+      },
+      {
+        label: vehicleLabels[1] || "Vehicle B",
+        history: rightItem?.variant_id ? priceHistory.byVariantId[rightItem.variant_id] ?? [] : [],
+        color: "#14b8a6",
+      },
+    ],
+    [vehicleLabels, leftItem?.variant_id, rightItem?.variant_id, priceHistory.byVariantId]
   );
 
   const comparisonRows = useMemo(() => {
-    if (!result) return [];
-
-    const customRows = [
-      {
-        key: "listing_price",
-        label: "Asking price",
-        left: leftSelection?.listing?.listing.asking_price,
-        right: rightSelection?.listing?.listing.asking_price,
-      },
-      {
-        key: "year",
-        label: "Model year",
-        left: leftItem?.year ?? null,
-        right: rightItem?.year ?? null,
-      },
-      {
-        key: "body_type",
-        label: "Body style",
-        left: leftItem?.body_type ?? null,
-        right: rightItem?.body_type ?? null,
-      },
-      {
-        key: "fuel_type_base",
-        label: "Fuel / powertrain",
-        left: leftItem?.fuel_type ?? null,
-        right: rightItem?.fuel_type ?? null,
-      },
-      {
-        key: "transmission_base",
-        label: "Transmission",
-        left: leftItem?.transmission ?? null,
-        right: rightItem?.transmission ?? null,
-      },
-      {
-        key: "mileage",
-        label: "Mileage",
-        left: leftSelection?.listing?.listing.mileage_km ?? null,
-        right: rightSelection?.listing?.listing.mileage_km ?? null,
-      },
-      {
-        key: "location",
-        label: "Location",
-        left: leftSelection?.listing
-          ? formatLocation(
-              leftSelection.listing.listing.location_city,
-              leftSelection.listing.listing.location_country_code
-            )
-          : null,
-        right: rightSelection?.listing
-          ? formatLocation(
-              rightSelection.listing.listing.location_city,
-              rightSelection.listing.listing.location_country_code
-            )
-          : null,
-      },
-    ].filter((row) => row.left != null || row.right != null);
-
-    const tableRows = Object.entries(result.comparison_table)
-      .filter(([key]) => compareTableLabels[key])
-      .map(([key, values]) => ({
+    if (!result || (!leftItem && !rightItem)) return [];
+    const leftId = leftItem?.variant_id ? String(leftItem.variant_id) : "";
+    const rightId = rightItem?.variant_id ? String(rightItem.variant_id) : "";
+    const baseRows = [
+      { key: "year", label: "Model year", left: leftItem?.year ?? null, right: rightItem?.year ?? null },
+      { key: "body_type", label: "Body style", left: leftItem?.body_type ?? null, right: rightItem?.body_type ?? null },
+      { key: "engine", label: "Engine", left: leftItem?.engine ?? null, right: rightItem?.engine ?? null },
+      { key: "fuel_type", label: "Fuel / powertrain", left: leftItem?.fuel_type ?? null, right: rightItem?.fuel_type ?? null },
+      { key: "transmission", label: "Transmission", left: leftItem?.transmission ?? null, right: rightItem?.transmission ?? null },
+      { key: "drivetrain", label: "Drivetrain", left: leftItem?.drivetrain ?? null, right: rightItem?.drivetrain ?? null },
+      { key: "seats", label: "Seats", left: leftItem?.seats ?? null, right: rightItem?.seats ?? null },
+      { key: "doors", label: "Doors", left: leftItem?.doors ?? null, right: rightItem?.doors ?? null },
+      { key: "msrp_base", label: "Original MSRP", left: leftItem?.msrp_base ?? null, right: rightItem?.msrp_base ?? null },
+      { key: "latest_price", label: "Market price", left: leftItem?.latest_price ?? null, right: rightItem?.latest_price ?? null },
+      { key: "avg_rating", label: "Owner rating", left: leftItem?.avg_rating ?? null, right: rightItem?.avg_rating ?? null },
+      { key: "review_count", label: "Review count", left: leftItem?.review_count ?? null, right: rightItem?.review_count ?? null },
+    ];
+    const baseKeys = new Set(baseRows.map((row) => row.key));
+    const dynamicRows = Object.entries(result.comparison_table ?? {})
+      .filter(([key]) => !baseKeys.has(key))
+      .map(([key, row]) => ({
         key,
-        label: compareTableLabels[key] || key,
-        left: values[String(leftSelection?.variantId ?? "")],
-        right: values[String(rightSelection?.variantId ?? "")],
-      }))
-      .filter((row) => row.left != null || row.right != null);
+        label: toTitleLabel(key),
+        left: leftId ? row[leftId] ?? null : null,
+        right: rightId ? row[rightId] ?? null : null,
+      }));
 
-    return [...customRows, ...tableRows];
-  }, [result, leftItem, rightItem, leftSelection, rightSelection]);
+    return [...baseRows, ...dynamicRows].filter((row) => hasMeaningfulValue(row.left) || hasMeaningfulValue(row.right));
+  }, [result, leftItem, rightItem]);
 
-  async function sendFollowUp(promptOverride?: string) {
-    if (!result || !leftSelection?.variantId || !rightSelection?.variantId) return;
-
-    const draft = (promptOverride ?? followUpInput).trim();
-    if (!draft || sendingFollowUp) return;
-
-    const enrichedMessage = enrichCompareFollowUpMessage(draft, vehicleLabels);
-    setFollowUpMessages((prev) => [
-      ...prev,
-      {
-        id: buildId("user"),
-        role: "user",
-        content: draft,
-      },
-    ]);
-    setFollowUpInput("");
-    setSendingFollowUp(true);
-
-    try {
-      const response: ChatResponse = await aiApi.chat({
-        session_id: followUpSessionId || undefined,
-        message: enrichedMessage,
-        context: {
-          market_id: marketId,
-          compare_variant_ids: [leftSelection.variantId, rightSelection.variantId],
-          compare_variant_labels: vehicleLabels,
-          focus_variant_id: recommendedItem?.variant_id ?? leftSelection.variantId,
-          focus_variant_label: recommendedItem ? buildCompareItemLabel(recommendedItem) : vehicleLabels[0],
-          advisor_profile: getStoredAdvisorProfile(),
-        },
-      });
-
-      setFollowUpSessionId(response.session_id);
-      setFollowUpMessages((prev) => [
-        ...prev,
-        {
-          id: buildId("assistant"),
-          role: "assistant",
-          content: response.answer,
-          cards: response.cards,
-          confidence: response.confidence ?? null,
-          caveats: response.caveats ?? [],
-          followUps: response.follow_up_questions,
-        },
-      ]);
-    } catch (error) {
-      setTone("error");
-      setMessage(error instanceof Error ? error.message : "Could not send the follow-up question.");
-    } finally {
-      setSendingFollowUp(false);
+  useEffect(() => {
+    const ids = [leftSelection?.variantId, rightSelection?.variantId].filter((id): id is number =>
+      Number.isInteger(id)
+    );
+    if (!result || ids.length < 2) {
+      setPriceHistory(emptyPriceHistoryState);
+      setPriceHoverTimestamp(null);
+      return;
     }
-  }
+
+    let cancelled = false;
+    setPriceHoverTimestamp(null);
+    setPriceHistory((prev) => ({ ...prev, loading: true, error: "" }));
+
+    async function loadPriceHistory() {
+      try {
+        const entries = await Promise.all(
+          ids.map(async (variantId) => {
+            const response = await catalogApi.variantPriceHistory(variantId, marketId, 36);
+            const history = response.items
+              .map(parsePriceHistoryPoint)
+              .filter((point): point is PriceHistoryPoint => Boolean(point));
+            return [variantId, history] as const;
+          })
+        );
+
+        if (cancelled) return;
+        setPriceHistory({
+          loading: false,
+          error: "",
+          byVariantId: Object.fromEntries(entries),
+        });
+      } catch (error) {
+        if (cancelled) return;
+        setPriceHistory({
+          loading: false,
+          error: error instanceof Error ? error.message : "Could not load local price history.",
+          byVariantId: {},
+        });
+      }
+    }
+
+    void loadPriceHistory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [result, leftSelection?.variantId, rightSelection?.variantId, marketId]);
+
+  useEffect(() => {
+    if (!result || !leftSelection?.variantId || !rightSelection?.variantId) return;
+    const key = `${marketId}:${leftSelection.variantId}:${rightSelection.variantId}`;
+    if (autoOpenedAssistantKeyRef.current === key) return;
+
+    const labels = vehicleLabels.filter((label): label is string => Boolean(label));
+    if (labels.length < 2) return;
+
+    autoOpenedAssistantKeyRef.current = key;
+    openAssistant({
+      marketId,
+      variantId: leftSelection.variantId,
+      variantLabel: labels[0],
+      compareVariantIds: [leftSelection.variantId, rightSelection.variantId],
+      compareVariantLabels: labels,
+    });
+  }, [
+    result,
+    leftSelection?.variantId,
+    rightSelection?.variantId,
+    marketId,
+    vehicleLabels,
+    openAssistant,
+  ]);
 
   if (!ready) return null;
 
@@ -1275,79 +1438,44 @@ function ComparePageContent() {
     <>
       <Header />
       <main className="container-cars py-6 sm:py-8">
-        <section className="section-shell overflow-hidden bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(233,241,255,0.92))] p-5 sm:p-6 md:p-8">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent">
-                Compare
-              </p>
-              <h1 className="mt-2 text-3xl font-apercu-bold text-cars-primary sm:text-4xl lg:text-[2.75rem] lg:leading-tight">
-                {compareTitle === "Selected vehicles" ? "Compare two vehicles" : compareTitle}
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-cars-gray">
-                Review the trade-offs, verdicts, and buyer-fit guidance from a grounded
-                comparison instead of starting with a blank chat.
-              </p>
-            </div>
-
-            <div className="grid w-full gap-3 sm:w-auto sm:grid-cols-1 lg:flex lg:flex-wrap">
-              <Link
-                href="/listings"
-                className="inline-flex h-11 w-full items-center justify-center rounded-full border border-cars-primary/15 px-4 text-sm font-semibold text-cars-primary transition-colors hover:bg-white sm:w-auto"
-              >
-                Browse listings
-              </Link>
-            </div>
+        {message ? (
+          <div className="mb-6">
+            <StatusBanner tone={tone}>{message}</StatusBanner>
           </div>
-        </section>
+        ) : null}
 
-        <div className="mt-6">
-          <StatusBanner tone={tone}>{message}</StatusBanner>
-        </div>
-
-        <section className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-stretch lg:gap-5">
-          <CompareSearchPanel
-            title="Vehicle A"
-            value={leftQuery}
-            onChange={(value) => updateSide("left", null, value)}
-            searchState={leftSearch}
-            selected={leftSelection}
-            helperNote={leftHelperNote}
-            helperTone={leftHelperTone}
-            onSelect={(item) => void handleSearchSelection("left", item)}
-            onClear={() => updateSide("left", null, "")}
-          />
-
-          <div className="flex items-center justify-center lg:pt-20">
-            <div className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-cars-primary text-white shadow-[0_18px_40px_rgba(15,45,98,0.18)] sm:h-12 sm:w-12">
-              <ArrowLeftRight className="h-5 w-5 rotate-90 lg:rotate-0" />
-            </div>
-          </div>
-
-          <CompareSearchPanel
-            title="Vehicle B"
-            value={rightQuery}
-            onChange={(value) => updateSide("right", null, value)}
-            searchState={rightSearch}
-            selected={rightSelection}
-            helperNote={rightHelperNote}
-            helperTone={rightHelperTone}
-            onSelect={(item) => void handleSearchSelection("right", item)}
-            onClear={() => updateSide("right", null, "")}
-          />
-        </section>
-
-        {!loadingSelections && (!leftSelection?.variantId || !rightSelection?.variantId) ? (
-          <div className="mt-6">
-            <EmptyState
-              title={compareBlocked ? "Compare works with catalog-backed vehicles only" : "Choose two vehicles to compare"}
-              description={
-                compareBlocked
-                  ? "One or both selections are not linked to a CarVista catalog variant yet. Search again and pick supported models to generate the comparison."
-                  : "Once both sides are selected, CarVista will build the comparison automatically."
-              }
+        {!result ? (
+          <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-stretch lg:gap-5">
+            <CompareSearchPanel
+              title="Vehicle A"
+              value={leftQuery}
+              onChange={(value) => updateSide("left", null, value)}
+              searchState={leftSearch}
+              selected={leftSelection}
+              helperNote={leftHelperNote}
+              helperTone={leftHelperTone}
+              onSelect={(item) => void handleSearchSelection("left", item)}
+              onClear={() => updateSide("left", null, "")}
             />
-          </div>
+
+            <div className="flex items-center justify-center lg:pt-20">
+              <div className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-cars-primary text-white shadow-[0_18px_40px_rgba(15,45,98,0.18)] sm:h-12 sm:w-12">
+                <ArrowLeftRight className="h-5 w-5 rotate-90 lg:rotate-0" />
+              </div>
+            </div>
+
+            <CompareSearchPanel
+              title="Vehicle B"
+              value={rightQuery}
+              onChange={(value) => updateSide("right", null, value)}
+              searchState={rightSearch}
+              selected={rightSelection}
+              helperNote={rightHelperNote}
+              helperTone={rightHelperTone}
+              onSelect={(item) => void handleSearchSelection("right", item)}
+              onClear={() => updateSide("right", null, "")}
+            />
+          </section>
         ) : null}
 
         {loadingSelections || comparing ? (
@@ -1366,87 +1494,46 @@ function ComparePageContent() {
         ) : null}
 
         {result ? (
-          <>
-            <section className="mt-6 section-shell overflow-hidden border-white/10 bg-[linear-gradient(135deg,rgba(244,248,255,0.98),rgba(229,238,255,0.95),rgba(194,214,255,0.9))] p-5 text-cars-primary shadow-[0_22px_56px_rgba(15,45,98,0.12)] dark:bg-[linear-gradient(135deg,rgba(15,45,98,0.98),rgba(27,76,160,0.92),rgba(95,150,255,0.82))] dark:text-white sm:p-6 md:p-8">
-              <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cars-accent dark:text-white/70">
-                    Quick verdict
-                  </p>
-                  <h2 className="mt-2 text-2xl font-apercu-bold text-cars-primary dark:text-white sm:text-3xl">
-                    {recommendedItem ? `${buildCompareItemLabel(recommendedItem)} comes out ahead overall.` : "Comparison ready"}
-                  </h2>
-                  <p className="mt-4 text-sm leading-7 text-cars-gray dark:text-white/85">
-                    {result.assistant_message}
-                  </p>
-                  {result.highlights?.length ? (
-                    <div className="mt-5 flex flex-wrap gap-2">
-                      {result.highlights.slice(0, 3).map((highlight) => (
-                        <span
-                          key={highlight}
-                          className="rounded-full border border-cars-primary/10 bg-white/80 px-3 py-2 text-xs font-semibold text-cars-primary dark:border-white/10 dark:bg-white/12 dark:text-white"
-                        >
-                          {highlight}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-
-                {recommendedItem && winnerHighlights.length ? (
-                  <aside className="rounded-[24px] border border-cars-primary/10 bg-white/80 px-5 py-5 text-cars-primary shadow-[0_18px_40px_rgba(15,45,98,0.1)] backdrop-blur-sm dark:border-white/12 dark:bg-white/10 dark:text-white">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cars-accent dark:text-white/70">
-                      Winner highlights
-                    </p>
-                    <h3 className="mt-2 text-lg font-apercu-bold text-cars-primary dark:text-white">
-                      {buildCompareItemLabel(recommendedItem)}
-                    </h3>
-                    <ul className="mt-4 space-y-3">
-                      {winnerHighlights.map((highlight) => (
-                        <li key={highlight.key} className="flex items-center gap-3">
-                          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-300" />
-                          <p className="text-sm font-semibold text-cars-primary dark:text-white">{highlight.title}</p>
-                        </li>
-                      ))}
-                    </ul>
-                  </aside>
-                ) : null}
+          <div className="space-y-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cars-accent">
+                  Side-by-side comparison
+                </p>
+                <h1 className="mt-2 text-2xl font-apercu-bold leading-tight text-cars-primary sm:text-3xl">
+                  {comparePairLabel}
+                </h1>
               </div>
-            </section>
+              <button
+                type="button"
+                onClick={showVehiclePicker}
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-cars-primary/15 bg-white px-5 text-sm font-semibold text-cars-primary shadow-[0_12px_28px_rgba(15,45,98,0.06)] transition hover:bg-cars-off-white sm:w-auto"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Change vehicles
+              </button>
+            </div>
 
-            <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {verdictCards.map((card) => (
-                <article
-                  key={card.key}
-                  className="rounded-[28px] border border-cars-gray-light/70 bg-white px-5 py-5 shadow-[0_18px_40px_rgba(15,45,98,0.06)]"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-cars-off-white text-cars-accent">
-                      <card.icon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cars-accent">
-                        {card.title}
-                      </p>
-                      <h3 className="mt-1 text-lg font-apercu-bold text-cars-primary">{card.winner}</h3>
-                    </div>
-                  </div>
-                  <p className="mt-4 text-sm leading-6 text-cars-gray">{card.description}</p>
-                </article>
-              ))}
-            </section>
-
-            <section className="mt-6 grid gap-5 xl:grid-cols-2">
-              {[{ selection: leftSelection, item: leftItem }, { selection: rightSelection, item: rightItem }].map(
-                ({ selection, item }, index) => (
+            <section className="grid gap-5 xl:grid-cols-2">
+              {[
+                { selection: leftSelection, item: leftItem },
+                { selection: rightSelection, item: rightItem },
+              ].map(({ selection, item }, index) => {
+                const href = getVehicleHref(selection);
+                const image = getSelectionImage(selection);
+                const status = getListingStatus(selection);
+                const cardKey = selection?.listingId ?? selection?.variantId ?? item?.variant_id ?? index;
+                const card = (
                   <article
-                    key={selection?.variantId ?? index}
-                    className="flex h-full flex-col overflow-hidden rounded-[30px] border border-cars-gray-light/70 bg-white shadow-[0_20px_44px_rgba(15,45,98,0.08)]"
+                    key={cardKey}
+                    className={`flex h-full flex-col overflow-hidden rounded-[30px] border border-cars-gray-light/70 bg-white shadow-[0_20px_44px_rgba(15,45,98,0.08)] ${
+                      href ? "transition hover:-translate-y-0.5 hover:shadow-[0_24px_52px_rgba(15,45,98,0.12)]" : ""
+                    }`}
                   >
                     <div className="relative h-[240px] bg-cars-off-white sm:h-[300px] lg:h-[340px]">
-                      {getSelectionImage(selection) ? (
+                      {image ? (
                         <img
-                          src={getSelectionImage(selection) || undefined}
+                          src={image}
                           alt={selection?.label || "Compared vehicle"}
                           className="h-full w-full object-cover"
                         />
@@ -1455,9 +1542,9 @@ function ComparePageContent() {
                           Photo unavailable
                         </div>
                       )}
-                      {getListingStatus(selection) ? (
+                      {status ? (
                         <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-cars-primary">
-                          {getListingStatus(selection)}
+                          {status}
                         </span>
                       ) : null}
                     </div>
@@ -1483,80 +1570,34 @@ function ComparePageContent() {
                           </p>
                         </div>
                       </div>
-
-                      <div className="mt-5 grid items-stretch gap-3 xl:grid-cols-2">
-                        <div className="flex h-full flex-col rounded-[20px] bg-cars-off-white px-4 py-4">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cars-accent">
-                            Key snapshot
-                          </p>
-                          <ul className="mt-3 flex-1 space-y-2 text-sm text-cars-primary">
-                            <li>{item?.year || "-"} · {formatBodyType(item?.body_type)}</li>
-                            <li>{formatFuelType(item?.fuel_type)} · {formatTransmission(item?.transmission)}</li>
-                            <li>{selection?.listing ? formatMileage(selection.listing.listing.mileage_km) : `${Number(item?.seats) || "-"} seats`}</li>
-                            {selection?.listing ? (
-                              <li>
-                                {formatLocation(
-                                  selection.listing.listing.location_city,
-                                  selection.listing.listing.location_country_code
-                                )}
-                              </li>
-                            ) : null}
-                          </ul>
-                        </div>
-
-                        <div className="flex h-full flex-col rounded-[20px] bg-cars-off-white px-4 py-4">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cars-accent">
-                            Best fit
-                          </p>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {(item ? buildVehicleStrengths(item) : []).map((strength) => (
-                              <span
-                                key={strength}
-                                className="rounded-full bg-white px-3 py-2 text-xs font-semibold text-cars-primary"
-                              >
-                                {strength}
-                              </span>
-                            ))}
-                          </div>
-                          {buildListingMarketPosition(selection, item) ? (
-                            <p className="mt-auto pt-3 text-sm leading-6 text-cars-gray">
-                              {buildListingMarketPosition(selection, item)}
-                            </p>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      <div className="mt-auto grid gap-3 pt-5 sm:flex sm:flex-wrap">
-                        {selection?.listingId ? (
-                          <Link
-                            href={`/listings/${selection.listingId}`}
-                            className="editorial-button inline-flex min-h-10 w-full items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-950 transition hover:brightness-105 dark:text-slate-950 sm:min-w-[132px] sm:w-auto"
-                          >
-                            View listing
-                          </Link>
-                        ) : selection?.variantId ? (
-                          <Link
-                            href={`/catalog/${selection.variantId}`}
-                            className="editorial-button inline-flex min-h-10 w-full items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-slate-950 transition hover:brightness-105 dark:text-slate-950 sm:min-w-[132px] sm:w-auto"
-                          >
-                            View vehicle
-                          </Link>
-                        ) : null}
-                      </div>
                     </div>
                   </article>
-                )
-              )}
+                );
+
+                return href ? (
+                  <Link
+                    key={cardKey}
+                    href={href}
+                    className="block h-full rounded-[30px] focus:outline-none focus:ring-2 focus:ring-cars-accent/40"
+                  >
+                    {card}
+                  </Link>
+                ) : (
+                  <div key={cardKey} className="h-full">
+                    {card}
+                  </div>
+                );
+              })}
             </section>
 
-            <section className="mt-6 section-shell p-4 sm:p-5 md:p-6">
+            <section className="section-shell p-4 sm:p-5">
               <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cars-accent">
-                    Side by side
+                    Side by side comparison
                   </p>
                   <h2 className="mt-2 text-2xl font-apercu-bold text-cars-primary">
-                    What changes between these two?
+                    What actually changes?
                   </h2>
                   <p className="mt-2 text-sm leading-6 text-cars-gray sm:hidden">
                     Swipe inside the compare table to see every field on smaller screens.
@@ -1580,162 +1621,69 @@ function ComparePageContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {comparisonRows.map((row) => (
-                      <tr key={row.key}>
-                        <td className="sticky left-0 rounded-l-[18px] bg-cars-off-white px-4 py-3 text-sm font-semibold text-cars-primary">
-                          {row.label}
-                        </td>
-                        <td className="max-w-[280px] break-words bg-white px-4 py-3 align-top text-sm leading-6 text-cars-gray">
-                          {row.key === "body_type"
-                            ? formatBodyType(row.left as string | null | undefined)
-                            : row.key === "fuel_type_base"
-                              ? formatFuelType(row.left as string | null | undefined)
-                              : row.key === "transmission_base"
-                                ? formatTransmission(row.left as string | null | undefined)
-                                : row.key === "listing_price"
-                                  ? formatListingPrice(row.left)
-                                  : row.key === "mileage"
-                                    ? formatMileage(row.left as number | null | undefined)
-                                    : formatCompareValue(row.key, row.left)}
-                        </td>
-                        <td className="max-w-[280px] break-words rounded-r-[18px] bg-white px-4 py-3 align-top text-sm leading-6 text-cars-gray">
-                          {row.key === "body_type"
-                            ? formatBodyType(row.right as string | null | undefined)
-                            : row.key === "fuel_type_base"
-                              ? formatFuelType(row.right as string | null | undefined)
-                              : row.key === "transmission_base"
-                                ? formatTransmission(row.right as string | null | undefined)
-                                : row.key === "listing_price"
-                                  ? formatListingPrice(row.right)
-                                  : row.key === "mileage"
-                                    ? formatMileage(row.right as number | null | undefined)
-                                    : formatCompareValue(row.key, row.right)}
-                        </td>
-                      </tr>
-                    ))}
+                    {comparisonRows.map((row) => {
+                      const leftCell = formatComparisonCell(row.key, row.left);
+                      const rightCell = formatComparisonCell(row.key, row.right);
+                      return (
+                        <tr key={row.key}>
+                          <td className="sticky left-0 rounded-l-[18px] bg-cars-off-white px-4 py-3 text-sm font-semibold text-cars-primary">
+                            {row.label}
+                          </td>
+                          <td
+                            title={leftCell.title}
+                            className="max-w-[280px] break-words bg-white px-4 py-3 align-top text-sm leading-6 text-cars-gray"
+                          >
+                            {leftCell.text}
+                          </td>
+                          <td
+                            title={rightCell.title}
+                            className="max-w-[280px] break-words rounded-r-[18px] bg-white px-4 py-3 align-top text-sm leading-6 text-cars-gray"
+                          >
+                            {rightCell.text}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             </section>
 
-            <section className="mt-6 grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-              <article className="section-shell p-4 sm:p-5 md:p-6">
-                <div className="flex items-center gap-3">
-                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-cars-off-white text-cars-accent">
-                    <Bot className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
-                      Follow-up
-                    </p>
-                    <h2 className="mt-1 text-2xl font-apercu-bold text-cars-primary">
-                      Ask a sharper question
-                    </h2>
-                  </div>
+            <section className="section-shell p-4 sm:p-5">
+              <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cars-accent">
+                    Market movement
+                  </p>
+                  <h2 className="mt-2 text-2xl font-apercu-bold text-cars-primary">
+                    Price history comparison
+                  </h2>
                 </div>
-
-                <div className="mt-5 flex flex-wrap gap-2">
-                  {followUpSuggestions.map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      type="button"
-                      onClick={() => void sendFollowUp(suggestion)}
-                      className="rounded-full border border-cars-primary/10 bg-white px-3 py-2 text-left text-xs font-semibold text-cars-primary transition-colors hover:bg-cars-off-white"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
+                <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-cars-off-white text-cars-accent">
+                  <BarChart3 className="h-5 w-5" />
                 </div>
+              </div>
 
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void sendFollowUp();
-                  }}
-                  className="mt-5 flex flex-col gap-3"
-                >
-                  <textarea
-                    value={followUpInput}
-                    onChange={(event) => setFollowUpInput(event.target.value)}
-                    placeholder="Ask about family use, resale, comfort, fuel economy, or ownership cost."
-                    className="min-h-[120px] rounded-[22px] border border-cars-gray-light bg-white px-4 py-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15"
+              {priceHistory.error ? (
+                <div className="mt-4 rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+                  {priceHistory.error}
+                </div>
+              ) : null}
+
+              {priceHistory.loading ? (
+                <div className="mt-5 h-[420px] animate-pulse rounded-[26px] bg-cars-off-white" />
+              ) : (
+                <div className="mt-5">
+                  <CombinedPriceHistoryChart
+                    series={priceHistorySeries}
+                    hoverTimestamp={priceHoverTimestamp}
+                    onHoverTimestampChange={setPriceHoverTimestamp}
                   />
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      type="submit"
-                      disabled={sendingFollowUp || !followUpInput.trim()}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-cars-primary px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"
-                    >
-                      {sendingFollowUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                      Ask follow-up
-                    </button>
-                  </div>
-                </form>
-
-                {followUpMessages.length > 0 ? (
-                  <div className="mt-5 space-y-4 rounded-[26px] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_50%)] p-4">
-                    {followUpMessages.map((message) => (
-                      <CompareFollowUpAnswer key={message.id} message={message} />
-                    ))}
-                  </div>
-                ) : null}
-              </article>
-
-              <article className="section-shell p-4 sm:p-5 md:p-6">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cars-accent">
-                  Confidence & caveats
-                </p>
-                <h2 className="mt-2 text-2xl font-apercu-bold text-cars-primary">
-                  What to keep in mind
-                </h2>
-
-                {result.confidence ? (
-                  <div className="mt-5 rounded-[22px] bg-cars-off-white px-4 py-4">
-                    <p className="text-sm font-semibold text-cars-primary">{result.confidence.label}</p>
-                    <ul className="mt-3 space-y-2 text-sm leading-6 text-cars-gray">
-                      {result.confidence.rationale.slice(0, 4).map((entry) => (
-                        <li key={entry}>- {entry}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-                {result.caveats?.length ? (
-                  <div className="mt-5 rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-4">
-                    <p className="text-sm font-semibold text-amber-900">Missing-data transparency</p>
-                    <ul className="mt-3 space-y-2 text-sm leading-6 text-amber-900">
-                      {result.caveats.slice(0, 4).map((entry) => (
-                        <li key={entry}>- {entry}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-                <div className="mt-5 rounded-[22px] border border-cars-gray-light/70 bg-white px-4 py-4">
-                  <p className="text-sm font-semibold text-cars-primary">Next actions</p>
-                  <div className="mt-4 grid gap-3 sm:flex sm:flex-wrap">
-                    <Link
-                      href={buildCompareHref({
-                        leftVariantId: leftSelection?.variantId ?? undefined,
-                        leftVariantLabel: leftSelection?.label ?? undefined,
-                        leftListingId: leftSelection?.listingId ?? undefined,
-                        marketId,
-                      })}
-                      className="inline-flex h-11 w-full items-center justify-center rounded-full border border-cars-primary/15 px-4 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white sm:w-auto"
-                    >
-                      Compare against another car
-                    </Link>
-                    <Link
-                      href="/listings"
-                      className="inline-flex h-11 w-full items-center justify-center rounded-full border border-cars-primary/15 px-4 text-sm font-semibold text-cars-primary transition-colors hover:bg-cars-off-white sm:w-auto"
-                    >
-                      Browse live listings
-                    </Link>
-                  </div>
                 </div>
-              </article>
+              )}
             </section>
-          </>
+
+          </div>
         ) : null}
       </main>
     </>

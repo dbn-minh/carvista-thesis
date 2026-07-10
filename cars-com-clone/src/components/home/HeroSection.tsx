@@ -93,7 +93,7 @@ export default function HeroSection() {
           </div>
           <div className="absolute inset-x-4 bottom-6 top-14 sm:inset-x-8 sm:bottom-8 sm:top-16">
             <Image
-              src="https://www.cars.com/images/sell/sale-dealer-woman-brand-colors.png"
+              src="/home/hero-market-intelligence.svg"
               alt="CarVista hero vehicle"
               fill
               priority

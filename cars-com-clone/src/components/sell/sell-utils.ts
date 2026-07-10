@@ -90,6 +90,8 @@ export type CustomVehicleDraft = {
   fuelType: string;
   drivetrain: string;
   engine: string;
+  seats: string;
+  doors: string;
   vin: string;
   licensePlate: string;
 };
@@ -145,6 +147,8 @@ export const initialCustomVehicle: CustomVehicleDraft = {
   fuelType: "",
   drivetrain: "",
   engine: "",
+  seats: "",
+  doors: "",
   vin: "",
   licensePlate: "",
 };

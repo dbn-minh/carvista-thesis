@@ -416,6 +416,9 @@ export async function generateAdvisorFinalResponse(
   { ollama = defaultLlmService } = {}
 ) {
   const fallbackInsight = fallbackAdvisorInsight(fallbackAnswer, structuredResult);
+  const modelGuidedClarification =
+    String(turnContext?.response_mode || "").toLowerCase() === "model_guided" ||
+    Boolean(structuredResult?.advisor_suggestion);
   const result = await runInsightGeneration({
     feature: "advisor_response",
     ollama,
@@ -435,6 +438,8 @@ export async function generateAdvisorFinalResponse(
       "For recommend_car only, if structuredResult says general_vehicle_suggestions_allowed or catalog coverage is empty/weak, you may suggest well-known vehicles outside the local database as general market suggestions.",
       "When suggesting outside-catalog vehicles, clearly say they are not confirmed CarVista catalog inventory and avoid exact prices, availability, or trim specs unless provided.",
       "Do not invent live inventory, exact local prices, taxes, fees, or market results.",
+      "If turn_context_json has response_mode model_guided or structuredResult has advisor_suggestion, treat fallback_backend_answer only as an emergency fallback, not as copy to repeat.",
+      "For model-guided clarification, use the user's words and missing_fields to ask naturally for the next useful detail.",
       "Ask one concise follow-up question only when the backend result says information is incomplete.",
       "Use a professional dealership advisor tone.",
       'Return JSON exactly as {"answer": string, "reasons": string[], "caveats": string[], "advice": string}.',
@@ -449,7 +454,10 @@ export async function generateAdvisorFinalResponse(
       `structured_backend_result_json: ${JSON.stringify(structuredResult || {})}`,
       `raw_backend_payload_json: ${JSON.stringify(rawPayload || null)}`,
     ].join("\n"),
-    options: { temperature: intent === "recommend_car" ? 0.58 : 0.34, num_predict: intent === "recommend_car" ? 900 : 420 },
+    options: {
+      temperature: modelGuidedClarification ? 0.64 : intent === "recommend_car" ? 0.58 : 0.34,
+      num_predict: modelGuidedClarification ? 620 : intent === "recommend_car" ? 900 : 420,
+    },
   });
 
   return {

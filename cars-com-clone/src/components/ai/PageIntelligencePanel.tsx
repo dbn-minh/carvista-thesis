@@ -4,7 +4,7 @@ import {
   ADVISOR_PROFILE_EVENT,
   getStoredAdvisorProfile,
 } from "@/lib/advisor-profile";
-import { toCurrency } from "@/lib/api-client";
+import { toCurrency, toNumberDisplay } from "@/lib/api-client";
 import { catalogApi, listingsApi } from "@/lib/carvista-api";
 import type {
   AdvisorProfile,
@@ -29,6 +29,7 @@ type PageIntelligencePanelProps = {
   showSectionCaveats?: boolean;
   showSectionSources?: boolean;
   allowedActionPathTypes?: string[];
+  requirePersonalizedContext?: boolean;
 };
 
 type InsightCardLike = {
@@ -57,6 +58,31 @@ function hasStoredProfile(
     if (typeof value === "number") return Number.isFinite(value);
     return hasText(typeof value === "string" ? value : null);
   });
+}
+
+function countAdvisorProfileSignals(profile: AdvisorProfile) {
+  const signals = [
+    profile.budget_min,
+    profile.budget_max,
+    profile.passenger_count,
+    profile.preferred_body_type,
+    profile.preferred_fuel_type,
+    profile.environment,
+    profile.long_trip_habit,
+    profile.maintenance_sensitivity,
+    profile.personality,
+    profile.brand_openness,
+    profile.new_vs_used,
+  ];
+
+  return signals.filter((value) => {
+    if (typeof value === "number") return Number.isFinite(value);
+    return hasText(typeof value === "string" ? value : null);
+  }).length;
+}
+
+function hasPersonalizedAdvisorContext(profile: AdvisorProfile) {
+  return countAdvisorProfileSignals(profile) >= 3;
 }
 
 function isMeaningfulInsightCard(card: InsightCardLike) {
@@ -94,7 +120,7 @@ function formatCardValue(
     return toCurrency(value);
   }
 
-  return new Intl.NumberFormat("vi-VN").format(value);
+  return toNumberDisplay(value);
 }
 
 function compactText(value: string, maxLength = 170) {
@@ -335,11 +361,14 @@ export default function PageIntelligencePanel({
   showSectionCaveats = true,
   showSectionSources = true,
   allowedActionPathTypes,
+  requirePersonalizedContext = false,
 }: PageIntelligencePanelProps) {
   const [data, setData] = useState<AiPageIntelligenceResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [profile, setProfile] = useState<AdvisorProfile>({});
+  const [profile, setProfile] = useState<AdvisorProfile>(() =>
+    getStoredAdvisorProfile(),
+  );
   const hiddenSectionSignature = useMemo(
     () => [...hiddenSectionKeys].sort().join("|"),
     [hiddenSectionKeys],
@@ -371,6 +400,10 @@ export default function PageIntelligencePanel({
     () => hasStoredProfile(profile, data?.subject?.profile_snapshot),
     [data?.subject?.profile_snapshot, profile],
   );
+  const hasPersonalizedContext = useMemo(
+    () => hasPersonalizedAdvisorContext(profile),
+    [profile],
+  );
   const compactActionPaths = useMemo(() => {
     const seen = new Set<string>();
     return visibleSections
@@ -389,6 +422,13 @@ export default function PageIntelligencePanel({
   }, [allowedActionPathTypes, visibleSections]);
   useEffect(() => {
     if (!Number.isFinite(subjectId)) return;
+    if (requirePersonalizedContext && !hasPersonalizedContext) {
+      setData(null);
+      setLoading(false);
+      setError("");
+      return;
+    }
+
     let cancelled = false;
 
     async function load() {
@@ -436,8 +476,23 @@ export default function PageIntelligencePanel({
     kmPerYear,
     profile,
     hiddenSectionSignature,
+    hasPersonalizedContext,
     normalizedHiddenSectionKeys,
+    requirePersonalizedContext,
   ]);
+
+  if (requirePersonalizedContext && !hasPersonalizedContext) {
+    return null;
+  }
+
+  if (
+    requirePersonalizedContext &&
+    !loading &&
+    !error &&
+    visibleSections.length === 0
+  ) {
+    return null;
+  }
 
   return (
     <section
@@ -452,7 +507,9 @@ export default function PageIntelligencePanel({
             {title}
           </h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-cars-gray">
-            {compactLayout
+            {requirePersonalizedContext
+              ? "Personalized fit signals from your saved Advisor profile."
+              : compactLayout
               ? "Short, buyer-friendly signals from CarVista's pricing and ownership engines."
               : "Helpful previews from the same recommendation, pricing, and ownership engines used by the CarVista advisor."}
           </p>
@@ -835,7 +892,10 @@ export default function PageIntelligencePanel({
         </>
       ) : null}
 
-      {!loading && !error && !visibleSections.length ? (
+      {!loading &&
+      !error &&
+      !visibleSections.length &&
+      !requirePersonalizedContext ? (
         <div className="mt-6 rounded-[24px] border border-dashed border-cars-primary/20 bg-cars-off-white px-5 py-5 text-sm leading-6 text-cars-gray">
           AI insights are available in a limited form for this vehicle right
           now.

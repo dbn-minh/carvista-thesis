@@ -74,13 +74,20 @@ Recommended auth/notification env vars:
 - `FACEBOOK_APP_ID`
 - `FACEBOOK_APP_SECRET`
 - `FACEBOOK_REDIRECT_URI=https://<your-render-service>.onrender.com/api/auth/social/facebook/callback`
-- `EMAIL_PROVIDER`
-- `EMAIL_FROM`
-- `RESEND_API_KEY`
-- `SMS_PROVIDER`
-- `TWILIO_ACCOUNT_SID`
-- `TWILIO_AUTH_TOKEN`
-- `TWILIO_FROM_NUMBER`
+- `EMAIL_PROVIDER=resend`
+- `EMAIL_FROM=CarVista <noreply@your-domain.example>`
+- `RESEND_API_KEY=<resend-api-key>`
+- `SMS_PROVIDER=twilio`
+- `TWILIO_ACCOUNT_SID=<twilio-account-sid>`
+- `TWILIO_AUTH_TOKEN=<twilio-auth-token>`
+- `TWILIO_FROM_NUMBER=<twilio-phone-number>`
+
+Email and SMS behavior:
+
+- Email OTP and viewing-request emails use `EMAIL_PROVIDER=resend`.
+- Phone OTP uses `SMS_PROVIDER=twilio`.
+- Buyer viewing-request confirmation and seller viewing-request alerts are sent from the notification job flow.
+- If `QUEUE_ENABLED=true`, run the notification worker process as well as the API process. If queueing is disabled or Redis is unavailable, the API falls back to inline notification delivery.
 
 CORS env:
 
@@ -92,6 +99,13 @@ Health verification after deploy:
 - `GET https://<render-service>/health`
 - `GET https://<render-service>/api/health`
 - `GET https://<render-service>/api-docs`
+
+Keep-alive for Render Free:
+
+- Render Free web services can spin down after about 15 minutes without inbound traffic.
+- The repository includes `.github/workflows/render-keepalive.yml`, which pings the backend every 10 minutes.
+- Set a GitHub repository variable or secret named `RENDER_HEALTH_URL` to `https://<render-service>.onrender.com/health`.
+- Keep the ping target on `/health`; do not ping authenticated or AI endpoints.
 
 ## 4. Vercel frontend
 

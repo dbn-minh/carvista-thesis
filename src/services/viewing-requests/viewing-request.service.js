@@ -3,6 +3,7 @@ import {
   processViewingRequestUpdatedNotification,
 } from "../notifications/notification-job.service.js";
 import { enqueueNotificationJob } from "../queue/queue.service.js";
+import { normalizePhoneNumberOrNull } from "../shared/phone-normalization.service.js";
 import { ensureViewingRequestSchema } from "./viewing-request-schema.service.js";
 
 const SELLER_FOLLOW_UP_STATUSES = new Set([
@@ -132,7 +133,7 @@ export class ViewingRequestService {
     const effectiveContact = {
       contactName: contactName ?? requester?.name ?? null,
       contactEmail: contactEmail ?? requester?.email ?? null,
-      contactPhone: contactPhone ?? requester?.phone ?? null,
+      contactPhone: normalizePhoneNumberOrNull(contactPhone ?? requester?.phone),
       preferredContactMethod:
         preferredContactMethod ?? requester?.preferred_contact_method ?? null,
     };
@@ -216,6 +217,7 @@ export class ViewingRequestService {
       return {
         viewingRequest: normalizeViewingRequest(viewingRequest),
         sellerNotified: Boolean(notificationResult.result?.sellerNotified),
+        buyerNotified: Boolean(notificationResult.result?.buyerNotified),
         notificationProvider: notificationResult.provider,
         notificationQueued: notificationResult.queued,
       };

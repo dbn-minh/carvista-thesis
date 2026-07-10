@@ -14,11 +14,13 @@ type Props = {
 export default function CustomVehicleForm({ value, onChange, errors }: Props) {
   const fieldClass =
     "h-12 w-full rounded-[20px] border border-cars-gray-light px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-slate-950/60 dark:text-white dark:placeholder:text-slate-400";
+  const numberFieldClass = `${fieldClass} [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`;
   return (
     <div className="grid gap-4">
       <div className="rounded-[22px] border border-cars-primary/12 bg-cars-off-white p-4 text-sm leading-6 text-cars-gray dark:border-cars-gray-light/35 dark:bg-slate-950/45">
         Your car can still be listed even if it is missing from the current catalog. We will create
-        a placeholder vehicle behind the scenes and keep the marketplace listing flow intact.
+        a placeholder vehicle behind the scenes and keep the marketplace listing flow intact. The
+        more exact specs you add here, the more accurate that custom vehicle record becomes.
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -132,6 +134,36 @@ export default function CustomVehicleForm({ value, onChange, errors }: Props) {
             className={fieldClass}
             placeholder="2.0L turbo"
           />
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-cars-primary">Seats</label>
+          <input
+            value={value.seats}
+            onChange={(event) => onChange("seats", event.target.value)}
+            inputMode="numeric"
+            type="number"
+            min={1}
+            max={12}
+            className={numberFieldClass}
+            placeholder="5"
+          />
+          {errors.customSeats ? <p className="mt-2 text-xs font-medium text-red-600">{errors.customSeats}</p> : null}
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-cars-primary">Doors</label>
+          <input
+            value={value.doors}
+            onChange={(event) => onChange("doors", event.target.value)}
+            inputMode="numeric"
+            type="number"
+            min={1}
+            max={6}
+            className={numberFieldClass}
+            placeholder="4"
+          />
+          {errors.customDoors ? <p className="mt-2 text-xs font-medium text-red-600">{errors.customDoors}</p> : null}
         </div>
 
         <div>

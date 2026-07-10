@@ -20,7 +20,6 @@ function appendString(
   if (!trimmed) return;
   params.set(key, trimmed);
 }
-
 function appendInteger(
   params: URLSearchParams,
   key: string,
@@ -56,26 +55,4 @@ export function buildComparePairLabel(labels: Array<string | null | undefined>) 
   if (parts.length === 0) return "Selected vehicles";
   if (parts.length === 1) return parts[0];
   return `${parts[0]} vs ${parts[1]}`;
-}
-
-export function enrichCompareFollowUpMessage(
-  message: string,
-  labels: Array<string | null | undefined>
-) {
-  const trimmed = message.trim();
-  const normalized = trimmed.toLowerCase();
-  const compareLabels = labels
-    .map((label) => String(label || "").trim())
-    .filter(Boolean)
-    .slice(0, 2);
-
-  if (!trimmed || compareLabels.length < 2) return trimmed;
-
-  const alreadyMentionsVehicles = compareLabels.some((label) =>
-    normalized.includes(label.toLowerCase())
-  );
-
-  if (alreadyMentionsVehicles) return trimmed;
-
-  return `Compare ${compareLabels[0]} and ${compareLabels[1]}. ${trimmed}`;
 }

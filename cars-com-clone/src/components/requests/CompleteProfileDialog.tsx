@@ -11,6 +11,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { authApi } from "@/lib/carvista-api";
+import {
+  hasVietnamPhoneSubscriberDigits,
+  normalizeVietnamPhoneInput,
+  VIETNAM_PHONE_PREFIX,
+} from "@/lib/phone";
 import type { User } from "@/lib/types";
 import {
   preferredContactOptions,
@@ -38,7 +43,7 @@ function buildDraft(initialProfile?: Partial<User> | null): DraftState {
   return {
     name: initialProfile?.name || "",
     email: initialProfile?.email || "",
-    phone: initialProfile?.phone || "",
+    phone: initialProfile?.phone || VIETNAM_PHONE_PREFIX,
     preferred_contact_method:
       (initialProfile?.preferred_contact_method as PreferredContactMethod | null) ||
       "phone_or_email",
@@ -68,9 +73,17 @@ export default function CompleteProfileDialog({
   }, [open, initialProfile]);
 
   async function handleSave() {
-    if (!draft.name.trim() || !draft.email.trim() || !draft.phone.trim()) {
+    const normalizedPhone = normalizeVietnamPhoneInput(draft.phone);
+
+    if (!draft.name.trim() || !draft.email.trim() || !normalizedPhone) {
       setTone("error");
       setMessage("Name, email, and phone number are required before sending a viewing request.");
+      return;
+    }
+
+    if (!hasVietnamPhoneSubscriberDigits(normalizedPhone)) {
+      setTone("error");
+      setMessage("Enter a valid Vietnam phone number, for example +84901234567.");
       return;
     }
 
@@ -81,7 +94,7 @@ export default function CompleteProfileDialog({
       const response = await authApi.updateMe({
         name: draft.name.trim(),
         email: draft.email.trim(),
-        phone: draft.phone.trim(),
+        phone: normalizedPhone,
         preferred_contact_method: draft.preferred_contact_method,
       });
       await onSaved(response.user);
@@ -132,11 +145,20 @@ export default function CompleteProfileDialog({
             <input
               className="h-12 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-background"
               value={draft.phone}
+              onBlur={() =>
+                setDraft((current) => ({
+                  ...current,
+                  phone:
+                    normalizeVietnamPhoneInput(current.phone) ||
+                    VIETNAM_PHONE_PREFIX,
+                }))
+              }
               onChange={(event) =>
                 setDraft((current) => ({ ...current, phone: event.target.value }))
               }
-              placeholder="Phone number"
+              placeholder="+84..."
               inputMode="tel"
+              type="tel"
             />
             <select
               className="h-12 rounded-[20px] border border-cars-gray-light bg-white px-4 text-sm text-cars-primary outline-none transition focus:border-cars-accent focus:ring-2 focus:ring-cars-accent/15 dark:bg-background"

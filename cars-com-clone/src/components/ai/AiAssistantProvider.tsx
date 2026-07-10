@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Loader2, MessageCircleMore, RotateCcw, Scale, SendHorizonal, Sparkles, X } from "lucide-react";
+import { Loader2, MessageCircleMore, Scale, SendHorizonal, Sparkles, X } from "lucide-react";
 import { useAuthModal } from "@/components/auth/AuthModalProvider";
 import {
   Dialog,
@@ -20,7 +20,7 @@ import {
 import { getStoredAdvisorProfile, setStoredAdvisorProfile } from "@/lib/advisor-profile";
 import { aiApi, catalogApi } from "@/lib/carvista-api";
 import { hasToken, toCurrency } from "@/lib/api-client";
-import { buildCompareHref, buildComparePairLabel, enrichCompareFollowUpMessage } from "@/lib/compare";
+import { buildCompareHref, buildComparePairLabel } from "@/lib/compare";
 import type {
   AiCompareResponse,
   AiConfidence,
@@ -37,6 +37,17 @@ type AssistantOptions = {
   variantLabel?: string;
   compareVariantIds?: number[];
   compareVariantLabels?: string[];
+};
+
+type GuidedSuggestionContext = {
+  label: string;
+  intent: string;
+} | null;
+
+type StarterPrompt = {
+  label: string;
+  prompt: string;
+  intent: string;
 };
 
 type CompareOptions = {
@@ -88,18 +99,57 @@ type AiAssistantContextValue = {
   openCompare: (options: CompareOptions) => void;
 };
 
-const starterPrompts = [
-  "Family use, 5 seats, under 1 billion.",
-  "Daily commute, fuel efficient, mid-range.",
-  "Long trips, 7 seats, comfortable.",
-  "Taxi use, durable and low maintenance.",
+const starterPrompts: StarterPrompt[] = [
+  {
+    label: "Find a family car",
+    intent: "recommendation",
+    prompt:
+      "I need help choosing a family vehicle. Ask me what matters first, then recommend cars based on my answers.",
+  },
+  {
+    label: "Plan a daily commuter",
+    intent: "commuter",
+    prompt:
+      "I want a practical daily commuter. Ask me about budget, fuel preference, comfort, and ownership costs before recommending.",
+  },
+  {
+    label: "Compare fuel options",
+    intent: "fuel_options",
+    prompt:
+      "Help me decide between gas, hybrid, and EV options for my situation. Ask one useful question at a time and explain the trade-offs.",
+  },
+  {
+    label: "Estimate ownership cost",
+    intent: "ownership_cost",
+    prompt:
+      "I want to understand ownership cost for a car I might buy. Ask for the vehicle, driving use, budget, and yearly mileage if needed.",
+  },
 ];
 
-const compareStarterPrompts = [
-  "Which is better for a family of 5?",
-  "Which one is cheaper to own over 5 years?",
-  "Which one is better for resale?",
-  "Give me the pros and cons only.",
+const compareStarterPrompts: StarterPrompt[] = [
+  {
+    label: "Ask what matters",
+    intent: "compare_priorities",
+    prompt: "Ask me a few questions about my priorities for these two cars before choosing one.",
+  },
+  {
+    label: "Price and ownership",
+    intent: "compare_price_ownership",
+    prompt:
+      "Use these two cars as the shortlist. Help me understand price history, ownership cost, and resale before making a recommendation.",
+  },
+  {
+    label: "Daily-use fit",
+    intent: "compare_daily_fit",
+    prompt:
+      "Use these two cars as the shortlist. Compare daily use, comfort, space, running cost, and practicality.",
+  },
+  {
+    label: "Performance vs comfort",
+    intent: "compare_performance_comfort",
+    prompt:
+      "Use these two cars as the shortlist. Help me compare performance, driving feel, comfort, and emotional appeal.",
+  },
 ];
 
 const emptyCompareState: CompareState = {
@@ -280,6 +330,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
   const [focusVariantId, setFocusVariantId] = useState<number | null>(null);
   const [focusVariantLabel, setFocusVariantLabel] = useState("");
   const [compareContext, setCompareContext] = useState<CompareContextState>(emptyCompareContext);
+  const [guidedSuggestion, setGuidedSuggestion] = useState<GuidedSuggestionContext>(null);
   const [queuedPrompt, setQueuedPrompt] = useState("");
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
@@ -296,8 +347,8 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
         id: buildId("assistant"),
         role: "assistant",
         content: hasComparePair
-          ? `I have ${comparePairLabel} loaded and ready to compare. Ask about family use, resale, ownership cost, comfort, or tell me what matters most to you.`
-          : "What will you mainly use the vehicle for? Taxi, daily commute, family use, business, or long trips?",
+          ? `I see you are comparing ${comparePairLabel}. Ask about price history, ownership cost, resale, family fit, performance, or details of either car.`
+          : "Tell me how you will use the vehicle and what matters most. I can ask a few quick questions before recommending cars.",
       },
     ]);
   }, [compareContext.labels, messages.length, open]);
@@ -323,7 +374,6 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!open || !queuedPrompt || sending) return;
-
     const prompt = queuedPrompt;
     setQueuedPrompt("");
     void sendMessage(prompt);
@@ -375,6 +425,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
     setQueuedPrompt("");
     setChatError("");
     setSending(false);
+    setGuidedSuggestion(null);
     if (clearProfile) {
       setStoredAdvisorProfile({});
     }
@@ -409,10 +460,6 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
       setInput(options.prompt);
       setQueuedPrompt(options.prompt);
     }
-  }
-
-  function startNewConversation() {
-    resetConversationState({ clearProfile: true });
   }
 
   function launchCompare(options: CompareOptions) {
@@ -452,9 +499,13 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
     launchCompare(options);
   }
 
-  async function sendMessage(prompt?: string) {
+  async function sendMessage(prompt?: string, options?: { starter?: StarterPrompt }) {
     const text = (prompt ?? input).trim();
     if (!text || sending) return;
+    const starterContext = options?.starter
+      ? { label: options.starter.label, intent: options.starter.intent }
+      : null;
+    const activeGuidedSuggestion = starterContext ?? guidedSuggestion;
     if (!ensureAccess(pathname || "/")) {
       requestLogin(
         {
@@ -471,6 +522,9 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (starterContext) {
+      setGuidedSuggestion(starterContext);
+    }
     setChatError("");
     setMessages((prev) => [...prev, { id: buildId("user"), role: "user", content: text }]);
     setInput("");
@@ -478,13 +532,9 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
     const requestVersion = conversationVersionRef.current;
 
     try {
-      const compareAwareText =
-        compareContext.variantIds.length >= 2
-          ? enrichCompareFollowUpMessage(text, compareContext.labels)
-          : text;
       const response = await aiApi.chat({
         session_id: sessionId || undefined,
-        message: compareAwareText,
+        message: text,
         context: {
           market_id: Number(marketId) || 1,
           ...(focusVariantId ? { focus_variant_id: focusVariantId } : {}),
@@ -493,6 +543,14 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
             ? {
                 compare_variant_ids: compareContext.variantIds,
                 compare_variant_labels: compareContext.labels,
+              }
+            : {}),
+          ...(activeGuidedSuggestion
+            ? {
+                prompt_source: "advisor_suggestion",
+                suggestion_label: activeGuidedSuggestion.label,
+                suggestion_intent: activeGuidedSuggestion.intent,
+                response_mode: "model_guided",
               }
             : {}),
         },
@@ -610,55 +668,40 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
     <AiAssistantContext.Provider value={contextValue}>
       {children}
 
-      <div className="fixed bottom-5 right-5 z-[60] flex flex-col items-end gap-3">
+      <div className="fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-3 sm:bottom-5 sm:right-5">
         {open ? (
-          <section className="w-[min(92vw,400px)] overflow-hidden rounded-[30px] border border-cars-primary/10 bg-white shadow-[0_24px_80px_rgba(15,45,98,0.22)] dark:border-white/10 dark:bg-[#091222] dark:shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
-            <div className="bg-[linear-gradient(135deg,rgba(15,45,98,0.98),rgba(27,76,160,0.92),rgba(95,150,255,0.82))] px-5 py-4 text-primary-foreground">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-2xl font-apercu-bold">CarVista Advisor</h2>
-                  <p className="mt-2 text-sm leading-6 text-primary-foreground/85">
-                    Ask for recommendations, compare cars, forecast pricing, or understand TCO.
-                  </p>
+          <section className="w-[min(94vw,420px)] overflow-hidden rounded-[28px] border border-cars-primary/10 bg-white/95 shadow-[0_24px_70px_rgba(15,45,98,0.22)] backdrop-blur-xl dark:border-white/10 dark:bg-[#091222]/95 dark:shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+            <div className="border-b border-cars-gray-light/70 bg-white/90 px-4 py-3 dark:border-white/10 dark:bg-[#0d1728]/92">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cars-primary text-primary-foreground shadow-[0_10px_24px_rgba(15,45,98,0.22)]">
+                    <MessageCircleMore className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <h2 className="truncate text-base font-apercu-bold text-cars-primary dark:text-white">
+                      CarVista Advisor
+                    </h2>
+                    <p className="text-xs font-medium text-cars-gray dark:text-white/58">
+                      Cars, pricing, TCO
+                    </p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={startNewConversation}
-                    className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-white/35 bg-white/92 px-3 py-2 text-xs font-semibold text-cars-primary shadow-sm transition-colors hover:bg-white dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                    Refresh
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setOpen(false)}
-                    className="rounded-full border border-white/35 bg-white/92 p-2 text-cars-primary shadow-sm transition-colors hover:bg-white dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+                    className="rounded-full border border-cars-primary/10 bg-cars-off-white p-2 text-cars-primary transition-colors hover:bg-white dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+                    aria-label="Close CarVista Advisor"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
               </div>
-
-              {focusVariantLabel ? (
-                <div className="mt-3 rounded-[18px] bg-white/10 px-3 py-2 text-sm leading-6 text-primary-foreground/85">
-                  Focused vehicle:{" "}
-                  <span className="font-semibold text-primary-foreground">{focusVariantLabel}</span>
-                </div>
-              ) : null}
-              {compareContext.labels.length >= 2 ? (
-                <div className="mt-3 rounded-[18px] bg-white/10 px-3 py-2 text-sm leading-6 text-primary-foreground/85">
-                  Comparing:{" "}
-                  <span className="font-semibold text-primary-foreground">
-                    {buildComparePairLabel(compareContext.labels)}
-                  </span>
-                </div>
-              ) : null}
             </div>
 
             <div
               ref={transcriptRef}
-              className="max-h-[420px] space-y-4 overflow-y-auto bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_45%)] px-4 py-4 dark:bg-[linear-gradient(180deg,#0b1424_0%,#091222_45%)]"
+              className="max-h-[min(62vh,520px)] space-y-3 overflow-y-auto bg-[linear-gradient(180deg,#f7faff_0%,#ffffff_46%)] px-3 py-4 dark:bg-[linear-gradient(180deg,#0b1424_0%,#091222_48%)]"
             >
               {messages.map((message) => (
                 <div
@@ -668,8 +711,8 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                   <div
                     className={
                       message.role === "user"
-                        ? "max-w-[85%] break-words rounded-[24px] rounded-br-md bg-cars-primary px-4 py-3 text-sm leading-6 text-primary-foreground dark:bg-[#18376f]"
-                        : "max-w-[92%] break-words rounded-[24px] rounded-bl-md border border-cars-gray-light/80 bg-white px-4 py-3 text-sm leading-6 text-cars-primary shadow-sm dark:border-white/10 dark:bg-[#101a2d] dark:text-white/88"
+                        ? "max-w-[86%] break-words rounded-[20px] rounded-br-md bg-cars-primary px-4 py-3 text-sm leading-6 text-primary-foreground shadow-sm dark:bg-[#1d3e78]"
+                        : "max-w-[92%] break-words rounded-[20px] rounded-bl-md border border-cars-gray-light/75 bg-white px-4 py-3 text-sm leading-6 text-cars-primary shadow-sm dark:border-white/10 dark:bg-[#101a2d] dark:text-white/88"
                     }
                   >
                     <p>{message.content}</p>
@@ -684,7 +727,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                               key={`${action.type}-${index}`}
                               type="button"
                               onClick={() => handleSuggestedAction(action)}
-                              className="rounded-full border border-cars-primary/15 px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-cars-off-white dark:border-white/10 dark:text-white/88 dark:hover:bg-[#16223a]"
+                              className="rounded-full border border-cars-primary/12 bg-cars-off-white px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-white/88 dark:hover:bg-[#16223a]"
                             >
                               {label}
                             </button>
@@ -698,10 +741,10 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
 
               {sending ? (
                 <div className="flex justify-start">
-                  <div className="rounded-[24px] rounded-bl-md border border-cars-gray-light/80 bg-white px-4 py-3 text-sm text-cars-gray shadow-sm dark:border-white/10 dark:bg-[#101a2d] dark:text-white/68">
+                  <div className="rounded-[20px] rounded-bl-md border border-cars-gray-light/80 bg-white px-4 py-3 text-sm text-cars-gray shadow-sm dark:border-white/10 dark:bg-[#101a2d] dark:text-white/68">
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Thinking...
+                      Thinking
                     </span>
                   </div>
                 </div>
@@ -709,14 +752,14 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
 
               {messages.length <= 1 ? (
                 <div className="flex flex-wrap gap-2">
-                  {activeStarterPrompts.map((prompt) => (
+                  {activeStarterPrompts.map((starter) => (
                     <button
-                      key={prompt}
+                      key={starter.label}
                       type="button"
-                      onClick={() => void sendMessage(prompt)}
+                      onClick={() => void sendMessage(starter.prompt, { starter })}
                       className="rounded-full border border-cars-primary/10 bg-white px-3 py-2 text-xs font-semibold text-cars-primary transition-colors hover:bg-cars-off-white dark:border-white/10 dark:bg-[#101a2d] dark:text-white/88 dark:hover:bg-[#16223a]"
                     >
-                      {prompt}
+                      {starter.label}
                     </button>
                   ))}
                 </div>
@@ -729,8 +772,8 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
               ) : null}
             </div>
 
-            <div className="border-t border-cars-gray-light/70 bg-white px-4 py-4 dark:border-white/10 dark:bg-[#091222]">
-              <div className="flex gap-3">
+            <div className="border-t border-cars-gray-light/70 bg-white/94 px-3 py-3 dark:border-white/10 dark:bg-[#091222]">
+              <div className="flex gap-2">
                 <textarea
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
@@ -740,14 +783,15 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
                       void sendMessage();
                     }
                   }}
-                  className="min-h-[76px] flex-1 rounded-[22px] border border-cars-gray-light bg-white px-4 py-3 text-sm leading-6 text-cars-primary outline-none placeholder:text-cars-gray focus:border-cars-accent dark:border-white/10 dark:bg-[#101a2d] dark:text-white/90 dark:placeholder:text-white/38 dark:focus:border-[#7da7ff]"
-                  placeholder="Example: Family use, SUV, under 1 billion."
+                  className="min-h-[54px] max-h-[124px] flex-1 resize-none rounded-[18px] border border-cars-gray-light bg-white px-4 py-3 text-sm leading-6 text-cars-primary outline-none placeholder:text-cars-gray focus:border-cars-accent dark:border-white/10 dark:bg-[#101a2d] dark:text-white/90 dark:placeholder:text-white/38 dark:focus:border-[#7da7ff]"
+                  placeholder="Ask about a car, price, or TCO"
                 />
                 <button
                   type="button"
                   onClick={() => void sendMessage()}
                   disabled={sending || input.trim().length === 0}
-                  className="flex h-[76px] w-[60px] items-center justify-center rounded-[22px] bg-cars-primary text-primary-foreground disabled:opacity-60"
+                  className="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-[18px] bg-cars-primary text-primary-foreground shadow-[0_12px_28px_rgba(15,45,98,0.20)] transition-colors hover:bg-cars-primary-light disabled:opacity-55"
+                  aria-label="Send message"
                 >
                   <SendHorizonal className="h-5 w-5" />
                 </button>
@@ -759,13 +803,14 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
         <button
           type="button"
           onClick={() => openAssistant()}
-          className="group inline-flex items-center gap-3 rounded-full bg-cars-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-[0_18px_42px_rgba(15,45,98,0.24)] transition-transform hover:-translate-y-0.5 hover:bg-cars-primary-light"
+          className="group inline-flex items-center gap-2 rounded-full bg-cars-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-[0_18px_42px_rgba(15,45,98,0.24)] transition-transform hover:-translate-y-0.5 hover:bg-cars-primary-light sm:px-4"
+          aria-label="Open CarVista Advisor"
         >
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm dark:bg-white/12 dark:shadow-none">
             <MessageCircleMore className="h-5 w-5 text-cars-primary dark:text-primary-foreground" />
           </span>
-          <span className="hidden sm:inline">Ask CarVista AI</span>
-          <Sparkles className="h-4 w-4 text-primary-foreground/75" />
+          <span className="hidden sm:inline">Advisor</span>
+          <Sparkles className="h-4 w-4 text-primary-foreground/70" />
         </button>
       </div>
 

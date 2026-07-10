@@ -215,7 +215,7 @@ export function buildPredictPresentation(result) {
     title: "AI price outlook",
     assistant_message:
       predictedPrice != null
-        ? `The best current estimate points to a ${direction} move over the next ${result?.horizon_months ?? 6} month(s), with a midpoint near ${formatMoneyText(
+        ? `Best current estimate: ${result?.horizon_months ?? 6}-month ${direction}, midpoint near ${formatMoneyText(
             predictedPrice,
             currency
           )}.`
@@ -233,7 +233,7 @@ export function buildPredictPresentation(result) {
         value: predictedPrice != null ? formatMoneyText(predictedPrice, currency) : "Unavailable",
         description:
           predictedMin != null && predictedMax != null
-            ? `Likely band ${formatMoneyText(predictedMin, currency)} to ${formatMoneyText(predictedMax, currency)}`
+            ? `${formatMoneyText(predictedMin, currency)} to ${formatMoneyText(predictedMax, currency)}`
             : "No confidence band could be established.",
       },
       {
@@ -241,13 +241,13 @@ export function buildPredictPresentation(result) {
         value: result?.confidence?.label ?? "Pending",
         description:
           result?.prediction_mode === "history_regression"
-            ? "Built from this variant's own market history."
-            : "Built from limited local history plus comparable market and retention signals.",
+            ? "From this variant's price history."
+            : "From limited history plus comparable market signals.",
       },
       {
         title: "Key factor",
         value: direction === "upward" ? "Retention support" : "Depreciation pressure",
-        description: result?.primary_driver ?? "The market outlook is driven by a blend of history, comparables, and retention heuristics.",
+        description: result?.primary_driver ?? "History, comparables, and retention signals.",
       },
     ],
     confidence:
@@ -276,39 +276,41 @@ export function buildTcoPresentation(result) {
     (safeNumber(result?.costs?.vat) ?? 0) +
     (safeNumber(result?.costs?.import_duty) ?? 0) +
     (safeNumber(result?.costs?.other) ?? 0);
+  const recurring =
+    (safeNumber(result?.costs?.insurance_total) ?? 0) +
+    (safeNumber(result?.costs?.maintenance_total) ?? 0) +
+    (safeNumber(result?.costs?.energy_total) ?? 0);
+  const years = result?.ownership_years ?? 5;
 
   return buildNarrativeEnvelope({
     title: "Estimated ownership cost",
-    assistant_message: `In ${result?.market_name || "the selected market"}, the drive-away spend is estimated around ${formatMoneyText(
-      upfront,
-      currency
-    )}, while total ownership over ${result?.ownership_years ?? 5} year(s) lands near ${formatMoneyText(
+    assistant_message: `${years}-year TCO: ${formatMoneyText(
       result?.total_cost,
+      currency
+    )}. Drive-away estimate: ${formatMoneyText(
+      upfront,
       currency
     )}.`,
     highlights: [
-      `Estimated drive-away spend: ${formatMoneyText(upfront, currency)}`,
-      `Estimated ${result?.ownership_years ?? 5}-year total: ${formatMoneyText(result?.total_cost, currency)}`,
-      `Average yearly cost: ${formatMoneyText(result?.yearly_cost_avg, currency)}`,
+      `Base price: ${formatMoneyText(result?.base_price, currency)}`,
+      `Taxes and one-time fees: ${formatMoneyText(upfront - (safeNumber(result?.base_price) ?? 0), currency)}`,
+      `Average monthly cost: ${formatMoneyText(result?.monthly_cost_avg, currency)}`,
     ],
     insight_cards: [
       {
-        title: "Drive-away estimate",
+        title: "Drive-away",
         value: formatMoneyText(upfront, currency),
-        description: "Vehicle price plus taxes, registration, and other one-time fees.",
+        description: "Price plus VAT, registration fee, and configured one-time fees.",
       },
       {
-        title: "Recurring ownership",
-        value: formatMoneyText(
-          (safeNumber(result?.costs?.insurance_total) ?? 0) + (safeNumber(result?.costs?.maintenance_total) ?? 0),
-          currency
-        ),
-        description: "Insurance and maintenance over the selected ownership period.",
+        title: "Running costs",
+        value: formatMoneyText(recurring, currency),
+        description: "Insurance, maintenance, and fuel or charging when available.",
       },
       {
         title: "Depreciation",
         value: formatMoneyText(result?.costs?.depreciation_total, currency),
-        description: "Depreciation is separated so the user can see the hidden cost of ownership clearly.",
+        description: "Estimated value loss over the selected years.",
       },
     ],
     confidence:

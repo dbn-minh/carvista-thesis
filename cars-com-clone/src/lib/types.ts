@@ -16,9 +16,16 @@ export type User = {
 export type AuthResponse = {
   token: string;
   user?: User | null;
+  user_created?: boolean;
 };
 
 export type AuthProvidersResponse = {
+  otp?: {
+    email: boolean;
+    phone: boolean;
+    expires_in_minutes: number;
+    resend_cooldown_seconds: number;
+  };
   social: {
     google: boolean;
     facebook: boolean;
@@ -265,21 +272,26 @@ export type AiTcoResponse = AiNarrative & {
     import_duty: number | null;
     insurance_total: number | null;
     maintenance_total: number | null;
+    energy_total?: number | null;
     depreciation_total: number | null;
     other: number | null;
   };
   yearly_breakdown: Record<string, number>;
   total_cost: number;
   yearly_cost_avg: number;
+  monthly_cost_avg?: number | null;
   rules_applied: Array<Record<string, unknown>>;
   notes?: string;
 };
 
 export type CatalogOwnershipSummary = {
-  variant_id: number;
+  listing_id?: number;
+  variant_id: number | null;
   market_id: number;
   ownership_years: number;
   base_price_source: string;
+  listing_status?: string;
+  asking_price?: number;
   estimate: AiTcoResponse;
 };
 
