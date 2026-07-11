@@ -75,7 +75,7 @@ export class OllamaService {
     this.model =
       config.model ??
       (provider === "fpt" ? fptConfig.model : ollamaConfig.model) ??
-      (provider === "fpt" ? "" : "qwen3:1.7b");
+      (provider === "fpt" ? "Qwen3-32B" : "qwen3:32b");
     this.apiKey = config.apiKey ?? (provider === "fpt" ? fptConfig.apiKey ?? "" : "");
     this.timeoutMs = Number(
       config.timeoutMs ??

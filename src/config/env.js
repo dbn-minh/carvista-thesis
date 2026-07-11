@@ -182,22 +182,22 @@ export const env = {
   ai: {
     provider:
       process.env.AI_PROVIDER ||
-      (process.env.FPT_AI_API_KEY ? "fpt" : "ollama"),
+      "fpt",
     ollama: {
       baseUrl: trimSlash(process.env.OLLAMA_BASE_URL || "http://localhost:11434"),
-      model: process.env.OLLAMA_MODEL || "qwen3:1.7b",
+      model: process.env.OLLAMA_MODEL || "qwen3:32b",
       timeoutMs: toInt(process.env.OLLAMA_TIMEOUT_MS, 30000),
     },
     fpt: {
       baseUrl: trimSlash(process.env.FPT_AI_BASE_URL || "https://api.gptcloud.com/aiam/v1"),
       apiKey: process.env.FPT_AI_API_KEY || "",
-      model: process.env.FPT_AI_MODEL || "",
+      model: process.env.FPT_AI_MODEL || "Qwen3-32B",
       timeoutMs: toInt(process.env.FPT_AI_TIMEOUT_MS, 30000),
     },
     openaiCompatible: {
       baseUrl: trimSlash(process.env.AI_BASE_URL || process.env.FPT_AI_BASE_URL || ""),
       apiKey: process.env.AI_API_KEY || process.env.FPT_AI_API_KEY || "",
-      model: process.env.AI_MODEL || process.env.FPT_AI_MODEL || "",
+      model: process.env.AI_MODEL || process.env.FPT_AI_MODEL || "Qwen3-32B",
       timeoutMs: toInt(process.env.AI_TIMEOUT_MS || process.env.FPT_AI_TIMEOUT_MS, 30000),
       chatCompletionsPath: process.env.AI_CHAT_COMPLETIONS_PATH || "/chat/completions",
     },

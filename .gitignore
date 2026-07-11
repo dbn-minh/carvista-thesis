@@ -1,5 +1,11 @@
 node_modules
 .gitnexus
+.agent
+.agents
+.claude
+.codex
+.codex-temp
+.idea
 .env
 .env.backup
 .env.*
@@ -8,5 +14,12 @@ cars-com-clone/.env.local
 cars-com-clone/.env.*
 !cars-com-clone/.env.example
 cars-com-clone/.next
+cars-com-clone/.idea
+cars-com-clone/.codex-next-dev*.log
+cars-com-clone/.tmp-tailwind-check.css
 cars-com-clone/out
+tmp
+docs/_render_check
+__pycache__
+*.pyc
 dist

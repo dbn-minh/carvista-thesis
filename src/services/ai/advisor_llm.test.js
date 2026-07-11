@@ -596,7 +596,7 @@ test("ollama service retries transient local errors and returns generated text",
     const service = new OllamaService({
       provider: "ollama",
       baseUrl: "http://localhost:11434",
-      model: "qwen3:1.7b",
+      model: "qwen3:32b",
       timeoutMs: 1000,
       retryCount: 1,
       retryDelayMs: 1,
@@ -619,7 +619,7 @@ test("ollama health check reports graceful failure", async () => {
     const service = new OllamaService({
       provider: "ollama",
       baseUrl: "http://localhost:11434",
-      model: "qwen3:1.7b",
+      model: "qwen3:32b",
       timeoutMs: 1000,
       retryCount: 0,
     });
